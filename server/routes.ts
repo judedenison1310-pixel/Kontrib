@@ -191,8 +191,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { groupId } = req.params;
       const projectData = { ...req.body, groupId };
       
-      // Handle deadline conversion
-      if (projectData.deadline) {
+      // Handle deadline conversion - ensure it's a Date object
+      if (projectData.deadline && typeof projectData.deadline === 'string') {
         projectData.deadline = new Date(projectData.deadline);
       }
       

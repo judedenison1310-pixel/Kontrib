@@ -14,7 +14,6 @@ import { z } from "zod";
 
 const createProjectFormSchema = insertProjectSchema.extend({
   targetAmount: z.string().min(1, "Target amount is required"),
-  deadline: z.string().optional(),
 });
 
 type CreateProjectFormData = z.infer<typeof createProjectFormSchema>;
@@ -43,10 +42,12 @@ export function CreateProjectModal({ open, onOpenChange, groupId, groupName }: C
 
   const createProjectMutation = useMutation({
     mutationFn: async (data: CreateProjectFormData) => {
-      const response = await apiRequest("POST", `/api/groups/${groupId}/projects`, {
+      const payload = {
         ...data,
-        deadline: data.deadline ? new Date(data.deadline).toISOString() : undefined,
-      });
+        // Ensure deadline is either a string or undefined, not an empty string
+        deadline: data.deadline && data.deadline.trim() ? data.deadline : undefined,
+      };
+      const response = await apiRequest("POST", `/api/groups/${groupId}/projects`, payload);
       return response.json();
     },
     onSuccess: (data) => {
@@ -122,8 +123,8 @@ export function CreateProjectModal({ open, onOpenChange, groupId, groupName }: C
                     <Input 
                       type="date" 
                       {...field} 
-                      value={field.value ? new Date(field.value).toISOString().split('T')[0] : ""}
-                      onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
+                      value={field.value || ""}
+                      onChange={(e) => field.onChange(e.target.value || undefined)}
                     />
                   </FormControl>
                   <FormMessage />

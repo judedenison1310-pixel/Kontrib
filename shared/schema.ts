@@ -91,6 +91,8 @@ export const insertProjectSchema = createInsertSchema(projects).omit({
   collectedAmount: true,
   customSlug: true,
   createdAt: true,
+}).extend({
+  deadline: z.string().optional().or(z.date().optional()),
 });
 
 export const insertAccountabilityPartnerSchema = createInsertSchema(accountabilityPartners).omit({
