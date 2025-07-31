@@ -330,12 +330,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/contributions", async (req, res) => {
     try {
+      console.log("Received contribution data:", req.body);
       const contributionData = insertContributionSchema.parse(req.body);
+      console.log("Parsed contribution data:", contributionData);
       const contribution = await storage.createContribution(contributionData);
       res.json(contribution);
     } catch (error) {
       console.error("Create contribution error:", error);
-      res.status(400).json({ message: "Invalid contribution data" });
+      if (error instanceof Error) {
+        console.error("Error details:", error.message);
+      }
+      res.status(400).json({ 
+        message: "Invalid contribution data",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 

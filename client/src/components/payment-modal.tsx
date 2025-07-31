@@ -79,7 +79,9 @@ export function PaymentModal({ open, onOpenChange, project }: PaymentModalProps)
       
       const response = await apiRequest("POST", "/api/contributions", {
         ...data,
+        amount: data.amount,
         projectId: project.id,
+        groupId: project.groupId,
         userId: user.id,
       });
       return response.json();

@@ -42,8 +42,9 @@ export interface IStorage {
   getGroupMember(groupId: string, userId: string): Promise<GroupMember | undefined>;
   
   // Project methods
-  getGroupProjects(groupId: string): Promise<ProjectWithStats[]>;
+  getProjectsByGroup(groupId: string): Promise<ProjectWithStats[]>;
   getProject(id: string): Promise<Project | undefined>;
+  getProjectByCustomSlug(customSlug: string): Promise<Project | undefined>;
   createProject(project: InsertProject): Promise<Project>;
   updateProject(id: string, updates: Partial<Project>): Promise<Project | undefined>;
   
@@ -175,6 +176,7 @@ export class MemStorage implements IStorage {
     const group: Group = {
       ...insertGroup,
       id,
+      description: insertGroup.description || null,
       registrationLink,
       customSlug: groupSlug,
       adminId,
@@ -512,8 +514,12 @@ export class MemStorage implements IStorage {
   }> {
     const adminGroups = Array.from(this.groups.values()).filter(group => group.adminId === adminId);
     
-    const totalCollections = adminGroups
-      .reduce((sum, group) => sum + Number(group.collectedAmount), 0)
+    // Calculate total collections from all projects in admin's groups
+    const allProjects = Array.from(this.projects.values()).filter(project => 
+      adminGroups.some(group => group.id === project.groupId)
+    );
+    const totalCollections = allProjects
+      .reduce((sum, project) => sum + Number(project.collectedAmount), 0)
       .toString();
     
     const activeMembers = Array.from(this.groupMembers.values())
@@ -527,20 +533,17 @@ export class MemStorage implements IStorage {
     let completedGroups = 0;
     
     adminGroups.forEach(group => {
-      const members = Array.from(this.groupMembers.values()).filter(member => member.groupId === group.id);
-      const expectedPerMember = Number(group.targetAmount) / members.length;
+      // Count pending payments based on contribution status
+      const groupContributions = Array.from(this.contributions.values())
+        .filter(contrib => contrib.groupId === group.id && contrib.status === "pending");
+      totalPendingPayments += groupContributions.length;
       
-      members.forEach(member => {
-        const memberContributions = Array.from(this.contributions.values())
-          .filter(contrib => contrib.groupId === group.id && contrib.userId === member.userId);
-        const totalContributed = memberContributions.reduce((sum, contrib) => sum + Number(contrib.amount), 0);
-        
-        if (totalContributed < expectedPerMember) {
-          totalPendingPayments++;
-        }
-      });
+      // Calculate completion based on projects
+      const groupProjects = Array.from(this.projects.values()).filter(project => project.groupId === group.id);
+      const totalTarget = groupProjects.reduce((sum, project) => sum + Number(project.targetAmount), 0);
+      const totalCollected = groupProjects.reduce((sum, project) => sum + Number(project.collectedAmount), 0);
       
-      if (Number(group.collectedAmount) >= Number(group.targetAmount)) {
+      if (totalTarget > 0 && totalCollected >= totalTarget) {
         completedGroups++;
       }
     });
@@ -569,6 +572,8 @@ export class MemStorage implements IStorage {
       id,
       read: false,
       createdAt: new Date(),
+      contributionId: insertNotification.contributionId || null,
+      projectId: insertNotification.projectId || null,
     };
     this.notifications.set(id, notification);
     return notification;
@@ -584,9 +589,14 @@ export class MemStorage implements IStorage {
 
   // Helper method to send payment notifications
   private async sendPaymentNotifications(contribution: Contribution): Promise<void> {
-    const user = this.users.get(contribution.userId)!;
-    const group = this.groups.get(contribution.groupId)!;
+    const user = this.users.get(contribution.userId);
+    const group = this.groups.get(contribution.groupId);
     const project = contribution.projectId ? this.projects.get(contribution.projectId) : null;
+    
+    if (!user || !group) {
+      console.error("User or group not found for notification");
+      return;
+    }
     
     const contributionAmount = new Intl.NumberFormat('en-NG', {
       style: 'currency',
