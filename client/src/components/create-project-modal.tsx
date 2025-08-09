@@ -45,7 +45,7 @@ export function CreatePurseModal({ open, onOpenChange, groupId, groupName }: Cre
       const payload = {
         ...data,
         // Ensure deadline is either a string or undefined, not an empty string
-        deadline: data.deadline && data.deadline.trim() ? data.deadline : undefined,
+        deadline: data.deadline && typeof data.deadline === 'string' && data.deadline.trim() ? data.deadline : undefined,
       };
       const response = await apiRequest("POST", `/api/groups/${groupId}/purses`, payload);
       return response.json();
@@ -123,7 +123,7 @@ export function CreatePurseModal({ open, onOpenChange, groupId, groupName }: Cre
                     <Input 
                       type="date" 
                       {...field} 
-                      value={field.value || ""}
+                      value={typeof field.value === 'string' ? field.value : ""}
                       onChange={(e) => field.onChange(e.target.value || undefined)}
                     />
                   </FormControl>
@@ -140,7 +140,7 @@ export function CreatePurseModal({ open, onOpenChange, groupId, groupName }: Cre
                   <FormLabel>Description (Optional)</FormLabel>
                   <FormControl>
                     <Textarea 
-                      placeholder="Enter project description..." 
+                      placeholder="Enter purse description..." 
                       rows={3}
                       {...field}
                       value={field.value || ""}
@@ -153,7 +153,7 @@ export function CreatePurseModal({ open, onOpenChange, groupId, groupName }: Cre
 
             <div className="bg-green-50 p-3 rounded-lg">
               <p className="text-sm text-green-700">
-                🔗 <strong>Custom URL:</strong> This project will get its own shareable link in format: kontrib.app/groupname/projectname
+                🔗 <strong>Custom URL:</strong> This purse will get its own shareable link in format: kontrib.app/groupname/pursename
               </p>
             </div>
 
@@ -168,10 +168,10 @@ export function CreatePurseModal({ open, onOpenChange, groupId, groupName }: Cre
               </Button>
               <Button 
                 type="submit" 
-                disabled={createProjectMutation.isPending}
+                disabled={createPurseMutation.isPending}
                 className="flex-1 bg-nigerian-green hover:bg-forest-green"
               >
-                {createProjectMutation.isPending ? "Creating..." : "Create Project"}
+                {createPurseMutation.isPending ? "Creating..." : "Create Purse"}
               </Button>
             </div>
           </form>

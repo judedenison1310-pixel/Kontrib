@@ -6,9 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Navigation } from "@/components/navigation";
 import { GroupCard } from "@/components/group-card";
 import { CreateGroupModal } from "@/components/create-group-modal";
-import { CreateProjectModal } from "@/components/create-project-modal";
+import { CreatePurseModal } from "@/components/create-project-modal";
 import { ManageAccountabilityPartnersModal } from "@/components/manage-accountability-partners-modal";
-import { ProjectCard } from "@/components/project-card";
+import { PurseCard } from "@/components/project-card";
 import { PaymentModal } from "@/components/payment-modal";
 import { NotificationsPanel } from "@/components/notifications-panel";
 import { 
@@ -27,17 +27,17 @@ import {
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { formatNaira } from "@/lib/currency";
-import { Group, Project } from "@shared/schema";
+import { Group, Purse } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
 export default function AdminDashboard() {
   const user = getCurrentUser();
   const { toast } = useToast();
   const [createGroupModalOpen, setCreateGroupModalOpen] = useState(false);
-  const [createProjectModalOpen, setCreateProjectModalOpen] = useState(false);
+  const [createPurseModalOpen, setCreatePurseModalOpen] = useState(false);
   const [managePartnersModalOpen, setManagePartnersModalOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [selectedPurse, setSelectedPurse] = useState<Purse | null>(null);
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
 
@@ -87,9 +87,9 @@ export default function AdminDashboard() {
     });
   };
 
-  const handleCreateProject = (group: Group) => {
+  const handleCreatePurse = (group: Group) => {
     setSelectedGroup(group);
-    setCreateProjectModalOpen(true);
+    setCreatePurseModalOpen(true);
   };
 
   const handleManagePartners = (group: Group) => {
@@ -101,22 +101,22 @@ export default function AdminDashboard() {
     setExpandedGroupId(expandedGroupId === groupId ? null : groupId);
   };
 
-  const handleContributeToProject = (project: Project) => {
-    setSelectedProject(project);
+  const handleContributeToPurse = (purse: Purse) => {
+    setSelectedPurse(purse);
     setPaymentModalOpen(true);
   };
 
-  // Hook to fetch projects for a specific group
-  const useGroupProjects = (groupId: string) => {
-    return useQuery<Project[]>({
-      queryKey: ["/api/groups", groupId, "projects"],
+  // Hook to fetch purses for a specific group
+  const useGroupPurses = (groupId: string) => {
+    return useQuery<Purse[]>({
+      queryKey: ["/api/groups", groupId, "purses"],
       enabled: !!groupId,
     });
   };
 
-  // Component to display group with its projects
-  function GroupWithProjects({ group }: { group: Group }) {
-    const { data: projects = [], isLoading: projectsLoading } = useGroupProjects(group.id);
+  // Component to display group with its purses
+  function GroupWithPurses({ group }: { group: Group }) {
+    const { data: purses = [], isLoading: pursesLoading } = useGroupPurses(group.id);
     const isExpanded = expandedGroupId === group.id;
 
     return (
@@ -131,13 +131,13 @@ export default function AdminDashboard() {
         {/* Quick Actions for Group */}
         <div className="flex space-x-2">
           <Button
-            onClick={() => handleCreateProject(group)}
+            onClick={() => handleCreatePurse(group)}
             variant="outline"
             size="sm"
             className="flex-1"
           >
             <FolderPlus className="h-4 w-4 mr-1" />
-            Add Project
+            Add Purse
           </Button>
           <Button
             onClick={() => toggleGroupExpansion(group.id)}
@@ -146,7 +146,7 @@ export default function AdminDashboard() {
             className="flex-1"
           >
             <Settings className="h-4 w-4 mr-1" />
-            {isExpanded ? 'Hide' : 'View'} Projects ({projects.length})
+            {isExpanded ? 'Hide' : 'View'} Purses ({purses.length})
           </Button>
           <Button
             onClick={() => handleManagePartners(group)}
@@ -159,36 +159,36 @@ export default function AdminDashboard() {
           </Button>
         </div>
 
-        {/* Projects List */}
+        {/* Purses List */}
         {isExpanded && (
           <div className="ml-4 pl-4 border-l-2 border-gray-200 space-y-3">
-            {projectsLoading ? (
+            {pursesLoading ? (
               <div className="text-center py-4">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-nigerian-green mx-auto"></div>
-                <p className="text-sm text-gray-600 mt-2">Loading projects...</p>
+                <p className="text-sm text-gray-600 mt-2">Loading purses...</p>
               </div>
-            ) : projects.length === 0 ? (
+            ) : purses.length === 0 ? (
               <div className="text-center py-6 bg-gray-50 rounded-lg">
                 <FolderPlus className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-sm text-gray-600 mb-3">No projects yet in this group</p>
+                <p className="text-sm text-gray-600 mb-3">No purses yet in this group</p>
                 <Button
-                  onClick={() => handleCreateProject(group)}
+                  onClick={() => handleCreatePurse(group)}
                   size="sm"
                   className="bg-nigerian-green hover:bg-forest-green"
                 >
                   <Plus className="h-4 w-4 mr-1" />
-                  Create First Project
+                  Create First Purse
                 </Button>
               </div>
             ) : (
               <div className="space-y-3">
-                <h4 className="font-medium text-gray-900">Active Projects ({projects.length})</h4>
-                {projects.map((project) => (
-                  <ProjectCard 
-                    key={project.id} 
-                    project={project} 
+                <h4 className="font-medium text-gray-900">Active Purses ({purses.length})</h4>
+                {purses.map((purse) => (
+                  <PurseCard 
+                    key={purse.id} 
+                    purse={purse} 
                     isAdmin={true}
-                    onContribute={handleContributeToProject}
+                    onContribute={handleContributeToPurse}
                   />
                 ))}
               </div>
@@ -341,7 +341,7 @@ export default function AdminDashboard() {
                 ) : (
                   <div className="space-y-4">
                     {groups.map((group) => (
-                      <GroupWithProjects key={group.id} group={group} />
+                      <GroupWithPurses key={group.id} group={group} />
                     ))}
                   </div>
                 )}
@@ -466,12 +466,12 @@ export default function AdminDashboard() {
         onOpenChange={setCreateGroupModalOpen}
       />
 
-      {/* Project and Accountability Partner Modals */}
+      {/* Purse and Accountability Partner Modals */}
       {selectedGroup && (
         <>
-          <CreateProjectModal
-            open={createProjectModalOpen}
-            onOpenChange={setCreateProjectModalOpen}
+          <CreatePurseModal
+            open={createPurseModalOpen}
+            onOpenChange={setCreatePurseModalOpen}
             groupId={selectedGroup.id}
             groupName={selectedGroup.name}
           />
@@ -488,7 +488,7 @@ export default function AdminDashboard() {
       <PaymentModal 
         open={paymentModalOpen}
         onOpenChange={setPaymentModalOpen}
-        project={selectedProject}
+        purse={selectedPurse}
       />
     </div>
   );
