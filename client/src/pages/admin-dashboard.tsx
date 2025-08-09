@@ -56,8 +56,8 @@ export default function AdminDashboard() {
     enabled: !!user,
   });
 
-  const { data: recentContributions = [], isLoading: contributionsLoading } = useQuery<any[]>({
-    queryKey: ["/api/contributions", "admin", user?.id],
+  const { data: recentContributions = [], isLoading: contributionsLoading } = useQuery<ContributionWithDetails[]>({
+    queryKey: ["/api/contributions/admin", user?.id],
     enabled: !!user,
   });
 
@@ -354,8 +354,7 @@ export default function AdminDashboard() {
             </Card>
 
             {/* Recent Transactions */}
-            {recentContributions.length > 0 && (
-              <Card>
+            <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle>Recent Transactions</CardTitle>
@@ -433,9 +432,15 @@ export default function AdminDashboard() {
                       </div>
                     ))}
                   </div>
+                  {recentContributions.length === 0 && (
+                    <div className="text-center py-8">
+                      <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">No transactions yet</h3>
+                      <p className="text-gray-600">Transaction history will appear here once members start contributing.</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
-            )}
           </div>
 
           {/* Sidebar */}
