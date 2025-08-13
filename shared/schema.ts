@@ -66,6 +66,16 @@ export const contributions = pgTable("contributions", {
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
+export const otpVerifications = pgTable("otp_verifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  phoneNumber: text("phone_number").notNull(),
+  otp: text("otp").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  verified: boolean("verified").notNull().default(false),
+  attempts: integer("attempts").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -125,6 +135,13 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
   createdAt: true,
 });
 
+export const insertOtpVerificationSchema = createInsertSchema(otpVerifications).omit({
+  id: true,
+  verified: true,
+  attempts: true,
+  createdAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type Group = typeof groups.$inferSelect;
@@ -141,6 +158,8 @@ export type InsertAccountabilityPartner = z.infer<typeof insertAccountabilityPar
 export type InsertContribution = z.infer<typeof insertContributionSchema>;
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type OtpVerification = typeof otpVerifications.$inferSelect;
+export type InsertOtpVerification = z.infer<typeof insertOtpVerificationSchema>;
 
 // Extended types for UI
 export type GroupWithStats = Group & {

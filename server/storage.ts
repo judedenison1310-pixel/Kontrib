@@ -6,6 +6,7 @@ import {
   type AccountabilityPartner,
   type Contribution,
   type Notification,
+  type OtpVerification,
   type InsertUser, 
   type InsertGroup, 
   type InsertGroupMember, 
@@ -13,6 +14,7 @@ import {
   type InsertAccountabilityPartner,
   type InsertContribution,
   type InsertNotification,
+  type InsertOtpVerification,
   type GroupWithStats,
   type MemberWithContributions,
   type ContributionWithDetails,
@@ -76,6 +78,12 @@ export interface IStorage {
     pendingPayments: number;
     completionRate: number;
   }>;
+  
+  // OTP Verification methods
+  createOtpVerification(otp: InsertOtpVerification): Promise<OtpVerification>;
+  getActiveOtpVerification(phoneNumber: string): Promise<OtpVerification | undefined>;
+  verifyOtp(phoneNumber: string, otp: string): Promise<boolean>;
+  cleanupExpiredOtps(): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -86,6 +94,7 @@ export class MemStorage implements IStorage {
   private accountabilityPartners: Map<string, AccountabilityPartner>;
   private contributions: Map<string, Contribution>;
   private notifications: Map<string, Notification>;
+  private otpVerifications: Map<string, OtpVerification>;
 
   constructor() {
     this.users = new Map();
@@ -95,6 +104,7 @@ export class MemStorage implements IStorage {
     this.accountabilityPartners = new Map();
     this.contributions = new Map();
     this.notifications = new Map();
+    this.otpVerifications = new Map();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -688,6 +698,67 @@ export class MemStorage implements IStorage {
       contributionId: contribution.id,
       purseId: contribution.purseId,
     });
+  }
+
+  // OTP Verification methods
+  async createOtpVerification(insertOtp: InsertOtpVerification): Promise<OtpVerification> {
+    const id = randomUUID();
+    const otp: OtpVerification = {
+      ...insertOtp,
+      id,
+      verified: false,
+      attempts: 0,
+      createdAt: new Date()
+    };
+    
+    // Clean up any existing OTPs for this phone number
+    this.otpVerifications.forEach((existingOtp, key) => {
+      if (existingOtp.phoneNumber === otp.phoneNumber) {
+        this.otpVerifications.delete(key);
+      }
+    });
+    
+    this.otpVerifications.set(id, otp);
+    return otp;
+  }
+
+  async getActiveOtpVerification(phoneNumber: string): Promise<OtpVerification | undefined> {
+    const now = new Date();
+    return Array.from(this.otpVerifications.values()).find(
+      otp => otp.phoneNumber === phoneNumber && 
+             !otp.verified && 
+             otp.expiresAt > now &&
+             otp.attempts < 3
+    );
+  }
+
+  async verifyOtp(phoneNumber: string, otpCode: string): Promise<boolean> {
+    const verification = await this.getActiveOtpVerification(phoneNumber);
+    if (!verification) return false;
+
+    verification.attempts += 1;
+    
+    if (verification.otp === otpCode) {
+      verification.verified = true;
+      this.otpVerifications.set(verification.id, verification);
+      return true;
+    }
+    
+    this.otpVerifications.set(verification.id, verification);
+    return false;
+  }
+
+  async cleanupExpiredOtps(): Promise<void> {
+    const now = new Date();
+    const expiredKeys: string[] = [];
+    
+    this.otpVerifications.forEach((otp, key) => {
+      if (otp.expiresAt < now) {
+        expiredKeys.push(key);
+      }
+    });
+    
+    expiredKeys.forEach(key => this.otpVerifications.delete(key));
   }
 }
 

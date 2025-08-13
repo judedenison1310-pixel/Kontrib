@@ -113,9 +113,27 @@ Uses **PostgreSQL** with a well-structured relational schema:
 
 The application is designed to be easily deployable on platforms like Replit, Vercel, or any Node.js hosting service with PostgreSQL database support. The modular architecture allows for easy scaling and maintenance of both frontend and backend components.
 
-## Recent Changes (July 30, 2025)
+## Recent Changes
 
-### Hierarchical Project Management Implementation
+### WhatsApp Integration & OTP Authentication Implementation (August 13, 2025)
+- **Comprehensive WhatsApp Integration Page**: Created interactive WhatsApp sharing view with live message previews
+- **OTP-Based Group Registration**: Implemented secure phone number verification for new member registration
+- **Multi-Step Registration Workflow**: New members provide username + WhatsApp number → receive OTP → verify → join group
+- **Enhanced Security**: OTP verification with 10-minute expiration, 3-attempt limit, and automatic cleanup
+- **Mobile-First Design**: Responsive registration forms optimized for mobile WhatsApp users
+- **Development Testing**: OTP displayed in console/toast for development testing (removed in production)
+- **Live Link Previews**: Interactive WhatsApp message previews with emojis, hashtags, and contribution status
+- **Navigation Integration**: Added WhatsApp integration menu item for easy access to sharing features
+- **Test Infrastructure**: Created comprehensive test data and API endpoint testing for OTP workflow
+
+### Technical Architecture Updates
+- **OTP Verification Schema**: Added otpVerifications table with phone number, code, expiration tracking
+- **New API Endpoints**: /api/auth/send-otp, /api/auth/verify-otp, /api/groups/:id/register-with-otp
+- **Enhanced Storage Interface**: Added OTP verification methods to storage layer with cleanup functionality
+- **Form Validation**: Zod schemas for Nigerian phone number format validation and OTP input
+- **Error Handling**: Comprehensive error states for expired/invalid OTPs and registration failures
+
+### Hierarchical Project Management Implementation (July 30, 2025)
 - **Simplified Groups Architecture**: Removed targetAmount, collectedAmount, and deadline fields from groups
 - **Project-Based Financial Tracking**: All financial data (targets, amounts, deadlines) moved to project level
 - **Hierarchical URLs**: Projects now have unique URLs in format kontrib.app/groupname/projectname

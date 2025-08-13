@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { 
   insertUserSchema, insertGroupSchema, insertGroupMemberSchema,
   insertPurseSchema, insertAccountabilityPartnerSchema, insertContributionSchema,
-  insertNotificationSchema 
+  insertNotificationSchema, insertOtpVerificationSchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -438,6 +438,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Get admin stats error:", error);
       res.status(500).json({ message: "Failed to fetch admin stats" });
+    }
+  });
+
+  // OTP Verification routes
+  app.post("/api/auth/send-otp", async (req, res) => {
+    try {
+      const { phoneNumber } = req.body;
+      
+      if (!phoneNumber) {
+        return res.status(400).json({ message: "Phone number is required" });
+      }
+      
+      // Generate random 6-digit OTP
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      // Set expiration to 10 minutes from now
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+      
+      const otpVerification = await storage.createOtpVerification({
+        phoneNumber,
+        otp,
+        expiresAt
+      });
+      
+      // In a real application, you would send the OTP via SMS
+      // For development, we'll return it in the response
+      console.log(`OTP for ${phoneNumber}: ${otp}`);
+      
+      res.json({ 
+        message: "OTP sent successfully",
+        // Remove this in production - only for development
+        developmentOtp: otp,
+        expiresAt: otpVerification.expiresAt
+      });
+    } catch (error) {
+      console.error("Send OTP error:", error);
+      res.status(500).json({ message: "Failed to send OTP" });
+    }
+  });
+
+  app.post("/api/auth/verify-otp", async (req, res) => {
+    try {
+      const { phoneNumber, otp } = req.body;
+      
+      if (!phoneNumber || !otp) {
+        return res.status(400).json({ message: "Phone number and OTP are required" });
+      }
+      
+      const isValid = await storage.verifyOtp(phoneNumber, otp);
+      
+      if (isValid) {
+        res.json({ message: "OTP verified successfully", verified: true });
+      } else {
+        res.status(400).json({ message: "Invalid or expired OTP", verified: false });
+      }
+    } catch (error) {
+      console.error("Verify OTP error:", error);
+      res.status(500).json({ message: "OTP verification failed" });
+    }
+  });
+
+  // Group registration with OTP verification
+  app.post("/api/groups/:groupId/register-with-otp", async (req, res) => {
+    try {
+      const { groupId } = req.params;
+      const { username, fullName, phoneNumber, otp } = req.body;
+      
+      if (!username || !fullName || !phoneNumber || !otp) {
+        return res.status(400).json({ message: "All fields are required" });
+      }
+      
+      // Verify OTP first
+      const isOtpValid = await storage.verifyOtp(phoneNumber, otp);
+      if (!isOtpValid) {
+        return res.status(400).json({ message: "Invalid or expired OTP" });
+      }
+      
+      // Check if username already exists
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+      
+      // Check if group exists
+      const group = await storage.getGroup(groupId);
+      if (!group) {
+        return res.status(404).json({ message: "Group not found" });
+      }
+      
+      // Create user with temporary password (they'll use OTP for login)
+      const tempPassword = Math.random().toString(36).slice(-8);
+      const user = await storage.createUser({
+        username,
+        fullName,
+        phoneNumber,
+        password: tempPassword, // Will be replaced with OTP-based auth
+        role: "member"
+      });
+      
+      // Add user to group
+      await storage.addGroupMember({
+        groupId,
+        userId: user.id
+      });
+      
+      res.json({ 
+        message: "Registration successful",
+        user: { ...user, password: undefined },
+        group
+      });
+    } catch (error) {
+      console.error("Group registration error:", error);
+      res.status(500).json({ message: "Registration failed" });
     }
   });
 
