@@ -21,6 +21,7 @@ import { z } from "zod";
 const registrationFormSchema = z.object({
   fullName: z.string().min(2, "Full name is required"),
   username: z.string().min(3, "Username must be at least 3 characters").max(20, "Username must be less than 20 characters"),
+  phoneNumber: z.string().regex(/^(\+234|0)[7-9]\d{9}$/, "Please enter a valid Nigerian phone number"),
 });
 
 const otpFormSchema = z.object({
@@ -55,6 +56,7 @@ export default function GroupRegistration() {
     defaultValues: {
       fullName: "",
       username: "",
+      phoneNumber: "",
     },
   });
 
@@ -65,18 +67,45 @@ export default function GroupRegistration() {
     },
   });
 
+  const sendOtpMutation = useMutation({
+    mutationFn: async (phoneNumber: string) => {
+      const response = await apiRequest("POST", "/api/auth/send-otp", {
+        phoneNumber,
+      });
+      return response.json();
+    },
+    onSuccess: (data, phoneNumber) => {
+      setOtpData({ phoneNumber, expiresAt: data.expiresAt });
+      setStep("otp-verification");
+      toast({
+        title: "OTP Sent!",
+        description: `Verification code sent to ${phoneNumber}. Check your WhatsApp messages.`,
+      });
+      
+      // For development, show the OTP in console
+      if (data.developmentOtp) {
+        console.log("Development OTP:", data.developmentOtp);
+        toast({
+          title: "Development Mode",
+          description: `OTP: ${data.developmentOtp} (Check console for details)`,
+          variant: "default",
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to Send OTP",
+        description: error.message || "Please try again later.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const registerMutation = useMutation({
-    mutationFn: async (data: RegistrationFormData) => {
+    mutationFn: async (data: RegistrationFormData & { otp: string }) => {
       if (!group) throw new Error("Group not found");
       
-      // Use a default phone number since we're removing phone verification
-      const registrationData = {
-        ...data,
-        phoneNumber: "+234800000000", // Default since we're not collecting phone
-        password: Math.random().toString(36).slice(-8), // Generate random password
-      };
-      
-      const response = await apiRequest("POST", `/api/groups/${group.id}/register-simple`, registrationData);
+      const response = await apiRequest("POST", `/api/groups/${group.id}/register-with-otp`, data);
       return response.json();
     },
     onSuccess: (data) => {
@@ -132,7 +161,15 @@ export default function GroupRegistration() {
   };
 
   const handleRegistrationSubmit = (data: RegistrationFormData) => {
-    registerMutation.mutate(data);
+    sendOtpMutation.mutate(data.phoneNumber);
+  };
+
+  const handleOtpSubmit = (data: OtpFormData) => {
+    const registrationData = registrationForm.getValues();
+    registerMutation.mutate({
+      ...registrationData,
+      otp: data.otp,
+    });
   };
 
   const handleLoginRedirect = () => {
@@ -273,20 +310,6 @@ export default function GroupRegistration() {
             <form onSubmit={registrationForm.handleSubmit(handleRegistrationSubmit)} className="space-y-4">
               <FormField
                 control={registrationForm.control}
-                name="username"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Username</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter your username" {...field} data-testid="input-username" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={registrationForm.control}
                 name="fullName"
                 render={({ field }) => (
                   <FormItem>
@@ -295,6 +318,23 @@ export default function GroupRegistration() {
                       <Input placeholder="Enter your full name" {...field} data-testid="input-fullname" />
                     </FormControl>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={registrationForm.control}
+                name="username"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Username (WhatsApp Group Nickname)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Your nickname in the WhatsApp group" {...field} data-testid="input-username" />
+                    </FormControl>
+                    <FormMessage />
+                    <p className="text-sm text-gray-500">
+                      Use the same name you have in the WhatsApp group
+                    </p>
                   </FormItem>
                 )}
               />
@@ -435,15 +475,15 @@ export default function GroupRegistration() {
         <CardContent>
           <div className="space-y-3">
             <div>
-              <Label className="text-sm text-gray-500">Username</Label>
-              <p className="font-medium">{newUser?.username}</p>
-            </div>
-            <div>
               <Label className="text-sm text-gray-500">Full Name</Label>
               <p className="font-medium">{newUser?.fullName}</p>
             </div>
             <div>
-              <Label className="text-sm text-gray-500">Phone Number</Label>
+              <Label className="text-sm text-gray-500">Username (WhatsApp Group Nickname)</Label>
+              <p className="font-medium">{newUser?.username}</p>
+            </div>
+            <div>
+              <Label className="text-sm text-gray-500">WhatsApp Phone Number</Label>
               <p className="font-medium">{newUser?.phoneNumber}</p>
             </div>
           </div>

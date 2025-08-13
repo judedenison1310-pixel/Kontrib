@@ -527,13 +527,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Group not found" });
       }
       
-      // Create user with temporary password (they'll use OTP for login)
-      const tempPassword = Math.random().toString(36).slice(-8);
+      // Create user without password (OTP-based auth)
       const user = await storage.createUser({
         username,
         fullName,
         phoneNumber,
-        password: tempPassword, // Will be replaced with OTP-based auth
+        password: "otp-auth", // Special marker for OTP-only accounts
         role: "member"
       });
       
