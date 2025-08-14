@@ -351,31 +351,6 @@ export default function MyContributions() {
             )}
           </CardContent>
         </Card>
-
-        {/* Quick Actions */}
-        <div className="mt-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Link href="/make-payment">
-                  <Button className="w-full bg-nigerian-green hover:bg-forest-green">
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Make New Payment
-                  </Button>
-                </Link>
-                <Link href="/dashboard">
-                  <Button variant="outline" className="w-full">
-                    <TrendingUp className="h-4 w-4 mr-2" />
-                    View Dashboard
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
       </div>
     </div>
   );

@@ -359,39 +359,6 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
-
-        {/* Quick Actions for Members */}
-        {!userIsAdmin && (
-          <div className="mt-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <Link href="/make-payment">
-                    <Button className="w-full bg-nigerian-green hover:bg-forest-green">
-                      <CreditCard className="h-4 w-4 mr-2" />
-                      Make Payment
-                    </Button>
-                  </Link>
-                  <Link href="/my-contributions">
-                    <Button variant="outline" className="w-full">
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      View History
-                    </Button>
-                  </Link>
-                  <Link href="/updates">
-                    <Button variant="outline" className="w-full">
-                      <AlertCircle className="h-4 w-4 mr-2" />
-                      Check Updates
-                    </Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
       </div>
     </div>
   );

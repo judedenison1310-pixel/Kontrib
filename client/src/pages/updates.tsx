@@ -341,35 +341,6 @@ export default function Updates() {
             )}
           </CardContent>
         </Card>
-
-        {/* Quick Actions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Link href="/make-payment">
-                <Button className="w-full bg-nigerian-green hover:bg-forest-green">
-                  <MessageCircle className="h-4 w-4 mr-2" />
-                  Make Payment
-                </Button>
-              </Link>
-              <Link href="/my-contributions">
-                <Button variant="outline" className="w-full">
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  View History
-                </Button>
-              </Link>
-              <Link href="/dashboard">
-                <Button variant="outline" className="w-full">
-                  <TrendingUp className="h-4 w-4 mr-2" />
-                  Dashboard
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

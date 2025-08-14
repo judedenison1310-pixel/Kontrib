@@ -333,61 +333,6 @@ export default function Groups() {
             </Card>
           </div>
         )}
-
-        {/* Quick Actions */}
-        <div className="mt-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {userIsAdmin ? (
-                  <>
-                    <Button 
-                      onClick={() => setCreateGroupModalOpen(true)}
-                      className="w-full bg-nigerian-green hover:bg-forest-green"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create New Group
-                    </Button>
-                    <Link href="/dashboard">
-                      <Button variant="outline" className="w-full">
-                        <TrendingUp className="h-4 w-4 mr-2" />
-                        View Dashboard
-                      </Button>
-                    </Link>
-                    <Button variant="outline" className="w-full">
-                      <FolderPlus className="h-4 w-4 mr-2" />
-                      Bulk Actions
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Link href="/make-payment">
-                      <Button className="w-full bg-nigerian-green hover:bg-forest-green">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Make Payment
-                      </Button>
-                    </Link>
-                    <Link href="/my-contributions">
-                      <Button variant="outline" className="w-full">
-                        <TrendingUp className="h-4 w-4 mr-2" />
-                        View History
-                      </Button>
-                    </Link>
-                    <Link href="/dashboard">
-                      <Button variant="outline" className="w-full">
-                        <Target className="h-4 w-4 mr-2" />
-                        Dashboard
-                      </Button>
-                    </Link>
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
       </div>
 
       {/* Create Group Modal */}
