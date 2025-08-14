@@ -18,7 +18,7 @@ import { z } from "zod";
 
 const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
-  password: z.string().min(1, "Password is required"),
+  phoneNumber: z.string().regex(/^(\+234|0)[7-9]\d{9}$/, "Please enter a valid Nigerian phone number"),
 });
 
 // OTP-based registration schema - no passwords needed
@@ -41,12 +41,13 @@ export default function Landing() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
   const [registrationStep, setRegistrationStep] = useState<"form" | "otp-verification" | "success">("form");
-  const [otpData, setOtpData] = useState<{ phoneNumber: string; expiresAt: string } | null>(null);
+  const [loginStep, setLoginStep] = useState<"form" | "otp-verification">("form");
+  const [otpData, setOtpData] = useState<{ phoneNumber: string; expiresAt: string; username?: string } | null>(null);
   const [newUser, setNewUser] = useState<any>(null);
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { username: "", password: "" },
+    defaultValues: { username: "", phoneNumber: "" },
   });
 
   const registerForm = useForm<RegisterFormData>({
@@ -65,9 +66,45 @@ export default function Landing() {
     },
   });
 
-  const loginMutation = useMutation({
+  const sendLoginOtpMutation = useMutation({
     mutationFn: async (data: LoginFormData) => {
-      const response = await apiRequest("POST", "/api/auth/login", data);
+      const response = await apiRequest("POST", "/api/auth/send-login-otp", data);
+      return response.json();
+    },
+    onSuccess: (data, variables) => {
+      setOtpData({ 
+        phoneNumber: variables.phoneNumber, 
+        username: variables.username,
+        expiresAt: data.expiresAt 
+      });
+      setLoginStep("otp-verification");
+      toast({
+        title: "OTP Sent!",
+        description: `Verification code sent to ${variables.phoneNumber} via SMS.`,
+      });
+      
+      // For development, show the OTP in console
+      if (data.developmentOtp) {
+        console.log("Development Login OTP:", data.developmentOtp);
+        toast({
+          title: "Development Mode",
+          description: `Login OTP: ${data.developmentOtp}`,
+          variant: "default",
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Login Failed",
+        description: error.message || "Invalid username or phone number.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const loginMutation = useMutation({
+    mutationFn: async (data: { username: string; phoneNumber: string; otp: string }) => {
+      const response = await apiRequest("POST", "/api/auth/login-with-otp", data);
       return response.json();
     },
     onSuccess: (data) => {
@@ -78,10 +115,10 @@ export default function Landing() {
       });
       setLocation(data.user.role === "admin" ? "/admin" : "/member");
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
         title: "Login Failed",
-        description: "Invalid username or password.",
+        description: error.message || "Invalid OTP or login details.",
         variant: "destructive",
       });
     },
@@ -150,8 +187,18 @@ export default function Landing() {
     },
   });
 
-  const onLogin = (data: LoginFormData) => {
-    loginMutation.mutate(data);
+  const onLoginForm = (data: LoginFormData) => {
+    sendLoginOtpMutation.mutate(data);
+  };
+
+  const onLoginOtpVerify = (data: OtpFormData) => {
+    if (!otpData?.username || !otpData?.phoneNumber) return;
+    
+    loginMutation.mutate({
+      username: otpData.username,
+      phoneNumber: otpData.phoneNumber,
+      otp: data.otp,
+    });
   };
 
   const onRegister = (data: RegisterFormData) => {
@@ -249,45 +296,132 @@ export default function Landing() {
                   </TabsList>
 
                   <TabsContent value="login">
-                    <Form {...loginForm}>
-                      <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-4">
-                        <FormField
-                          control={loginForm.control}
-                          name="username"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Username</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Enter your username" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                    {loginStep === "form" && (
+                      <Form {...loginForm}>
+                        <form onSubmit={loginForm.handleSubmit(onLoginForm)} className="space-y-4">
+                          <FormField
+                            control={loginForm.control}
+                            name="username"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Username</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Enter your username" {...field} data-testid="login-input-username" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
 
-                        <FormField
-                          control={loginForm.control}
-                          name="password"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Password</FormLabel>
-                              <FormControl>
-                                <Input type="password" placeholder="Enter your password" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                          <FormField
+                            control={loginForm.control}
+                            name="phoneNumber"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>WhatsApp Phone Number</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="e.g., +2348012345678 or 08012345678" {...field} data-testid="login-input-phone" />
+                                </FormControl>
+                                <FormMessage />
+                                <p className="text-xs text-gray-500 mt-1">
+                                  We'll send an OTP to this number via SMS for verification
+                                </p>
+                              </FormItem>
+                            )}
+                          />
 
-                        <Button 
-                          type="submit" 
-                          className="w-full bg-nigerian-green hover:bg-forest-green"
-                          disabled={loginMutation.isPending}
-                        >
-                          {loginMutation.isPending ? "Logging in..." : "Login"}
-                        </Button>
-                      </form>
-                    </Form>
+                          <Button 
+                            type="submit" 
+                            className="w-full bg-nigerian-green hover:bg-forest-green"
+                            disabled={sendLoginOtpMutation.isPending}
+                            data-testid="send-login-otp"
+                          >
+                            {sendLoginOtpMutation.isPending ? (
+                              "Sending OTP..."
+                            ) : (
+                              <>
+                                <Smartphone className="h-4 w-4 mr-2" />
+                                Send OTP via SMS
+                              </>
+                            )}
+                          </Button>
+                        </form>
+                      </Form>
+                    )}
+
+                    {loginStep === "otp-verification" && (
+                      <div className="space-y-4">
+                        <div className="text-center mb-6">
+                          <h3 className="text-lg font-semibold text-gray-900">Verify Login</h3>
+                          <p className="text-sm text-gray-600 mt-1">
+                            Enter the 6-digit code sent to {otpData?.phoneNumber}
+                          </p>
+                        </div>
+                        
+                        <Form {...otpForm}>
+                          <form onSubmit={otpForm.handleSubmit(onLoginOtpVerify)} className="space-y-4">
+                            <FormField
+                              control={otpForm.control}
+                              name="otp"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Verification Code</FormLabel>
+                                  <FormControl>
+                                    <Input 
+                                      placeholder="Enter 6-digit code" 
+                                      {...field} 
+                                      maxLength={6}
+                                      className="text-center text-2xl tracking-widest"
+                                      data-testid="login-input-otp"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <Button 
+                              type="submit" 
+                              className="w-full bg-nigerian-green hover:bg-forest-green"
+                              disabled={loginMutation.isPending}
+                              data-testid="verify-login-otp"
+                            >
+                              {loginMutation.isPending ? "Logging in..." : "Verify & Login"}
+                            </Button>
+                            
+                            <div className="flex justify-between items-center text-sm">
+                              <Button 
+                                type="button"
+                                variant="ghost" 
+                                onClick={() => {
+                                  setLoginStep("form");
+                                  otpForm.reset();
+                                }}
+                                data-testid="back-to-login-form"
+                              >
+                                ← Back to Login
+                              </Button>
+                              <Button 
+                                type="button"
+                                variant="link" 
+                                onClick={() => {
+                                  if (otpData?.username && otpData?.phoneNumber) {
+                                    sendLoginOtpMutation.mutate({
+                                      username: otpData.username,
+                                      phoneNumber: otpData.phoneNumber
+                                    });
+                                  }
+                                }}
+                                disabled={sendLoginOtpMutation.isPending}
+                                data-testid="resend-login-otp"
+                              >
+                                Resend Code
+                              </Button>
+                            </div>
+                          </form>
+                        </Form>
+                      </div>
+                    )}
                   </TabsContent>
 
                   <TabsContent value="register">

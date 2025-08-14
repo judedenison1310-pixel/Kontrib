@@ -80,6 +80,7 @@ export interface IStorage {
   }>;
   
   // OTP Verification methods
+  sendOtp(phoneNumber: string): Promise<{ code: string; expiresAt: string }>;
   createOtpVerification(otp: InsertOtpVerification): Promise<OtpVerification>;
   getActiveOtpVerification(phoneNumber: string): Promise<OtpVerification | undefined>;
   verifyOtp(phoneNumber: string, otp: string): Promise<boolean>;
@@ -701,6 +702,30 @@ export class MemStorage implements IStorage {
   }
 
   // OTP Verification methods
+  async sendOtp(phoneNumber: string): Promise<{ code: string; expiresAt: string }> {
+    // Generate a 6-digit OTP
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Set expiration to 10 minutes from now
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    
+    // Create OTP verification record
+    await this.createOtpVerification({
+      phoneNumber,
+      otp: code,
+      expiresAt
+    });
+    
+    // In a real implementation, you would send the OTP via SMS here
+    // For development, we return the code
+    console.log(`OTP for ${phoneNumber}: ${code}`);
+    
+    return {
+      code,
+      expiresAt: expiresAt.toISOString()
+    };
+  }
+
   async createOtpVerification(insertOtp: InsertOtpVerification): Promise<OtpVerification> {
     const id = randomUUID();
     const otp: OtpVerification = {

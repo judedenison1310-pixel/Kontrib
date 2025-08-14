@@ -553,6 +553,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Send login OTP route
+  app.post("/api/auth/send-login-otp", async (req, res) => {
+    try {
+      const { username, phoneNumber } = req.body;
+      
+      if (!username || !phoneNumber) {
+        return res.status(400).json({ message: "Username and phone number are required" });
+      }
+      
+      // Check if user exists with this username and phone number
+      const user = await storage.getUserByUsername(username);
+      if (!user || user.phoneNumber !== phoneNumber) {
+        return res.status(400).json({ message: "Invalid username or phone number" });
+      }
+      
+      // Generate and send OTP using existing storage method
+      const otpData = await storage.sendOtp(phoneNumber);
+      
+      // In development, include the OTP in the response
+      const isDevelopment = process.env.NODE_ENV === "development";
+      
+      res.json({
+        message: "Login OTP sent successfully",
+        expiresAt: otpData.expiresAt,
+        ...(isDevelopment && { developmentOtp: otpData.code })
+      });
+    } catch (error) {
+      console.error("Send login OTP error:", error);
+      res.status(500).json({ message: "Failed to send login OTP" });
+    }
+  });
+
+  // Login with OTP route
+  app.post("/api/auth/login-with-otp", async (req, res) => {
+    try {
+      const { username, phoneNumber, otp } = req.body;
+      
+      if (!username || !phoneNumber || !otp) {
+        return res.status(400).json({ message: "All fields are required" });
+      }
+      
+      // Verify OTP first
+      const isOtpValid = await storage.verifyOtp(phoneNumber, otp);
+      if (!isOtpValid) {
+        return res.status(400).json({ message: "Invalid or expired OTP" });
+      }
+      
+      // Get user by username and verify phone number
+      const user = await storage.getUserByUsername(username);
+      if (!user || user.phoneNumber !== phoneNumber) {
+        return res.status(400).json({ message: "Invalid login credentials" });
+      }
+      
+      res.json({ 
+        message: "Login successful",
+        user: { ...user, password: undefined }
+      });
+    } catch (error) {
+      console.error("Login with OTP error:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
   // OTP-based registration route
   app.post("/api/auth/register-with-otp", async (req, res) => {
     try {
