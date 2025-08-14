@@ -26,16 +26,21 @@ import {
   FolderPlus,
   UserCheck,
   CheckCircle,
-  XCircle
+  XCircle,
+  LogOut,
+  BarChart3
 } from "lucide-react";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, logout } from "@/lib/auth";
 import { formatNaira } from "@/lib/currency";
 import { Group, Purse, ContributionWithDetails } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 export default function AdminDashboard() {
   const user = getCurrentUser();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const [activeTab, setActiveTab] = useState<"dashboard" | "groups">("dashboard");
   const [createGroupModalOpen, setCreateGroupModalOpen] = useState(false);
   const [createPurseModalOpen, setCreatePurseModalOpen] = useState(false);
   const [managePartnersModalOpen, setManagePartnersModalOpen] = useState(false);
@@ -109,6 +114,15 @@ export default function AdminDashboard() {
   const handleContributeToPurse = (purse: Purse) => {
     setSelectedPurse(purse);
     setPaymentModalOpen(true);
+  };
+
+  const handleLogout = () => {
+    logout();
+    toast({
+      title: "Logged Out",
+      description: "You have been logged out successfully.",
+    });
+    setLocation("/");
   };
 
   // Hook to fetch purses for a specific group
@@ -224,21 +238,77 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20 sm:pb-0">
-      <Navigation />
-      
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Dashboard Header */}
-        <div className="mb-8">
-          <div className="bg-gradient-to-r from-nigerian-green to-forest-green rounded-xl p-6 text-white">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-2xl font-bold mb-2">Admin Dashboard</h2>
-                <p className="text-green-100">Welcome back, {user?.fullName}</p>
-                <p className="text-green-200 text-sm">Managing {groups.length} active groups</p>
+      {/* Admin Navigation Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo and Title */}
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-nigerian-green rounded-lg flex items-center justify-center">
+                <Users className="text-white h-5 w-5" />
               </div>
+              <div>
+                <h1 className="text-lg font-bold text-nigerian-green">Kontrib Admin</h1>
+              </div>
+            </div>
+
+            {/* Navigation Menu */}
+            <div className="flex items-center space-x-6">
+              <button
+                onClick={() => setActiveTab("dashboard")}
+                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === "dashboard"
+                    ? "bg-nigerian-green text-white"
+                    : "text-gray-700 hover:text-nigerian-green hover:bg-gray-100"
+                }`}
+                data-testid="tab-dashboard"
+              >
+                <BarChart3 className="h-4 w-4" />
+                <span>Dashboard</span>
+              </button>
+              
+              <button
+                onClick={() => setActiveTab("groups")}
+                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === "groups"
+                    ? "bg-nigerian-green text-white"
+                    : "text-gray-700 hover:text-nigerian-green hover:bg-gray-100"
+                }`}
+                data-testid="tab-groups"
+              >
+                <Users className="h-4 w-4" />
+                <span>Groups</span>
+              </button>
+
+              <button
+                onClick={handleLogout}
+                className="flex items-center space-x-2 px-3 py-2 text-gray-700 hover:text-red-600 hover:bg-red-50 rounded-md text-sm font-medium transition-colors"
+                data-testid="button-logout"
+              >
+                <LogOut className="h-4 w-4" />
+                <span>Log Out</span>
+              </button>
             </div>
           </div>
         </div>
+      </div>
+      
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Dashboard Content */}
+        {activeTab === "dashboard" && (
+          <>
+            {/* Dashboard Header */}
+            <div className="mb-8">
+              <div className="bg-gradient-to-r from-nigerian-green to-forest-green rounded-xl p-6 text-white">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold mb-2">Dashboard Overview</h2>
+                    <p className="text-green-100">Welcome back, {user?.fullName}</p>
+                    <p className="text-green-200 text-sm">Managing {groups.length} active groups</p>
+                  </div>
+                </div>
+              </div>
+            </div>
 
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -514,6 +584,142 @@ export default function AdminDashboard() {
             )}
           </div>
         </div>
+          </>
+        )}
+
+        {/* Groups Tab Content */}
+        {activeTab === "groups" && (
+          <>
+            <div className="mb-8">
+              <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-6 text-white">
+                <h2 className="text-2xl font-bold mb-2">Groups Management</h2>
+                <p className="text-blue-100">View all active groups, contribution status, and WhatsApp dashboard links</p>
+              </div>
+            </div>
+
+            {/* Groups List */}
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Active Groups ({groups.length})
+                </h3>
+                <Button 
+                  onClick={() => setCreateGroupModalOpen(true)}
+                  className="bg-nigerian-green hover:bg-forest-green"
+                  data-testid="create-group-button"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Group
+                </Button>
+              </div>
+
+              {groups.length === 0 ? (
+                <Card>
+                  <CardContent className="p-12">
+                    <div className="text-center">
+                      <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                      <h3 className="text-xl font-medium text-gray-900 mb-2">No groups yet</h3>
+                      <p className="text-gray-600 mb-6">Create your first group to start collecting contributions and managing payments.</p>
+                      <Button 
+                        onClick={() => setCreateGroupModalOpen(true)}
+                        className="bg-nigerian-green hover:bg-forest-green"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create Your First Group
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-6">
+                  {groups.map((group) => (
+                    <Card key={group.id} className="overflow-hidden">
+                      <CardContent className="p-6">
+                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+                          {/* Group Info */}
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-3 mb-2">
+                              <h4 className="text-lg font-semibold text-gray-900">{group.name}</h4>
+                              <Badge variant="outline" className="text-green-700 border-green-300">
+                                Active
+                              </Badge>
+                            </div>
+                            <p className="text-gray-600 mb-3">{group.description}</p>
+                            
+                            {/* WhatsApp Share Link */}
+                            <div className="flex items-center space-x-2 text-sm">
+                              <MessageCircle className="h-4 w-4 text-green-600" />
+                              <span className="text-gray-600">Registration Link:</span>
+                              <code className="bg-gray-100 px-2 py-1 rounded text-xs">
+                                kontrib.app/register/{group.registrationLink}
+                              </code>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleShareGroup(group)}
+                                className="h-6 px-2"
+                              >
+                                Share
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Group Actions */}
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleCreatePurse(group)}
+                              data-testid={`add-purse-${group.id}`}
+                            >
+                              <FolderPlus className="h-4 w-4 mr-1" />
+                              Add Purse
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => toggleGroupExpansion(group.id)}
+                              data-testid={`view-purses-${group.id}`}
+                            >
+                              <Settings className="h-4 w-4 mr-1" />
+                              View Purses
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleManagePartners(group)}
+                              data-testid={`manage-partners-${group.id}`}
+                            >
+                              <UserCheck className="h-4 w-4 mr-1" />
+                              Partners
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleShareGroup(group)}
+                              className="text-green-600 border-green-300 hover:bg-green-50"
+                              data-testid={`share-group-${group.id}`}
+                            >
+                              <MessageCircle className="h-4 w-4 mr-1" />
+                              WhatsApp
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Expanded Purses View */}
+                        {expandedGroupId === group.id && (
+                          <div className="mt-6 pt-6 border-t border-gray-200">
+                            <GroupWithPurses group={group} />
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Create Group Modal */}

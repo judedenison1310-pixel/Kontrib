@@ -131,6 +131,16 @@ The application is designed to be easily deployable on platforms like Replit, Ve
 - **Comprehensive API**: /api/auth/send-otp, /api/auth/send-login-otp, /api/auth/register-with-otp, /api/auth/login-with-otp
 - **WhatsApp Integration**: Maintained for group sharing and invitations while using SMS for authentication
 
+### Admin Dashboard Menu System (August 14, 2025)
+- **Three-Item Navigation Menu**: Implemented Dashboard, Groups, and Log Out menu items as specified
+- **Dashboard Tab**: Overview of group goals, progress, key stats, recent transactions, and quick actions
+- **Groups Tab**: Complete list of active groups with contribution status and unique WhatsApp dashboard links
+- **Log Out Functionality**: Secure session termination with confirmation toast and redirect to landing page
+- **Professional Navigation Header**: Clean Kontrib Admin branding with active tab highlighting
+- **Role-Based Access Control**: Menu system exclusive to admin users with proper authentication checks
+- **Interactive Elements**: All buttons and tabs include proper test IDs for user interaction tracking
+- **Responsive Design**: Mobile-optimized layout with proper spacing and touch-friendly controls
+
 ### Technical Architecture Updates
 - **OTP Verification Schema**: Added otpVerifications table with phone number, code, expiration tracking
 - **New API Endpoints**: /api/auth/send-otp, /api/auth/verify-otp, /api/groups/:id/register-with-otp
