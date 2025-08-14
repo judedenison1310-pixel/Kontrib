@@ -117,13 +117,15 @@ The application is designed to be easily deployable on platforms like Replit, Ve
 
 ### SMS-Based OTP Authentication System (August 14, 2025)
 - **Complete OTP-Only Authentication**: Rebuilt both registration ("Sign Up") and login workflows to use SMS OTP verification exclusively
+- **Role-Based Registration**: Added ability to sign up as either Group Admin or Group Member with role-specific UI and permissions
 - **Global Phone Number Support**: Updated validation to accept international phone numbers for diaspora users participating in local groups
 - **Unified SMS Authentication**: All OTP codes delivered via SMS text messages for consistent user experience
 - **Two-Step Authentication Flows**: 
-  - Sign Up: Full Name + Username (WhatsApp Nickname) + Phone Number → SMS OTP → Account Creation
+  - Sign Up: Full Name + Username (WhatsApp Nickname) + Phone Number + Role Selection → SMS OTP → Account Creation
   - Login: Username + Phone Number → SMS OTP → Authentication
 - **No Password Requirements**: Eliminated all password fields for streamlined, secure authentication
 - **Enhanced Security**: 6-digit OTP codes with 10-minute expiration, 3-attempt limit, and automatic cleanup
+- **Role-Based Redirects**: Automatic redirection to appropriate dashboard (admin vs member) after successful registration
 - **Mobile-First Design**: Responsive forms optimized for SMS-based verification workflow
 - **Development Testing**: OTP codes displayed in console for testing (removed in production)
 - **Comprehensive API**: /api/auth/send-otp, /api/auth/send-login-otp, /api/auth/register-with-otp, /api/auth/login-with-otp

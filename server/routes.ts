@@ -619,7 +619,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // OTP-based registration route
   app.post("/api/auth/register-with-otp", async (req, res) => {
     try {
-      const { username, fullName, phoneNumber, otp } = req.body;
+      const { username, fullName, phoneNumber, otp, role } = req.body;
       
       if (!username || !fullName || !phoneNumber || !otp) {
         return res.status(400).json({ message: "All fields are required" });
@@ -643,7 +643,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fullName,
         phoneNumber,
         password: "otp-auth", // OTP-based auth marker
-        role: "member"
+        role: role || "member"
       });
       
       res.json({ 

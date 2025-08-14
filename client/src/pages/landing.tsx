@@ -26,6 +26,7 @@ const registerSchema = z.object({
   fullName: z.string().min(2, "Full name is required"),
   username: z.string().min(3, "Username must be at least 3 characters").max(20, "Username must be less than 20 characters"),
   phoneNumber: z.string().regex(/^\+?[1-9]\d{1,14}$/, "Please enter a valid phone number with country code (e.g., +234, +1, +44)"),
+  role: z.enum(["admin", "member"], { required_error: "Please select your role" }),
 });
 
 const otpSchema = z.object({
@@ -56,6 +57,7 @@ export default function Landing() {
       fullName: "",
       username: "",
       phoneNumber: "",
+      role: "member",
     },
   });
 
@@ -164,7 +166,7 @@ export default function Landing() {
       const userData = {
         ...data,
         password: "otp-auth", // OTP-based auth marker
-        role: "member"
+        role: data.role
       };
       
       const response = await apiRequest("POST", "/api/auth/register-with-otp", userData);
@@ -172,11 +174,17 @@ export default function Landing() {
     },
     onSuccess: (data) => {
       setNewUser(data.user);
+      setCurrentUser(data.user);
       setRegistrationStep("success");
       toast({
         title: "Account Created!",
-        description: "Your account has been created successfully with OTP verification.",
+        description: `Welcome ${data.user.role === "admin" ? "Admin" : "Member"}! Your account has been created successfully.`,
       });
+      
+      // Redirect based on role after a short delay
+      setTimeout(() => {
+        setLocation(data.user.role === "admin" ? "/admin" : "/member");
+      }, 2000);
     },
     onError: (error: any) => {
       toast({
@@ -473,6 +481,44 @@ export default function Landing() {
                                   <p className="text-xs text-gray-500 mt-1">
                                     We'll send an OTP to this number via SMS text message for verification
                                   </p>
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={registerForm.control}
+                              name="role"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Account Type</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value} data-testid="select-role">
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select your account type" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="member">
+                                        <div className="flex items-center space-x-2">
+                                          <Users className="h-4 w-4" />
+                                          <div>
+                                            <p className="font-medium">Group Member</p>
+                                            <p className="text-xs text-gray-500">Join groups and make contributions</p>
+                                          </div>
+                                        </div>
+                                      </SelectItem>
+                                      <SelectItem value="admin">
+                                        <div className="flex items-center space-x-2">
+                                          <Shield className="h-4 w-4" />
+                                          <div>
+                                            <p className="font-medium">Group Admin</p>
+                                            <p className="text-xs text-gray-500">Create and manage contribution groups</p>
+                                          </div>
+                                        </div>
+                                      </SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
                                 </FormItem>
                               )}
                             />
