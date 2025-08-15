@@ -241,7 +241,7 @@ export default function AdminDashboard() {
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-6 pt-[10px] pb-[10px]">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total Collections</p>
