@@ -164,6 +164,7 @@ export type InsertOtpVerification = z.infer<typeof insertOtpVerificationSchema>;
 // Extended types for UI
 export type GroupWithStats = Group & {
   memberCount: number;
+  projectCount: number;
   completionRate: number;
   pendingPayments: number;
 };

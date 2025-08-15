@@ -159,6 +159,7 @@ export class MemStorage implements IStorage {
       return {
         ...group,
         memberCount,
+        projectCount: groupProjects.length,
         completionRate,
         pendingPayments
       };

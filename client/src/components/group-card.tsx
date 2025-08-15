@@ -3,8 +3,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { MessageCircle, Settings, Users } from "lucide-react";
-import { formatNaira, calculateProgress } from "@/lib/currency";
+import { MessageCircle, Settings, Users, Target } from "lucide-react";
+import { formatNaira } from "@/lib/currency";
 
 interface GroupCardProps {
   group: Group | GroupWithStats;
@@ -38,6 +38,7 @@ export function GroupCard({
 
   // Check if this is a GroupWithStats object
   const hasStats = 'memberCount' in group;
+  const groupWithStats = group as GroupWithStats;
 
   return (
     <Card className="hover:shadow-md transition-shadow">
@@ -45,65 +46,77 @@ export function GroupCard({
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
             <div className="flex items-center space-x-3 mb-2">
-              <h4 className="font-semibold text-gray-900">{group.name}</h4>
+              <h4 className="font-semibold text-gray-900 dark:text-white">{group.name}</h4>
               <Badge className={getStatusColor(group.status)}>
                 {group.status}
               </Badge>
             </div>
             {group.description && (
-              <p className="text-sm text-gray-600 mb-3">{group.description}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">{group.description}</p>
             )}
           </div>
         </div>
 
         {hasStats && (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm mb-4">
-              <div>
-                <p className="text-gray-600">
-                  {isAdmin ? "Members" : userContribution ? "My Contribution" : "Members"}
-                </p>
-                <p className="font-semibold">
-                  {isAdmin ? (group as any).memberCount : userContribution ? formatNaira(userContribution) : (group as any).memberCount}
-                </p>
+            {/* Member and Project counts */}
+            <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-gray-500" />
+                <div>
+                  <p className="text-gray-600 dark:text-gray-400">Members</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{groupWithStats.memberCount || 0}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-gray-600">Target</p>
-                <p className="font-semibold">{formatNaira((group as any).targetAmount)}</p>
-              </div>
-              <div>
-                <p className="text-gray-600">Collected</p>
-                <p className="font-semibold text-green-600">{formatNaira((group as any).collectedAmount)}</p>
-              </div>
-              <div>
-                <p className="text-gray-600">Progress</p>
-                <div className="flex items-center space-x-2">
-                  <Progress value={calculateProgress((group as any).collectedAmount, (group as any).targetAmount)} className="flex-1 h-2" />
-                  <span className="text-xs font-medium">{calculateProgress((group as any).collectedAmount, (group as any).targetAmount)}%</span>
+              <div className="flex items-center gap-2">
+                <Target className="h-4 w-4 text-gray-500" />
+                <div>
+                  <p className="text-gray-600 dark:text-gray-400">Projects</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{groupWithStats.projectCount || 0}</p>
                 </div>
               </div>
             </div>
-
-            {isAdmin && (group as any).pendingPayments > 0 && (
-              <div className="mb-4 p-3 bg-orange-50 rounded-lg">
-                <p className="text-sm text-orange-800">
+            
+            {/* User contribution (for members) */}
+            {userContribution && !isAdmin && (
+              <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg mb-4">
+                <p className="text-sm text-gray-600 dark:text-gray-400">My Contribution</p>
+                <p className="font-semibold text-green-700 dark:text-green-400">{formatNaira(userContribution)}</p>
+              </div>
+            )}
+            
+            {/* Group progress */}
+            <div className="space-y-2 mb-4">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-400">Group Progress</span>
+                <span className="font-medium text-gray-900 dark:text-white">{groupWithStats.completionRate || 0}%</span>
+              </div>
+              <Progress value={groupWithStats.completionRate || 0} className="h-2" />
+            </div>
+            
+            {/* Pending payments alert (for admins) */}
+            {isAdmin && groupWithStats.pendingPayments > 0 && (
+              <div className="mb-4 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                <p className="text-sm text-orange-800 dark:text-orange-200">
                   <Users className="inline h-4 w-4 mr-1" />
-                  {(group as any).pendingPayments} pending payments
+                  {groupWithStats.pendingPayments} pending payments
                 </p>
               </div>
             )}
           </>
         )}
 
+        {/* Custom URL display (for admins) */}
         {isAdmin && group.customSlug && (
-          <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-            <p className="text-xs font-medium text-blue-700 mb-1">Custom URL for sharing:</p>
-            <p className="text-sm font-mono text-blue-600 bg-white px-2 py-1 rounded">
+          <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+            <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">Custom URL for sharing:</p>
+            <p className="text-sm font-mono text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-800 px-2 py-1 rounded">
               kontrib.app/{group.customSlug}
             </p>
           </div>
         )}
 
+        {/* Action buttons */}
         <div className="flex space-x-2">
           {isAdmin ? (
             <>
@@ -112,6 +125,7 @@ export function GroupCard({
                 size="sm"
                 onClick={() => onShare?.(group)}
                 className="flex-1"
+                data-testid={`share-group-${group.id}`}
               >
                 <MessageCircle className="h-4 w-4 mr-2" />
                 Share
@@ -121,6 +135,7 @@ export function GroupCard({
                 size="sm"
                 onClick={() => onManage?.(group)}
                 className="flex-1"
+                data-testid={`manage-group-${group.id}`}
               >
                 <Settings className="h-4 w-4 mr-2" />
                 Manage
@@ -130,6 +145,7 @@ export function GroupCard({
             <Button
               onClick={() => onMakePayment?.(group)}
               className="flex-1 bg-nigerian-green hover:bg-forest-green"
+              data-testid={`make-payment-${group.id}`}
             >
               Make Payment
             </Button>

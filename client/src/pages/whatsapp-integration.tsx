@@ -133,7 +133,7 @@ export default function WhatsAppIntegration() {
                       }`}
                       onClick={() => {
                         setSelectedGroup(group);
-                        setSelectedPurse(null);
+                        setSelectedProject(null);
                       }}
                       data-testid={`group-select-${group.id}`}
                     >

@@ -513,7 +513,7 @@ export default function AdminDashboard() {
       <PaymentModal 
         open={paymentModalOpen}
         onOpenChange={setPaymentModalOpen}
-        purse={selectedProject}
+        project={selectedProject}
       />
       <PaymentApprovalModal
         open={approvalModalOpen}
