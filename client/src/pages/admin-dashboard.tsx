@@ -457,14 +457,6 @@ export default function AdminDashboard() {
                     <Plus className="h-4 w-4 mr-3" />
                     Create New Group
                   </Button>
-                  <Button variant="outline" className="w-full">
-                    <Bell className="h-4 w-4 mr-3" />
-                    Send Reminders
-                  </Button>
-                  <Button variant="outline" className="w-full">
-                    <FileText className="h-4 w-4 mr-3" />
-                    Generate Report
-                  </Button>
                 </div>
               </CardContent>
             </Card>

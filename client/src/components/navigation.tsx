@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Users, Bell, Menu, X, MessageCircle, TrendingUp, CreditCard, History, Megaphone, LogOut } from "lucide-react";
+import { Users, Bell, Menu, X, MessageCircle, TrendingUp, CreditCard, History, Megaphone, LogOut, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { NotificationBell } from "@/components/notification-bell";
@@ -50,16 +50,34 @@ export function Navigation() {
                 </Link>
                 
                 {isAdmin() ? (
-                  <Link href="/groups">
+                  <>
+                    <Link href="/groups">
+                      <Button 
+                        variant={location === "/groups" ? "default" : "ghost"}
+                        size="sm"
+                        className={location === "/groups" ? "bg-nigerian-green text-white" : ""}
+                      >
+                        <Users className="h-4 w-4 mr-1" />
+                        Groups
+                      </Button>
+                    </Link>
                     <Button 
-                      variant={location === "/groups" ? "default" : "ghost"}
+                      variant="ghost"
                       size="sm"
-                      className={location === "/groups" ? "bg-nigerian-green text-white" : ""}
+                      onClick={() => {/* TODO: Implement send reminders */}}
                     >
-                      <Users className="h-4 w-4 mr-1" />
-                      Groups
+                      <Bell className="h-4 w-4 mr-1" />
+                      Send Reminders
                     </Button>
-                  </Link>
+                    <Button 
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {/* TODO: Implement generate report */}}
+                    >
+                      <FileText className="h-4 w-4 mr-1" />
+                      Generate Report
+                    </Button>
+                  </>
                 ) : (
                   <>
                     <Link href="/make-payment">
@@ -132,12 +150,36 @@ export function Navigation() {
                       </Link>
                       
                       {isAdmin() ? (
-                        <Link href="/groups" onClick={() => setMobileMenuOpen(false)}>
-                          <Button variant="ghost" className="w-full justify-start">
-                            <Users className="h-4 w-4 mr-2" />
-                            Groups
+                        <>
+                          <Link href="/groups" onClick={() => setMobileMenuOpen(false)}>
+                            <Button variant="ghost" className="w-full justify-start">
+                              <Users className="h-4 w-4 mr-2" />
+                              Groups
+                            </Button>
+                          </Link>
+                          <Button 
+                            variant="ghost" 
+                            className="w-full justify-start"
+                            onClick={() => {
+                              setMobileMenuOpen(false);
+                              /* TODO: Implement send reminders */
+                            }}
+                          >
+                            <Bell className="h-4 w-4 mr-2" />
+                            Send Reminders
                           </Button>
-                        </Link>
+                          <Button 
+                            variant="ghost" 
+                            className="w-full justify-start"
+                            onClick={() => {
+                              setMobileMenuOpen(false);
+                              /* TODO: Implement generate report */
+                            }}
+                          >
+                            <FileText className="h-4 w-4 mr-2" />
+                            Generate Report
+                          </Button>
+                        </>
                       ) : (
                         <>
                           <Link href="/make-payment" onClick={() => setMobileMenuOpen(false)}>
