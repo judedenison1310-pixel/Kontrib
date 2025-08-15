@@ -232,7 +232,6 @@ export default function AdminDashboard() {
           <div className="bg-gradient-to-r from-nigerian-green to-forest-green rounded-xl p-6 text-white">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-2xl font-bold mb-2">Admin Dashboard</h2>
                 <p className="text-green-100">Welcome back, {user?.fullName}</p>
                 <p className="text-green-200 text-sm">Managing {groups.length} active groups</p>
               </div>
