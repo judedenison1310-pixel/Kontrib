@@ -228,7 +228,7 @@ export default function AdminDashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Dashboard Header */}
         <div className="mb-8">
-          <div className="bg-gradient-to-r from-nigerian-green to-forest-green rounded-xl p-6 text-white">
+          <div className="bg-gradient-to-r from-nigerian-green to-forest-green rounded-xl p-6 text-white pt-[0px] pb-[0px]">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-bold text-[#0d0d0d] text-[21px]">Welcome back, {user?.fullName}</p>
