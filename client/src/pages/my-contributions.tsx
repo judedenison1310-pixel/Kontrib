@@ -43,7 +43,7 @@ export default function MyContributions() {
   // Filter contributions based on search and status
   const filteredContributions = contributions.filter((contribution) => {
     const matchesSearch = contribution.groupName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         contribution.purseName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         contribution.projectName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          contribution.reference?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === "all" || contribution.status === statusFilter;
@@ -301,9 +301,9 @@ export default function MyContributions() {
                               {contribution.status.toUpperCase()}
                             </Badge>
                           </div>
-                          {contribution.purseName && (
+                          {contribution.projectName && (
                             <p className="text-sm text-gray-600 mb-1">
-                              Purse: {contribution.purseName}
+                              Project: {contribution.projectName}
                             </p>
                           )}
                           <div className="flex items-center text-sm text-gray-500 space-x-4">

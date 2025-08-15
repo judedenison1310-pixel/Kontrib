@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { insertContributionSchema, Purse } from "@shared/schema";
+import { insertContributionSchema, Project } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { getCurrentUser } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -19,7 +19,7 @@ const paymentFormSchema = insertContributionSchema.extend({
   amount: z.string().min(1, "Amount is required"),
 }).omit({
   groupId: true,
-  purseId: true,
+  projectId: true,
   userId: true,
 });
 
@@ -28,10 +28,10 @@ type PaymentFormData = z.infer<typeof paymentFormSchema>;
 interface PaymentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  purse: Purse | null;
+  project: Project | null;
 }
 
-export function PaymentModal({ open, onOpenChange, purse }: PaymentModalProps) {
+export function PaymentModal({ open, onOpenChange, project }: PaymentModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const user = getCurrentUser();
@@ -79,15 +79,15 @@ export function PaymentModal({ open, onOpenChange, purse }: PaymentModalProps) {
 
   const createPaymentMutation = useMutation({
     mutationFn: async (data: PaymentFormData) => {
-      if (!purse || !user) throw new Error("Missing purse or user");
+      if (!project || !user) throw new Error("Missing project or user");
       
-      console.log("Submitting payment data:", { ...data, purseId: purse.id, groupId: purse.groupId, userId: user.id });
+      console.log("Submitting payment data:", { ...data, projectId: project.id, groupId: project.groupId, userId: user.id });
       
       const response = await apiRequest("POST", "/api/contributions", {
         ...data,
         amount: data.amount,
-        purseId: purse.id,
-        groupId: purse.groupId,
+        projectId: project.id,
+        groupId: project.groupId,
         userId: user.id,
       });
       return response.json();
@@ -119,7 +119,7 @@ export function PaymentModal({ open, onOpenChange, purse }: PaymentModalProps) {
     console.log("Form submission data:", data);
     console.log("Form errors:", form.formState.errors);
     console.log("Form validation state:", form.formState.isValid);
-    console.log("Purse data:", purse);
+    console.log("Project data:", project);
     console.log("User data:", user);
     
     if (!form.formState.isValid) {
@@ -133,7 +133,7 @@ export function PaymentModal({ open, onOpenChange, purse }: PaymentModalProps) {
     createPaymentMutation.mutate(data);
   };
 
-  if (!purse) return null;
+  if (!project) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -141,7 +141,7 @@ export function PaymentModal({ open, onOpenChange, purse }: PaymentModalProps) {
         <DialogHeader>
           <DialogTitle>Make Payment</DialogTitle>
           <p className="text-sm text-gray-600">
-            Contributing to <span className="font-medium">{purse.name}</span>
+            Contributing to <span className="font-medium">{project.name}</span>
           </p>
         </DialogHeader>
 
@@ -149,11 +149,11 @@ export function PaymentModal({ open, onOpenChange, purse }: PaymentModalProps) {
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <p className="text-gray-600">Target Amount</p>
-              <p className="font-semibold">{formatNaira(purse.targetAmount)}</p>
+              <p className="font-semibold">{formatNaira(project.targetAmount)}</p>
             </div>
             <div>
               <p className="text-gray-600">Collected So Far</p>
-              <p className="font-semibold text-green-600">{formatNaira(purse.collectedAmount)}</p>
+              <p className="font-semibold text-green-600">{formatNaira(project.collectedAmount)}</p>
             </div>
           </div>
         </div>

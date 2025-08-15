@@ -2,7 +2,7 @@ import {
   type User, 
   type Group, 
   type GroupMember, 
-  type Purse,
+  type Project,
   type AccountabilityPartner,
   type Contribution,
   type Notification,
@@ -10,7 +10,7 @@ import {
   type InsertUser, 
   type InsertGroup, 
   type InsertGroupMember, 
-  type InsertPurse,
+  type InsertProject,
   type InsertAccountabilityPartner,
   type InsertContribution,
   type InsertNotification,
@@ -18,7 +18,7 @@ import {
   type GroupWithStats,
   type MemberWithContributions,
   type ContributionWithDetails,
-  type PurseWithStats,
+  type ProjectWithStats,
   type AccountabilityPartnerWithDetails
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -43,12 +43,12 @@ export interface IStorage {
   addGroupMember(member: InsertGroupMember): Promise<GroupMember>;
   getGroupMember(groupId: string, userId: string): Promise<GroupMember | undefined>;
   
-  // Purse methods
-  getPursesByGroup(groupId: string): Promise<PurseWithStats[]>;
-  getPurse(id: string): Promise<Purse | undefined>;
-  getPurseByCustomSlug(customSlug: string): Promise<Purse | undefined>;
-  createPurse(purse: InsertPurse): Promise<Purse>;
-  updatePurse(id: string, updates: Partial<Purse>): Promise<Purse | undefined>;
+  // Project methods
+  getProjectsByGroup(groupId: string): Promise<ProjectWithStats[]>;
+  getProject(id: string): Promise<Project | undefined>;
+  getProjectByCustomSlug(customSlug: string): Promise<Project | undefined>;
+  createProject(project: InsertProject): Promise<Project>;
+  updateProject(id: string, updates: Partial<Project>): Promise<Project | undefined>;
   
   // Accountability Partner methods
   getGroupAccountabilityPartners(groupId: string): Promise<AccountabilityPartnerWithDetails[]>;
@@ -57,7 +57,7 @@ export interface IStorage {
 
   // Contribution methods
   getGroupContributions(groupId: string): Promise<ContributionWithDetails[]>;
-  getPurseContributions(purseId: string): Promise<ContributionWithDetails[]>;
+  getProjectContributions(projectId: string): Promise<ContributionWithDetails[]>;
   createContribution(contribution: InsertContribution): Promise<Contribution>;
   confirmContribution(contributionId: string): Promise<Contribution | undefined>;
   
@@ -91,7 +91,7 @@ export class MemStorage implements IStorage {
   private users: Map<string, User>;
   private groups: Map<string, Group>;
   private groupMembers: Map<string, GroupMember>;
-  private purses: Map<string, Purse>;
+  private projects: Map<string, Project>;
   private accountabilityPartners: Map<string, AccountabilityPartner>;
   private contributions: Map<string, Contribution>;
   private notifications: Map<string, Notification>;
@@ -101,7 +101,7 @@ export class MemStorage implements IStorage {
     this.users = new Map();
     this.groups = new Map();
     this.groupMembers = new Map();
-    this.purses = new Map();
+    this.projects = new Map();
     this.accountabilityPartners = new Map();
     this.contributions = new Map();
     this.notifications = new Map();
@@ -146,15 +146,15 @@ export class MemStorage implements IStorage {
       const members = Array.from(this.groupMembers.values()).filter(member => member.groupId === group.id);
       const memberCount = members.length;
       
-      // Calculate stats based on purses instead of group target
-      const groupPurses = Array.from(this.purses.values()).filter(purse => purse.groupId === group.id);
-      const totalPurseTarget = groupPurses.reduce((sum, purse) => sum + Number(purse.targetAmount), 0);
-      const totalPurseCollected = groupPurses.reduce((sum, purse) => sum + Number(purse.collectedAmount), 0);
+      // Calculate stats based on projects instead of group target
+      const groupProjects = Array.from(this.projects.values()).filter(project => project.groupId === group.id);
+      const totalProjectTarget = groupProjects.reduce((sum, project) => sum + Number(project.targetAmount), 0);
+      const totalProjectCollected = groupProjects.reduce((sum, project) => sum + Number(project.collectedAmount), 0);
       
-      const completionRate = totalPurseTarget > 0 ? 
-        Math.round((totalPurseCollected / totalPurseTarget) * 100) : 0;
+      const completionRate = totalProjectTarget > 0 ? 
+        Math.round((totalProjectCollected / totalProjectTarget) * 100) : 0;
       
-      const pendingPayments = 0; // Will be calculated based on purse contributions
+      const pendingPayments = 0; // Will be calculated based on project contributions
 
       return {
         ...group,
@@ -242,81 +242,81 @@ export class MemStorage implements IStorage {
       .find(member => member.groupId === groupId && member.userId === userId);
   }
 
-  // Purse methods
-  async getPursesByGroup(groupId: string): Promise<PurseWithStats[]> {
-    const purses = Array.from(this.purses.values())
-      .filter(purse => purse.groupId === groupId);
+  // Project methods
+  async getProjectsByGroup(groupId: string): Promise<ProjectWithStats[]> {
+    const projects = Array.from(this.projects.values())
+      .filter(project => project.groupId === groupId);
     
-    return purses.map(purse => {
+    return projects.map(project => {
       const contributions = Array.from(this.contributions.values())
-        .filter(c => c.purseId === purse.id);
+        .filter(c => c.projectId === project.id);
       
       const contributionCount = contributions.length;
-      const completionRate = Number(purse.targetAmount) > 0 
-        ? Math.round((Number(purse.collectedAmount) / Number(purse.targetAmount)) * 100)
+      const completionRate = Number(project.targetAmount) > 0 
+        ? Math.round((Number(project.collectedAmount) / Number(project.targetAmount)) * 100)
         : 0;
       
       return {
-        ...purse,
+        ...project,
         contributionCount,
         completionRate,
       };
     });
   }
 
-  async getPurse(id: string): Promise<Purse | undefined> {
-    return this.purses.get(id);
+  async getProject(id: string): Promise<Project | undefined> {
+    return this.projects.get(id);
   }
 
-  async getPurseByCustomSlug(customSlug: string): Promise<Purse | undefined> {
-    return Array.from(this.purses.values()).find(purse => purse.customSlug === customSlug);
+  async getProjectByCustomSlug(customSlug: string): Promise<Project | undefined> {
+    return Array.from(this.projects.values()).find(project => project.customSlug === customSlug);
   }
 
-  async createPurse(insertPurse: InsertPurse): Promise<Purse> {
+  async createProject(insertProject: InsertProject): Promise<Project> {
     const id = randomUUID();
     
-    // Get the group to create purse URL slug
-    const group = this.groups.get(insertPurse.groupId);
+    // Get the group to create project URL slug
+    const group = this.groups.get(insertProject.groupId);
     const groupSlug = group?.customSlug || "group";
     
-    // Generate clean URL slug from purse name
-    const purseSlug = insertPurse.name
+    // Generate clean URL slug from project name
+    const projectSlug = insertProject.name
       .toLowerCase()
       .replace(/[^a-z0-9\s-]/g, '') // Remove special characters except spaces and hyphens
       .replace(/\s+/g, '') // Remove all spaces
       .slice(0, 50); // Limit length
     
-    const customSlug = `${groupSlug}/${purseSlug}`;
+    const customSlug = `${groupSlug}/${projectSlug}`;
 
-    const purse: Purse = {
-      ...insertPurse,
+    const project: Project = {
+      ...insertProject,
       id,
       collectedAmount: "0",
       customSlug,
       createdAt: new Date(),
-      description: insertPurse.description || null,
-      deadline: insertPurse.deadline ? 
-        (typeof insertPurse.deadline === 'string' ? new Date(insertPurse.deadline) : insertPurse.deadline) 
+      description: insertProject.description || null,
+      deadline: insertProject.deadline ? 
+        (typeof insertProject.deadline === 'string' ? new Date(insertProject.deadline) : insertProject.deadline) 
         : null,
-      status: insertPurse.status || "active",
+      status: insertProject.status || "active",
     };
 
-    this.purses.set(id, purse);
-    return purse;
+    this.projects.set(id, project);
+    return project;
   }
 
-  async updatePurse(id: string, updates: Partial<Purse>): Promise<Purse | undefined> {
-    const purse = this.purses.get(id);
-    if (!purse) return undefined;
+  async updateProject(id: string, updates: Partial<Project>): Promise<Project | undefined> {
+    const project = this.projects.get(id);
+    if (!project) return undefined;
     
     // Handle deadline conversion if it's a string
     if (updates.deadline && typeof updates.deadline === 'string') {
       updates.deadline = new Date(updates.deadline);
     }
     
-    const updatedPurse = { ...purse, ...updates };
-    this.purses.set(id, updatedPurse);
-    return updatedPurse;
+    const updatedProject = { ...project, ...updates };
+    this.projects.set(id, updatedProject);
+    return updatedProject;
   }
 
   // Accountability Partner methods
@@ -381,20 +381,20 @@ export class MemStorage implements IStorage {
     });
   }
 
-  async getPurseContributions(purseId: string): Promise<ContributionWithDetails[]> {
+  async getProjectContributions(projectId: string): Promise<ContributionWithDetails[]> {
     const contributions = Array.from(this.contributions.values())
-      .filter(contrib => contrib.purseId === purseId)
+      .filter(contrib => contrib.projectId === projectId)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     
     return contributions.map(contrib => {
       const user = this.users.get(contrib.userId)!;
       const group = this.groups.get(contrib.groupId)!;
-      const purse = this.purses.get(contrib.purseId!)!;
+      const project = this.projects.get(contrib.projectId!)!;
       return {
         ...contrib,
         userName: user.fullName,
         groupName: group.name,
-        purseName: purse.name
+        projectName: project.name
       };
     });
   }
@@ -407,12 +407,12 @@ export class MemStorage implements IStorage {
     return contributions.map(contrib => {
       const user = this.users.get(contrib.userId)!;
       const group = this.groups.get(contrib.groupId)!;
-      const purse = contrib.purseId ? this.purses.get(contrib.purseId) : null;
+      const project = contrib.projectId ? this.projects.get(contrib.projectId) : null;
       return {
         ...contrib,
         userName: user.fullName,
         groupName: group.name,
-        purseName: purse?.name
+        projectName: project?.name
       };
     });
   }
@@ -430,12 +430,12 @@ export class MemStorage implements IStorage {
     return contributions.map(contrib => {
       const user = this.users.get(contrib.userId)!;
       const group = this.groups.get(contrib.groupId)!;
-      const purse = contrib.purseId ? this.purses.get(contrib.purseId) : null;
+      const project = contrib.projectId ? this.projects.get(contrib.projectId) : null;
       return {
         ...contrib,
         userName: user.fullName,
         groupName: group.name,
-        purseName: purse?.name
+        projectName: project?.name
       };
     });
   }
@@ -468,12 +468,12 @@ export class MemStorage implements IStorage {
     // Update status to confirmed
     contribution.status = "confirmed";
     
-    // Update purse collected amount if contribution is for a specific purse
-    if (contribution.purseId) {
-      const purse = this.purses.get(contribution.purseId);
-      if (purse) {
-        const newCollectedAmount = (Number(purse.collectedAmount) + Number(contribution.amount)).toString();
-        await this.updatePurse(purse.id, { collectedAmount: newCollectedAmount });
+    // Update project collected amount if contribution is for a specific project
+    if (contribution.projectId) {
+      const project = this.projects.get(contribution.projectId);
+      if (project) {
+        const newCollectedAmount = (Number(project.collectedAmount) + Number(contribution.amount)).toString();
+        await this.updateProject(project.id, { collectedAmount: newCollectedAmount });
       }
     }
 
@@ -494,7 +494,7 @@ export class MemStorage implements IStorage {
   private async createConfirmationNotifications(contribution: Contribution): Promise<void> {
     const user = this.users.get(contribution.userId);
     const group = this.groups.get(contribution.groupId);
-    const purse = contribution.purseId ? this.purses.get(contribution.purseId) : null;
+    const project = contribution.projectId ? this.projects.get(contribution.projectId) : null;
     
     if (!user || !group) {
       console.error("User or group not found for confirmation notification");
@@ -506,7 +506,7 @@ export class MemStorage implements IStorage {
       currency: 'NGN'
     }).format(Number(contribution.amount));
 
-    const entityName = purse ? purse.name : group.name;
+    const entityName = project ? project.name : group.name;
 
     // Notify the contributor that their payment was confirmed
     await this.createNotification({
@@ -515,7 +515,7 @@ export class MemStorage implements IStorage {
       title: "Payment Confirmed!",
       message: `Your payment of ${contributionAmount} for ${entityName} has been confirmed and added to the total.`,
       contributionId: contribution.id,
-      purseId: contribution.purseId,
+      projectId: contribution.projectId,
     });
   }
 
@@ -556,12 +556,12 @@ export class MemStorage implements IStorage {
   }> {
     const adminGroups = Array.from(this.groups.values()).filter(group => group.adminId === adminId);
     
-    // Calculate total collections from all purses in admin's groups
-    const allPurses = Array.from(this.purses.values()).filter(purse => 
-      adminGroups.some(group => group.id === purse.groupId)
+    // Calculate total collections from all projects in admin's groups
+    const allProjects = Array.from(this.projects.values()).filter(project => 
+      adminGroups.some(group => group.id === project.groupId)
     );
-    const totalCollections = allPurses
-      .reduce((sum, purse) => sum + Number(purse.collectedAmount), 0)
+    const totalCollections = allProjects
+      .reduce((sum, project) => sum + Number(project.collectedAmount), 0)
       .toString();
     
     const activeMembers = Array.from(this.groupMembers.values())
@@ -580,10 +580,10 @@ export class MemStorage implements IStorage {
         .filter(contrib => contrib.groupId === group.id && contrib.status === "pending");
       totalPendingPayments += groupContributions.length;
       
-      // Calculate completion based on purses
-      const groupPurses = Array.from(this.purses.values()).filter(purse => purse.groupId === group.id);
-      const totalTarget = groupPurses.reduce((sum, purse) => sum + Number(purse.targetAmount), 0);
-      const totalCollected = groupPurses.reduce((sum, purse) => sum + Number(purse.collectedAmount), 0);
+      // Calculate completion based on projects
+      const groupProjects = Array.from(this.projects.values()).filter(project => project.groupId === group.id);
+      const totalTarget = groupProjects.reduce((sum, project) => sum + Number(project.targetAmount), 0);
+      const totalCollected = groupProjects.reduce((sum, project) => sum + Number(project.collectedAmount), 0);
       
       if (totalTarget > 0 && totalCollected >= totalTarget) {
         completedGroups++;
@@ -633,7 +633,7 @@ export class MemStorage implements IStorage {
   private async createPaymentNotifications(contribution: Contribution): Promise<void> {
     const user = this.users.get(contribution.userId);
     const group = this.groups.get(contribution.groupId);
-    const purse = contribution.purseId ? this.purses.get(contribution.purseId) : null;
+    const project = contribution.projectId ? this.projects.get(contribution.projectId) : null;
     
     if (!user || !group) {
       console.error("User or group not found for notification");
@@ -645,7 +645,7 @@ export class MemStorage implements IStorage {
       currency: 'NGN'
     }).format(Number(contribution.amount));
 
-    const entityName = purse ? purse.name : group.name;
+    const entityName = project ? project.name : group.name;
 
     // Notify group admin
     await this.createNotification({
@@ -654,7 +654,7 @@ export class MemStorage implements IStorage {
       title: "New Payment Submitted",
       message: `${user.fullName} submitted a payment of ${contributionAmount} for ${entityName}. Please review and confirm.`,
       contributionId: contribution.id,
-      purseId: contribution.purseId,
+      projectId: contribution.projectId,
     });
 
     // Notify accountability partners
@@ -666,7 +666,7 @@ export class MemStorage implements IStorage {
         title: "Payment Submitted for Review",
         message: `${user.fullName} submitted a payment of ${contributionAmount} for ${entityName}. You can review the payment details.`,
         contributionId: contribution.id,
-        purseId: contribution.purseId,
+        projectId: contribution.projectId,
       });
     }
   }
@@ -675,7 +675,7 @@ export class MemStorage implements IStorage {
   async createRejectionNotification(contribution: Contribution, reason?: string): Promise<void> {
     const user = this.users.get(contribution.userId);
     const group = this.groups.get(contribution.groupId);
-    const purse = contribution.purseId ? this.purses.get(contribution.purseId) : null;
+    const project = contribution.projectId ? this.projects.get(contribution.projectId) : null;
     
     if (!user || !group) {
       console.error("User or group not found for rejection notification");
@@ -687,7 +687,7 @@ export class MemStorage implements IStorage {
       currency: 'NGN'
     }).format(Number(contribution.amount));
 
-    const entityName = purse ? purse.name : group.name;
+    const entityName = project ? project.name : group.name;
     const reasonText = reason ? ` Reason: ${reason}` : '';
 
     // Notify the contributor that their payment was rejected
@@ -697,7 +697,7 @@ export class MemStorage implements IStorage {
       title: "Payment Rejected",
       message: `Your payment of ${contributionAmount} for ${entityName} was rejected.${reasonText} Please contact the admin for clarification.`,
       contributionId: contribution.id,
-      purseId: contribution.purseId,
+      projectId: contribution.projectId,
     });
   }
 

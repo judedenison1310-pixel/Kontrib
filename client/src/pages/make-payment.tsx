@@ -63,9 +63,9 @@ export default function MakePayment() {
     enabled: !!user,
   });
 
-  // Fetch purses for selected group
+  // Fetch projects for selected group
   const { data: groupPurses = [] } = useQuery<any[]>({
-    queryKey: ["/api/groups", selectedGroupId, "purses"],
+    queryKey: ["/api/groups", selectedGroupId, "projects"],
     enabled: !!selectedGroupId,
   });
 
@@ -290,28 +290,28 @@ export default function MakePayment() {
                       )}
                     />
 
-                    {/* Purse Selection (if group has purses) */}
+                    {/* Project Selection (if group has projects) */}
                     {groupPurses.length > 0 && (
                       <FormField
                         control={form.control}
-                        name="purseId"
+                        name="projectId"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Select Purse (Optional)</FormLabel>
+                            <FormLabel>Select Project (Optional)</FormLabel>
                             <Select onValueChange={field.onChange} defaultValue={field.value}>
                               <FormControl>
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Choose a specific purse or leave empty for general contribution" />
+                                  <SelectValue placeholder="Choose a specific project or leave empty for general contribution" />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
                                 <SelectItem value="">General Contribution</SelectItem>
-                                {groupPurses.map((purse) => (
-                                  <SelectItem key={purse.id} value={purse.id}>
+                                {groupPurses.map((project) => (
+                                  <SelectItem key={project.id} value={project.id}>
                                     <div className="flex items-center justify-between w-full">
-                                      <span>{purse.name}</span>
+                                      <span>{project.name}</span>
                                       <span className="text-xs text-gray-500 ml-2">
-                                        {formatNaira(purse.targetAmount)}
+                                        {formatNaira(project.targetAmount)}
                                       </span>
                                     </div>
                                   </SelectItem>

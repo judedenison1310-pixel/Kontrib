@@ -12,25 +12,25 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 
-const createPurseFormSchema = insertPurseSchema.extend({
+const createProjectFormSchema = insertProjectSchema.extend({
   targetAmount: z.string().min(1, "Target amount is required"),
 });
 
-type CreatePurseFormData = z.infer<typeof createPurseFormSchema>;
+type CreateProjectFormData = z.infer<typeof createProjectFormSchema>;
 
-interface CreatePurseModalProps {
+interface CreateProjectModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   groupId: string;
   groupName: string;
 }
 
-export function CreatePurseModal({ open, onOpenChange, groupId, groupName }: CreatePurseModalProps) {
+export function CreateProjectModal({ open, onOpenChange, groupId, groupName }: CreateProjectModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const form = useForm<CreatePurseFormData>({
-    resolver: zodResolver(createPurseFormSchema),
+  const form = useForm<CreateProjectFormData>({
+    resolver: zodResolver(createProjectFormSchema),
     defaultValues: {
       name: "",
       description: "",
@@ -40,21 +40,21 @@ export function CreatePurseModal({ open, onOpenChange, groupId, groupName }: Cre
     },
   });
 
-  const createPurseMutation = useMutation({
-    mutationFn: async (data: CreatePurseFormData) => {
+  const createProjectMutation = useMutation({
+    mutationFn: async (data: CreateProjectFormData) => {
       const payload = {
         ...data,
         // Ensure deadline is either a string or undefined, not an empty string
         deadline: data.deadline && typeof data.deadline === 'string' && data.deadline.trim() ? data.deadline : undefined,
       };
-      const response = await apiRequest("POST", `/api/groups/${groupId}/purses`, payload);
+      const response = await apiRequest("POST", `/api/groups/${groupId}/projects`, payload);
       return response.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/groups", groupId, "purses"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/groups", groupId, "projects"] });
       toast({
-        title: "Purse Created!",
-        description: `Purse "${data.name}" has been created with custom URL: kontrib.app/${data.customSlug}`,
+        title: "Project Created!",
+        description: `Project "${data.name}" has been created with custom URL: kontrib.app/${data.customSlug}`,
       });
       form.reset();
       onOpenChange(false);
@@ -62,21 +62,21 @@ export function CreatePurseModal({ open, onOpenChange, groupId, groupName }: Cre
     onError: (error) => {
       toast({
         title: "Error",
-        description: "Failed to create purse. Please try again.",
+        description: "Failed to create project. Please try again.",
         variant: "destructive",
       });
     },
   });
 
-  const onSubmit = (data: CreatePurseFormData) => {
-    createPurseMutation.mutate(data);
+  const onSubmit = (data: CreateProjectFormData) => {
+    createProjectMutation.mutate(data);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create New Purse for {groupName}</DialogTitle>
+          <DialogTitle>Create New Project for {groupName}</DialogTitle>
         </DialogHeader>
         
         <Form {...form}>
@@ -86,9 +86,9 @@ export function CreatePurseModal({ open, onOpenChange, groupId, groupName }: Cre
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Purse Name</FormLabel>
+                  <FormLabel>Project Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter purse name" {...field} />
+                    <Input placeholder="Enter project name" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

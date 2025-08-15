@@ -18,7 +18,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { getCurrentUser } from "@/lib/auth";
 import { formatNaira } from "@/lib/currency";
-import { Group, Purse, ContributionWithDetails } from "@shared/schema";
+import { Group, Project, ContributionWithDetails } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
@@ -46,12 +46,12 @@ export default function WhatsAppIntegration() {
 
   const generateWhatsAppLink = (group: Group, purse?: Purse) => {
     const baseUrl = window.location.origin;
-    const groupUrl = purse 
-      ? `${baseUrl}/${group.customSlug}/${purse.customSlug?.split('/')[1] || purse.name.toLowerCase().replace(/\s+/g, '')}`
+    const groupUrl = project 
+      ? `${baseUrl}/${group.customSlug}/${project.customSlug?.split('/')[1] || project.name.toLowerCase().replace(/\s+/g, '')}`
       : `${baseUrl}/register/${group.registrationLink}`;
     
-    const message = purse 
-      ? `🎯 *${purse.name}* - Kontrib\n\n💰 Target: ${formatNaira(Number(purse.targetAmount))}\n📈 Progress: ${purse.collectedAmount ? Math.round((Number(purse.collectedAmount) / Number(purse.targetAmount)) * 100) : 0}%\n📅 Deadline: ${new Date(purse.deadline || '').toLocaleDateString()}\n\n👥 Join our contribution group and track progress together!\n\n🔗 ${groupUrl}\n\n#Kontrib #GroupContributions #${group.name.replace(/\s+/g, '')}`
+    const message = project 
+      ? `🎯 *${project.name}* - Kontrib\n\n💰 Target: ${formatNaira(Number(project.targetAmount))}\n📈 Progress: ${project.collectedAmount ? Math.round((Number(project.collectedAmount) / Number(project.targetAmount)) * 100) : 0}%\n📅 Deadline: ${new Date(project.deadline || '').toLocaleDateString()}\n\n👥 Join our contribution group and track progress together!\n\n🔗 ${groupUrl}\n\n#Kontrib #GroupContributions #${group.name.replace(/\s+/g, '')}`
       : `🎉 Join "${group.name}" on Kontrib!\n\nManage group contributions with transparency and ease.\n\n👉 Register here: ${groupUrl}\n\n#Kontrib #GroupContributions`;
     
     return `https://wa.me/?text=${encodeURIComponent(message)}`;
@@ -150,40 +150,40 @@ export default function WhatsAppIntegration() {
               </CardContent>
             </Card>
 
-            {/* Purse Selection */}
+            {/* Project Selection */}
             {selectedGroup && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-sm">Select Purse (Optional)</CardTitle>
+                  <CardTitle className="text-sm">Select Project (Optional)</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {purses.length === 0 ? (
-                    <p className="text-gray-500 text-sm">No purses in this group</p>
+                  {projects.length === 0 ? (
+                    <p className="text-gray-500 text-sm">No projects in this group</p>
                   ) : (
-                    purses.map((purse) => (
+                    projects.map((project) => (
                       <div
-                        key={purse.id}
+                        key={project.id}
                         className={`p-3 border rounded-lg cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${
-                          selectedPurse?.id === purse.id ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'border-gray-200 dark:border-gray-700'
+                          selectedProject?.id === project.id ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'border-gray-200 dark:border-gray-700'
                         }`}
-                        onClick={() => setSelectedPurse(purse)}
-                        data-testid={`purse-select-${purse.id}`}
+                        onClick={() => setSelectedProject(project)}
+                        data-testid={`project-select-${project.id}`}
                       >
                         <div className="space-y-2">
                           <div className="flex justify-between items-start">
-                            <h3 className="font-medium text-gray-900 dark:text-white">{purse.name}</h3>
+                            <h3 className="font-medium text-gray-900 dark:text-white">{project.name}</h3>
                             <Badge variant="outline">
-                              {Math.round((Number(purse.collectedAmount) / Number(purse.targetAmount)) * 100)}%
+                              {Math.round((Number(project.collectedAmount) / Number(project.targetAmount)) * 100)}%
                             </Badge>
                           </div>
                           <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 dark:text-gray-400">
                             <div className="flex items-center gap-1">
                               <Target className="h-3 w-3" />
-                              {formatNaira(Number(purse.targetAmount))}
+                              {formatNaira(Number(project.targetAmount))}
                             </div>
                             <div className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
-                              {new Date(purse.deadline || '').toLocaleDateString()}
+                              {new Date(project.deadline || '').toLocaleDateString()}
                             </div>
                           </div>
                         </div>
@@ -207,15 +207,15 @@ export default function WhatsAppIntegration() {
                   {/* Preview of the message */}
                   <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
                     <div className="space-y-2 text-sm">
-                      {selectedPurse ? (
+                      {selectedProject ? (
                         <>
-                          <div className="font-semibold">🎯 {selectedPurse.name} - Kontrib</div>
-                          <div>💰 Target: {formatNaira(Number(selectedPurse.targetAmount))}</div>
-                          <div>📈 Progress: {Math.round((Number(selectedPurse.collectedAmount) / Number(selectedPurse.targetAmount)) * 100)}%</div>
-                          <div>📅 Deadline: {new Date(selectedPurse.deadline || '').toLocaleDateString()}</div>
+                          <div className="font-semibold">🎯 {selectedProject.name} - Kontrib</div>
+                          <div>💰 Target: {formatNaira(Number(selectedProject.targetAmount))}</div>
+                          <div>📈 Progress: {Math.round((Number(selectedProject.collectedAmount) / Number(selectedProject.targetAmount)) * 100)}%</div>
+                          <div>📅 Deadline: {new Date(selectedProject.deadline || '').toLocaleDateString()}</div>
                           <div className="pt-2">👥 Join our contribution group and track progress together!</div>
                           <div className="text-blue-600 dark:text-blue-400">
-                            🔗 {window.location.origin}/{selectedGroup.customSlug}/{selectedPurse.customSlug?.split('/')[1] || selectedPurse.name.toLowerCase().replace(/\s+/g, '')}
+                            🔗 {window.location.origin}/{selectedGroup.customSlug}/{selectedProject.customSlug?.split('/')[1] || selectedProject.name.toLowerCase().replace(/\s+/g, '')}
                           </div>
                           <div className="text-gray-500 text-xs">
                             #Kontrib #GroupContributions #{selectedGroup.name.replace(/\s+/g, '')}
@@ -239,7 +239,7 @@ export default function WhatsAppIntegration() {
                   {/* Action Buttons */}
                   <div className="flex flex-wrap gap-2">
                     <Button
-                      onClick={() => openWhatsApp(generateWhatsAppLink(selectedGroup, selectedPurse || undefined))}
+                      onClick={() => openWhatsApp(generateWhatsAppLink(selectedGroup, selectedProject || undefined))}
                       className="bg-green-600 hover:bg-green-700 text-white"
                       data-testid="share-whatsapp"
                     >
@@ -249,8 +249,8 @@ export default function WhatsAppIntegration() {
                     <Button
                       variant="outline"
                       onClick={() => {
-                        const url = selectedPurse 
-                          ? `${window.location.origin}/${selectedGroup.customSlug}/${selectedPurse.customSlug?.split('/')[1] || selectedPurse.name.toLowerCase().replace(/\s+/g, '')}`
+                        const url = selectedProject 
+                          ? `${window.location.origin}/${selectedGroup.customSlug}/${selectedProject.customSlug?.split('/')[1] || selectedProject.name.toLowerCase().replace(/\s+/g, '')}`
                           : `${window.location.origin}/register/${selectedGroup.registrationLink}`;
                         copyToClipboard(url);
                       }}
@@ -262,8 +262,8 @@ export default function WhatsAppIntegration() {
                     <Button
                       variant="outline"
                       onClick={() => {
-                        const url = selectedPurse 
-                          ? `${window.location.origin}/${selectedGroup.customSlug}/${selectedPurse.customSlug?.split('/')[1] || selectedPurse.name.toLowerCase().replace(/\s+/g, '')}`
+                        const url = selectedProject 
+                          ? `${window.location.origin}/${selectedGroup.customSlug}/${selectedProject.customSlug?.split('/')[1] || selectedProject.name.toLowerCase().replace(/\s+/g, '')}`
                           : `${window.location.origin}/register/${selectedGroup.registrationLink}`;
                         window.open(url, '_blank');
                       }}
@@ -335,8 +335,8 @@ export default function WhatsAppIntegration() {
                           <div>
                             <div className="font-medium text-gray-900 dark:text-white">
                               {contribution.groupName}
-                              {contribution.purseName && (
-                                <span className="text-gray-500"> → {contribution.purseName}</span>
+                              {contribution.projectName && (
+                                <span className="text-gray-500"> → {contribution.projectName}</span>
                               )}
                             </div>
                             <div className="text-sm text-gray-500">

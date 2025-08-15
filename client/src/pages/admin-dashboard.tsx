@@ -111,17 +111,17 @@ export default function AdminDashboard() {
     setPaymentModalOpen(true);
   };
 
-  // Hook to fetch purses for a specific group
-  const useGroupPurses = (groupId: string) => {
-    return useQuery<Purse[]>({
-      queryKey: ["/api/groups", groupId, "purses"],
+  // Hook to fetch projects for a specific group
+  const useGroupProjects = (groupId: string) => {
+    return useQuery<Project[]>({
+      queryKey: ["/api/groups", groupId, "projects"],
       enabled: !!groupId,
     });
   };
 
-  // Component to display group with its purses
-  function GroupWithPurses({ group }: { group: Group }) {
-    const { data: purses = [], isLoading: pursesLoading } = useGroupPurses(group.id);
+  // Component to display group with its projects
+  function GroupWithProjects({ group }: { group: Group }) {
+    const { data: projects = [], isLoading: projectsLoading } = useGroupProjects(group.id);
     const isExpanded = expandedGroupId === group.id;
 
     return (
@@ -136,13 +136,13 @@ export default function AdminDashboard() {
         {/* Quick Actions for Group */}
         <div className="flex space-x-2">
           <Button
-            onClick={() => handleCreatePurse(group)}
+            onClick={() => handleCreateProject(group)}
             variant="outline"
             size="sm"
             className="flex-1"
           >
             <FolderPlus className="h-4 w-4 mr-1" />
-            Add Purse
+            Add Project
           </Button>
           <Button
             onClick={() => toggleGroupExpansion(group.id)}
@@ -151,7 +151,7 @@ export default function AdminDashboard() {
             className="flex-1"
           >
             <Settings className="h-4 w-4 mr-1" />
-            {isExpanded ? 'Hide' : 'View'} Purses ({purses.length})
+            {isExpanded ? 'Hide' : 'View'} Projects ({projects.length})
           </Button>
           <Button
             onClick={() => handleManagePartners(group)}
@@ -164,36 +164,36 @@ export default function AdminDashboard() {
           </Button>
         </div>
 
-        {/* Purses List */}
+        {/* Projects List */}
         {isExpanded && (
           <div className="ml-4 pl-4 border-l-2 border-gray-200 space-y-3">
-            {pursesLoading ? (
+            {projectsLoading ? (
               <div className="text-center py-4">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-nigerian-green mx-auto"></div>
-                <p className="text-sm text-gray-600 mt-2">Loading purses...</p>
+                <p className="text-sm text-gray-600 mt-2">Loading projects...</p>
               </div>
-            ) : purses.length === 0 ? (
+            ) : projects.length === 0 ? (
               <div className="text-center py-6 bg-gray-50 rounded-lg">
                 <FolderPlus className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-sm text-gray-600 mb-3">No purses yet in this group</p>
+                <p className="text-sm text-gray-600 mb-3">No projects yet in this group</p>
                 <Button
-                  onClick={() => handleCreatePurse(group)}
+                  onClick={() => handleCreateProject(group)}
                   size="sm"
                   className="bg-nigerian-green hover:bg-forest-green"
                 >
                   <Plus className="h-4 w-4 mr-1" />
-                  Create First Purse
+                  Create First Project
                 </Button>
               </div>
             ) : (
               <div className="space-y-3">
-                <h4 className="font-medium text-gray-900">Active Purses ({purses.length})</h4>
-                {purses.map((purse) => (
-                  <PurseCard 
-                    key={purse.id} 
-                    purse={purse} 
+                <h4 className="font-medium text-gray-900">Active Projects ({projects.length})</h4>
+                {projects.map((project) => (
+                  <ProjectCard 
+                    key={project.id} 
+                    project={project} 
                     isAdmin={true}
-                    onContribute={handleContributeToPurse}
+                    onContribute={handleContributeToProject}
                   />
                 ))}
               </div>
@@ -344,7 +344,7 @@ export default function AdminDashboard() {
                 ) : (
                   <div className="space-y-4">
                     {groups.map((group) => (
-                      <GroupWithPurses key={group.id} group={group} />
+                      <GroupWithProjects key={group.id} group={group} />
                     ))}
                   </div>
                 )}
@@ -404,8 +404,8 @@ export default function AdminDashboard() {
                               </Badge>
                             </div>
                             <p className="text-sm text-gray-600">{contribution.groupName}
-                              {contribution.purseName && (
-                                <span className="text-gray-500"> → {contribution.purseName}</span>
+                              {contribution.projectName && (
+                                <span className="text-gray-500"> → {contribution.projectName}</span>
                               )}
                             </p>
                             <p className="text-xs text-gray-500">
@@ -443,20 +443,7 @@ export default function AdminDashboard() {
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Quick Actions */}
-            <Card>
-              <CardContent>
-                <div className="space-y-3">
-                  <Button 
-                    onClick={() => setCreateGroupModalOpen(true)}
-                    className="w-full bg-nigerian-green hover:bg-forest-green"
-                  >
-                    <Plus className="h-4 w-4 mr-3" />
-                    Create New Group
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            
 
             {/* WhatsApp Integration */}
             <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
@@ -507,12 +494,12 @@ export default function AdminDashboard() {
         open={createGroupModalOpen}
         onOpenChange={setCreateGroupModalOpen}
       />
-      {/* Purse and Accountability Partner Modals */}
+      {/* Project and Accountability Partner Modals */}
       {selectedGroup && (
         <>
-          <CreatePurseModal
-            open={createPurseModalOpen}
-            onOpenChange={setCreatePurseModalOpen}
+          <CreateProjectModal
+            open={createProjectModalOpen}
+            onOpenChange={setCreateProjectModalOpen}
             groupId={selectedGroup.id}
             groupName={selectedGroup.name}
           />
@@ -528,7 +515,7 @@ export default function AdminDashboard() {
       <PaymentModal 
         open={paymentModalOpen}
         onOpenChange={setPaymentModalOpen}
-        purse={selectedPurse}
+        project={selectedProject}
       />
       <PaymentApprovalModal
         open={approvalModalOpen}

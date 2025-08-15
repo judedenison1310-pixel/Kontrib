@@ -1,4 +1,4 @@
-import { Purse, PurseWithStats } from "@shared/schema";
+import { Project, ProjectWithStats } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,21 +6,21 @@ import { Progress } from "@/components/ui/progress";
 import { Settings, Target, Calendar, TrendingUp } from "lucide-react";
 import { formatNaira, calculateProgress } from "@/lib/currency";
 
-interface PurseCardProps {
-  purse: Purse | PurseWithStats;
+interface ProjectCardProps {
+  project: Project | ProjectWithStats;
   isAdmin?: boolean;
-  onManage?: (purse: Purse) => void;
-  onContribute?: (purse: Purse) => void;
+  onManage?: (project: Project) => void;
+  onContribute?: (project: Project) => void;
 }
 
-export function PurseCard({ 
-  purse, 
+export function ProjectCard({ 
+  project, 
   isAdmin = false, 
   onManage, 
   onContribute
-}: PurseCardProps) {
-  const progress = calculateProgress(purse.collectedAmount, purse.targetAmount);
-  const contributionCount = 'contributionCount' in purse ? purse.contributionCount : 0;
+}: ProjectCardProps) {
+  const progress = calculateProgress(project.collectedAmount, project.targetAmount);
+  const contributionCount = 'contributionCount' in project ? project.contributionCount : 0;
   
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -41,13 +41,13 @@ export function PurseCard({
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
             <div className="flex items-center space-x-3 mb-2">
-              <h4 className="font-semibold text-gray-900">{purse.name}</h4>
-              <Badge className={getStatusColor(purse.status)}>
-                {purse.status}
+              <h4 className="font-semibold text-gray-900">{project.name}</h4>
+              <Badge className={getStatusColor(project.status)}>
+                {project.status}
               </Badge>
             </div>
-            {purse.description && (
-              <p className="text-sm text-gray-600 mb-3">{purse.description}</p>
+            {project.description && (
+              <p className="text-sm text-gray-600 mb-3">{project.description}</p>
             )}
           </div>
         </div>
@@ -58,11 +58,11 @@ export function PurseCard({
               <Target className="h-4 w-4 mr-1" />
               Target
             </p>
-            <p className="font-semibold">{formatNaira(purse.targetAmount)}</p>
+            <p className="font-semibold">{formatNaira(project.targetAmount)}</p>
           </div>
           <div>
             <p className="text-gray-600">Collected</p>
-            <p className="font-semibold text-green-600">{formatNaira(purse.collectedAmount)}</p>
+            <p className="font-semibold text-green-600">{formatNaira(project.collectedAmount)}</p>
           </div>
           <div>
             <p className="text-gray-600 flex items-center">
@@ -76,25 +76,25 @@ export function PurseCard({
           </div>
         </div>
 
-        {purse.deadline && (
+        {project.deadline && (
           <div className="mb-4 p-2 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-600 flex items-center">
               <Calendar className="h-4 w-4 mr-1" />
-              Deadline: {new Date(purse.deadline).toLocaleDateString()}
+              Deadline: {new Date(project.deadline).toLocaleDateString()}
             </p>
           </div>
         )}
 
-        {('contributionCount' in purse || 'completionRate' in purse) && (
+        {('contributionCount' in project || 'completionRate' in project) && (
           <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
-            {'contributionCount' in purse && <span>{(purse as any).contributionCount} contributions</span>}
-            {'completionRate' in purse && <span>Completion: {(purse as any).completionRate}%</span>}
+            {'contributionCount' in project && <span>{(project as any).contributionCount} contributions</span>}
+            {'completionRate' in project && <span>Completion: {(project as any).completionRate}%</span>}
           </div>
         )}
 
         <div className="flex space-x-2">
           <Button
-            onClick={() => onContribute?.(purse)}
+            onClick={() => onContribute?.(project)}
             className="flex-1 bg-nigerian-green hover:bg-forest-green"
           >
             Contribute
@@ -103,7 +103,7 @@ export function PurseCard({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onManage?.(purse)}
+              onClick={() => onManage?.(project)}
               className="flex-1"
             >
               <Settings className="h-4 w-4 mr-2" />
