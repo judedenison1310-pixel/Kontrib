@@ -445,9 +445,6 @@ export default function AdminDashboard() {
           <div className="space-y-6">
             {/* Quick Actions */}
             <Card>
-              <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-              </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   <Button 
