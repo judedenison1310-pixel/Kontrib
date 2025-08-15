@@ -275,7 +275,7 @@ export default function AdminDashboard() {
           </Card>
 
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-6 pt-[10px] pb-[10px]">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Pending Payments</p>
