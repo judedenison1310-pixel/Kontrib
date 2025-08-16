@@ -17,7 +17,8 @@ import {
   ChevronUp,
   Settings,
   Target,
-  Calendar
+  Calendar,
+  MessageCircle
 } from "lucide-react";
 import { getCurrentUser, isAdmin } from "@/lib/auth";
 import { formatNaira } from "@/lib/currency";
@@ -277,8 +278,8 @@ export default function Groups() {
 
       {/* Create Group Modal */}
       <CreateGroupModal
-        isOpen={createGroupModalOpen}
-        onClose={() => setCreateGroupModalOpen(false)}
+        open={createGroupModalOpen}
+        onOpenChange={setCreateGroupModalOpen}
       />
 
       {/* Create Project Modal */}
@@ -352,7 +353,7 @@ export default function Groups() {
               ) : (
                 <>
                   <ChevronDown className="h-4 w-4 mr-1" />
-                  View Projects ({group.projectCount || 0})
+                  View Projects ({(group as any).projectCount || 0})
                 </>
               )}
             </Button>
