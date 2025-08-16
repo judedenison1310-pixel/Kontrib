@@ -140,6 +140,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const membership = await storage.addGroupMember({ groupId, userId });
+      
+      // Get group and new member details for notification
+      const group = await storage.getGroup(groupId);
+      const user = await storage.getUser(userId);
+      
+      if (group && user) {
+        // Create notification for group admin about new member
+        await storage.createNotification({
+          userId: group.adminId,
+          type: "member_joined",
+          title: "New Member Joined",
+          message: `${user.fullName} (@${user.username}) has joined your group "${group.name}"`,
+          data: JSON.stringify({
+            groupId: group.id,
+            groupName: group.name,
+            newMemberId: user.id,
+            newMemberName: user.fullName,
+            newMemberUsername: user.username
+          })
+        });
+      }
+      
       res.json(membership);
     } catch (error) {
       console.error("Join group error:", error);

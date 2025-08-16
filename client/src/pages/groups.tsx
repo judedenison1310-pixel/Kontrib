@@ -18,7 +18,10 @@ import {
   Settings,
   Target,
   Calendar,
-  MessageCircle
+  MessageCircle,
+  UserPlus,
+  Eye,
+  UserCheck
 } from "lucide-react";
 import { getCurrentUser, isAdmin } from "@/lib/auth";
 import { formatNaira } from "@/lib/currency";
@@ -58,6 +61,14 @@ export default function Groups() {
     });
   };
 
+  // Hook to fetch members for a specific group
+  const useGroupMembers = (groupId: string) => {
+    return useQuery<any[]>({
+      queryKey: ["/api/groups", groupId, "members"],
+      enabled: !!groupId && expandedGroups.has(groupId),
+    });
+  };
+
   const toggleGroupExpansion = (groupId: string) => {
     const newExpanded = new Set(expandedGroups);
     if (newExpanded.has(groupId)) {
@@ -84,6 +95,11 @@ export default function Groups() {
   const handleContributeToProject = (project: Project) => {
     // Navigate to make payment page with project pre-selected
     window.location.href = "/make-payment";
+  };
+
+  const handleViewMembers = (group: Group) => {
+    // Toggle group expansion to show members
+    toggleGroupExpansion(group.id);
   };
 
   const handleShareGroup = (group: any) => {
@@ -305,6 +321,7 @@ export default function Groups() {
     userContribution?: string;
   }) {
     const { data: projects = [], isLoading: projectsLoading } = useGroupProjects(group.id);
+    const { data: members = [], isLoading: membersLoading } = useGroupMembers(group.id);
 
     return (
       <Card className="hover:shadow-lg transition-shadow">
@@ -358,6 +375,19 @@ export default function Groups() {
               )}
             </Button>
 
+            {userIsAdmin && (
+              <Button
+                onClick={() => handleViewMembers(group)}
+                variant="outline"
+                size="sm"
+                className="flex-1 min-w-[120px]"
+                data-testid={`view-members-${group.id}`}
+              >
+                <UserCheck className="h-4 w-4 mr-1" />
+                View Members ({(group as any).memberCount || 0})
+              </Button>
+            )}
+
             <Button
               onClick={() => handleShareGroup(group)}
               variant="outline"
@@ -370,27 +400,89 @@ export default function Groups() {
             </Button>
           </div>
 
-          {/* Projects Section */}
+          {/* Expanded Content - Members and Projects */}
           {isExpanded && (
-            <div className="border-t pt-4">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="font-semibold text-gray-900 dark:text-white flex items-center">
-                  <Target className="h-5 w-5 mr-2 text-nigerian-green" />
-                  Projects in {group.name}
-                </h4>
-                {userIsAdmin && (
-                  <Button
-                    onClick={() => handleCreateProject(group)}
-                    size="sm"
-                    className="bg-nigerian-green hover:bg-forest-green"
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    New Project
-                  </Button>
-                )}
-              </div>
+            <div className="border-t pt-4 space-y-6">
+              {/* Members Section */}
+              {userIsAdmin && (
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-semibold text-gray-900 dark:text-white flex items-center">
+                      <Users className="h-5 w-5 mr-2 text-nigerian-green" />
+                      Members in {group.name}
+                    </h4>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        {members.length} member{members.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  </div>
 
-              {projectsLoading ? (
+                  {membersLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-nigerian-green"></div>
+                      <span className="ml-2 text-sm text-gray-600">Loading members...</span>
+                    </div>
+                  ) : members.length === 0 ? (
+                    <div className="text-center py-6 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <UserPlus className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
+                        No members have joined this group yet. Share the group link to invite members.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {members.map((member) => (
+                        <Card key={member.id} className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-nigerian-green rounded-full flex items-center justify-center">
+                              <Users className="h-5 w-5 text-white" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-gray-900 dark:text-white truncate">
+                                {member.user?.fullName || 'Unknown Member'}
+                              </p>
+                              <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                                @{member.user?.username || 'unknown'}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                Joined {new Date(member.joinedAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-medium text-nigerian-green">
+                                {formatNaira(member.contributedAmount || "0")}
+                              </p>
+                              <p className="text-xs text-gray-500">contributed</p>
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Projects Section */}
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-semibold text-gray-900 dark:text-white flex items-center">
+                    <Target className="h-5 w-5 mr-2 text-nigerian-green" />
+                    Projects in {group.name}
+                  </h4>
+                  {userIsAdmin && (
+                    <Button
+                      onClick={() => handleCreateProject(group)}
+                      size="sm"
+                      className="bg-nigerian-green hover:bg-forest-green"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      New Project
+                    </Button>
+                  )}
+                </div>
+
+                {projectsLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-nigerian-green"></div>
                   <span className="ml-2 text-gray-600">Loading projects...</span>
@@ -447,6 +539,7 @@ export default function Groups() {
                   ))}
                 </div>
               )}
+              </div>
             </div>
           )}
         </CardContent>
