@@ -168,19 +168,25 @@ export class MemStorage implements IStorage {
 
   async createGroup(insertGroup: InsertGroup, adminId: string): Promise<Group> {
     const id = randomUUID();
-    const registrationLink = randomUUID();
     
-    // Create custom URL slug from group name
-    const groupSlug = insertGroup.name
+    // Create user-friendly registration code from group name
+    const baseCode = insertGroup.name
       .toLowerCase()
       .replace(/[^a-z0-9\s]/g, '') // Remove special characters
       .replace(/\s+/g, '') // Remove spaces
-      .substring(0, 20); // Limit length
+      .substring(0, 15); // Limit length
+    
+    // Add year to make it unique and memorable
+    const currentYear = new Date().getFullYear();
+    const registrationLink = `${baseCode}${currentYear}`;
+    
+    // Create custom URL slug from group name (keep existing logic)
+    const groupSlug = baseCode;
 
-    // Auto-generate WhatsApp sharing link if not provided
+    // Auto-generate WhatsApp sharing link with new format
     let whatsappLink = insertGroup.whatsappLink;
     if (!whatsappLink) {
-      const customUrl = `kontrib.app/${groupSlug}`;
+      const customUrl = `kontrib.app/join/${registrationLink}`;
       const message = `🎉 Join "${insertGroup.name}" on Kontrib!\n\nManage group contributions with transparency and ease.\n\n👉 Register here: ${customUrl}\n\n#Kontrib #GroupContributions`;
       whatsappLink = `https://wa.me/?text=${encodeURIComponent(message)}`;
     }

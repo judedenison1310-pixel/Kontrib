@@ -8,6 +8,7 @@ import { CreateGroupModal } from "@/components/create-group-modal";
 import { CreateProjectModal } from "@/components/create-project-modal";
 import { GroupCard } from "@/components/group-card";
 import { ProjectCard } from "@/components/project-card";
+import { ShareableLinkDisplay, CopyLinkButton } from "@/components/copy-link-button";
 import { 
   Users, 
   Plus, 
@@ -103,7 +104,7 @@ export default function Groups() {
   };
 
   const handleShareGroup = (group: any) => {
-    const shareUrl = `${window.location.origin}/register/${group.registrationLink}`;
+    const shareUrl = `${window.location.origin}/join/${group.registrationLink}`;
     
     if (navigator.share) {
       navigator.share({
@@ -120,7 +121,7 @@ export default function Groups() {
     } else {
       // Fallback: Generate WhatsApp message
       const whatsappMessage = encodeURIComponent(
-        `🎯 You're invited to join our contribution group "${group.name}"!\n\n💰 Target: ${formatNaira(group.targetAmount || 0)}\n📅 Deadline: ${group.deadline ? new Date(group.deadline).toLocaleDateString() : 'No deadline'}\n\n👥 Join here: ${shareUrl}\n\n#Kontrib #GroupContribution`
+        `🎯 You're invited to join our contribution group "${group.name}"!\n\n💰 Manage contributions with transparency and ease.\n\n👥 Join here: ${shareUrl}\n\n#Kontrib #GroupContribution`
       );
       window.open(`https://wa.me/?text=${whatsappMessage}`, '_blank');
     }
@@ -339,6 +340,17 @@ export default function Groups() {
               />
             </div>
           </div>
+
+          {/* Shareable Link Display for Admins */}
+          {userIsAdmin && (
+            <div className="mb-6">
+              <ShareableLinkDisplay
+                link={`${window.location.origin}/join/${group.registrationLink}`}
+                title="Share Group Link"
+                description="Share this easy-to-remember link with people you want to invite"
+              />
+            </div>
+          )}
 
           {/* Group Action Buttons */}
           <div className="flex flex-wrap gap-2 mb-4">
