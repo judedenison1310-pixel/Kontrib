@@ -538,11 +538,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // When WhatsApp sending is successful, behave like production (no OTP in response)
       res.json({ 
         message: "OTP sent successfully via WhatsApp",
-        expiresAt: otpVerification.expiresAt,
-        // Only show OTP in development mode
-        ...(isDevelopment && { developmentOtp: otp })
+        expiresAt: otpVerification.expiresAt
+        // OTP codes are not included in response when WhatsApp delivery is successful
       });
     } catch (error) {
       console.error("Send OTP error:", error);
@@ -650,13 +650,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate and send OTP using existing storage method
       const otpData = await storage.sendOtp(phoneNumber);
       
-      // In development, include the OTP in the response
-      const isDevelopment = process.env.NODE_ENV === "development";
-      
+      // When WhatsApp sending is successful, behave like production (no OTP in response)
       res.json({
         message: "Login OTP sent successfully via WhatsApp",
-        expiresAt: otpData.expiresAt,
-        ...(isDevelopment && { developmentOtp: otpData.code })
+        expiresAt: otpData.expiresAt
+        // OTP codes are not included in response when WhatsApp delivery is successful
       });
     } catch (error) {
       console.error("Send login OTP error:", error);
