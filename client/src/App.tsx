@@ -58,6 +58,9 @@ function Router() {
       <Route path="/join/:link" component={GroupLanding} />
       <Route path="/member-payment" component={MemberPayment} />
       
+      {/* Member route - accessible but shows appropriate content based on auth */}
+      <Route path="/member" component={user ? MemberDashboard : Landing} />
+      
       {/* Protected routes */}
       {user && (
         <>
@@ -69,9 +72,8 @@ function Router() {
           <Route path="/groups" component={Groups} />
           <Route path="/join-group" component={JoinGroup} />
           
-          {/* Legacy admin/member specific routes */}
+          {/* Legacy admin specific route */}
           <Route path="/admin" component={AdminDashboard} />
-          <Route path="/member" component={MemberDashboard} />
           <Route path="/whatsapp" component={WhatsAppIntegration} />
         </>
       )}
