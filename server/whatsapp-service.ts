@@ -32,7 +32,7 @@ class WhatsAppService {
 
   constructor() {
     this.accessToken = process.env.META_WHATSAPP_TOKEN || process.env.WHATSAPP_ACCESS_TOKEN!;
-    this.phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID!;
+    this.phoneNumberId = process.env.META_PHONE_NUMBER_ID || process.env.WHATSAPP_PHONE_NUMBER_ID!;
     this.baseUrl = `https://graph.facebook.com/${this.apiVersion}/${this.phoneNumberId}`;
 
     if (!this.accessToken || !this.phoneNumberId) {
