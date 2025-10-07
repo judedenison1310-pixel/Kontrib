@@ -61,12 +61,12 @@ function Router() {
       
       {/* Member route - accessible but shows appropriate content based on auth */}
       <Route path="/member" component={user ? MemberDashboard : Landing} />
+      <Route path="/dashboard" component={user ? (isAdmin() ? AdminDashboard : MemberDashboard) : Landing} />
       
       {/* Protected routes */}
       {user && (
         <>
           {/* Member pages */}
-          <Route path="/dashboard" component={isAdmin() ? AdminDashboard : MemberDashboard} />
           <Route path="/make-payment" component={MakePayment} />
           <Route path="/my-contributions" component={MyContributions} />
           <Route path="/updates" component={Updates} />
