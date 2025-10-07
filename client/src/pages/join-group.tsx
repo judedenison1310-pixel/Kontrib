@@ -177,11 +177,6 @@ export default function JoinGroupPage() {
   
   const daysRemaining = getDaysRemaining();
 
-  if (!user) {
-    setLocation("/");
-    return null;
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-md mx-auto px-4 space-y-6">
@@ -325,25 +320,46 @@ export default function JoinGroupPage() {
               )}
 
               {/* Join Button */}
-              <Button 
-                onClick={handleJoinGroup}
-                disabled={joinGroupMutation.isPending}
-                className="w-full bg-green-600 hover:bg-green-700 text-white py-6 text-lg font-semibold rounded-lg shadow-lg"
-                data-testid="button-join-group"
-              >
-                {joinGroupMutation.isPending ? (
-                  <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Joining...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="w-5 h-5 mr-2" />
-                    Join This Group
-                    <ArrowRight className="w-5 h-5 ml-2" />
-                  </>
-                )}
-              </Button>
+              {user ? (
+                <Button 
+                  onClick={handleJoinGroup}
+                  disabled={joinGroupMutation.isPending}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white py-6 text-lg font-semibold rounded-lg shadow-lg"
+                  data-testid="button-join-group"
+                >
+                  {joinGroupMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Joining...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-5 h-5 mr-2" />
+                      Join This Group
+                      <ArrowRight className="w-5 h-5 ml-2" />
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <div className="space-y-3">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+                    <AlertCircle className="w-6 h-6 text-blue-600 mx-auto mb-2" />
+                    <p className="text-sm text-blue-800 font-medium mb-2">
+                      Please log in to join this group
+                    </p>
+                    <p className="text-xs text-blue-600">
+                      You'll need an account to become a member and start contributing
+                    </p>
+                  </div>
+                  <Button 
+                    onClick={() => setLocation("/")}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4"
+                    data-testid="button-login-to-join"
+                  >
+                    Go to Login
+                  </Button>
+                </div>
+              )}
 
               {/* Projects Preview */}
               {groupPreview.projects.length > 0 && (

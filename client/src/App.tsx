@@ -56,6 +56,7 @@ function Router() {
       <Route path="/register/:link" component={GroupRegistration} />
       <Route path="/join/:registrationId" component={GroupLanding} />
       <Route path="/join/:link" component={GroupLanding} />
+      <Route path="/join-group" component={JoinGroup} />
       <Route path="/member-payment" component={MemberPayment} />
       
       {/* Member route - accessible but shows appropriate content based on auth */}
@@ -70,7 +71,6 @@ function Router() {
           <Route path="/my-contributions" component={MyContributions} />
           <Route path="/updates" component={Updates} />
           <Route path="/groups" component={Groups} />
-          <Route path="/join-group" component={JoinGroup} />
           
           {/* Legacy admin specific route */}
           <Route path="/admin" component={AdminDashboard} />
