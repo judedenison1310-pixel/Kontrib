@@ -44,7 +44,7 @@ interface GroupData {
 
 export default function JoinGroupPage() {
   const [groupLink, setGroupLink] = useState("");
-  const [extractedLink, setExtractedLink] = useState<string | null>(null);
+  const [extractedIdentifier, setExtractedIdentifier] = useState<{ value: string; type: 'slug' | 'registration' } | null>(null);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const user = getCurrentUser();
@@ -56,57 +56,69 @@ export default function JoinGroupPage() {
     return Math.round((collectedNum / targetNum) * 100);
   };
 
-  // Extract registration link from various URL formats
-  const extractRegistrationLink = (input: string): string | null => {
+  // Extract group identifier (custom slug or registration link) from various URL formats
+  const extractGroupIdentifier = (input: string): { value: string; type: 'slug' | 'registration' } | null => {
     const trimmedInput = input.trim();
     
-    // Handle direct registration link format
+    // Handle direct UUID registration link format
     if (trimmedInput.match(/^[a-f0-9-]{36}$/)) {
-      return trimmedInput;
+      return { value: trimmedInput, type: 'registration' };
     }
     
-    // Handle kontrib.app/join/[link] format
-    const joinMatch = trimmedInput.match(/kontrib\.app\/join\/([a-f0-9-]{36})/);
-    if (joinMatch) {
-      return joinMatch[1];
+    // Handle kontrib.app/join/[identifier] format (could be slug or UUID)
+    const kontribMatch = trimmedInput.match(/kontrib\.app\/join\/([^/?]+)/);
+    if (kontribMatch) {
+      const identifier = kontribMatch[1];
+      const type = identifier.match(/^[a-f0-9-]{36}$/) ? 'registration' : 'slug';
+      return { value: identifier, type };
     }
     
-    // Handle /join/[link] format
-    const pathMatch = trimmedInput.match(/\/join\/([a-f0-9-]{36})/);
-    if (pathMatch) {
-      return pathMatch[1];
-    }
-    
-    // Handle full URLs with registration parameter
+    // Handle full URL with /join/[identifier] path (including replit.app URLs)
     try {
       const url = new URL(trimmedInput);
-      const linkParam = url.searchParams.get('link');
-      if (linkParam && linkParam.match(/^[a-f0-9-]{36}$/)) {
-        return linkParam;
+      const joinMatch = url.pathname.match(/\/join\/([^/?]+)/);
+      if (joinMatch) {
+        const identifier = joinMatch[1];
+        const type = identifier.match(/^[a-f0-9-]{36}$/) ? 'registration' : 'slug';
+        return { value: identifier, type };
       }
     } catch {
       // Not a valid URL, continue
     }
     
+    // Handle /join/[identifier] format
+    const pathMatch = trimmedInput.match(/^\/join\/([^/?]+)/);
+    if (pathMatch) {
+      const identifier = pathMatch[1];
+      const type = identifier.match(/^[a-f0-9-]{36}$/) ? 'registration' : 'slug';
+      return { value: identifier, type };
+    }
+    
+    // Handle direct custom slug (alphanumeric, hyphens, underscores)
+    if (trimmedInput.match(/^[a-zA-Z0-9_-]+$/)) {
+      return { value: trimmedInput, type: 'slug' };
+    }
+    
     return null;
   };
 
-  // Preview group data when link is detected
+  // Preview group data when identifier is detected
   const { data: groupPreview, isLoading: isLoadingPreview, error: previewError } = useQuery<GroupData>({
-    queryKey: ['/api/groups/registration', extractedLink],
-    enabled: !!extractedLink,
+    queryKey: extractedIdentifier 
+      ? extractedIdentifier.type === 'slug' 
+        ? ['/api/groups/slug', extractedIdentifier.value]
+        : ['/api/groups/registration', extractedIdentifier.value]
+      : ['/api/groups/none'],
+    enabled: !!extractedIdentifier,
   });
 
   // Join group mutation
   const joinGroupMutation = useMutation({
     mutationFn: async () => {
-      if (!extractedLink || !user || !groupPreview) throw new Error("Missing data");
+      if (!extractedIdentifier || !user || !groupPreview) throw new Error("Missing data");
       
-      return apiRequest(`/api/groups/${groupPreview.group.id}/join`, {
-        method: "POST",
-        body: JSON.stringify({
-          userId: user.id
-        })
+      return apiRequest("POST", `/api/groups/${groupPreview.group.id}/join`, {
+        userId: user.id
       });
     },
     onSuccess: () => {
@@ -133,8 +145,8 @@ export default function JoinGroupPage() {
 
   const handleLinkInput = (value: string) => {
     setGroupLink(value);
-    const link = extractRegistrationLink(value);
-    setExtractedLink(link);
+    const identifier = extractGroupIdentifier(value);
+    setExtractedIdentifier(identifier);
   };
 
   const handleJoinGroup = () => {
@@ -198,7 +210,7 @@ export default function JoinGroupPage() {
                 onChange={(e) => handleLinkInput(e.target.value)}
                 data-testid="input-group-link"
               />
-              {groupLink && !extractedLink && (
+              {groupLink && !extractedIdentifier && (
                 <div className="flex items-center gap-2 text-sm text-orange-600">
                   <AlertCircle className="w-4 h-4" />
                   Invalid link format. Please check and try again.
@@ -209,7 +221,7 @@ export default function JoinGroupPage() {
         </Card>
 
         {/* Loading State */}
-        {isLoadingPreview && extractedLink && (
+        {isLoadingPreview && extractedIdentifier && (
           <Card>
             <CardContent className="py-8 text-center">
               <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-green-600" />
@@ -219,7 +231,7 @@ export default function JoinGroupPage() {
         )}
 
         {/* Error State */}
-        {previewError && extractedLink && (
+        {previewError && extractedIdentifier && (
           <Card className="border-red-200">
             <CardContent className="py-8 text-center">
               <AlertCircle className="w-12 h-12 mx-auto mb-4 text-red-500" />

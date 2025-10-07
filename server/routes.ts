@@ -122,8 +122,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!group) {
         return res.status(404).json({ message: "Group not found" });
       }
+
+      // Get projects for this group
+      const projects = await storage.getProjectsByGroup(group.id);
       
-      res.json(group);
+      // Get member count
+      const members = await storage.getGroupMembers(group.id);
+      
+      // Calculate totals across all projects
+      const totalTarget = projects.reduce((sum: number, project: any) => 
+        sum + parseFloat(project.targetAmount || "0"), 0
+      ).toString();
+      
+      const totalCollected = projects.reduce((sum: number, project: any) => 
+        sum + parseFloat(project.collectedAmount || "0"), 0
+      ).toString();
+      
+      const landingData = {
+        group,
+        projects: projects.map((project: any) => ({
+          id: project.id,
+          name: project.name,
+          targetAmount: project.targetAmount,
+          collectedAmount: project.collectedAmount,
+          deadline: project.deadline
+        })),
+        memberCount: members.length,
+        totalTarget,
+        totalCollected
+      };
+      
+      res.json(landingData);
     } catch (error) {
       console.error("Get group by custom slug error:", error);
       res.status(500).json({ message: "Failed to fetch group" });
