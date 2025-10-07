@@ -117,7 +117,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/groups/slug/:slug", async (req, res) => {
     try {
       const { slug } = req.params;
-      const group = await storage.getGroupByCustomSlug(slug);
+      let group = await storage.getGroupByCustomSlug(slug);
+      
+      // If not found by custom slug, try registration link as fallback
+      if (!group) {
+        group = await storage.getGroupByRegistrationLink(slug);
+      }
       
       if (!group) {
         return res.status(404).json({ message: "Group not found" });
