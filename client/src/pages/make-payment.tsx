@@ -91,7 +91,6 @@ export default function MakePayment() {
     mutationFn: async (data: PaymentFormData) => {
       const response = await apiRequest("POST", "/api/contributions", {
         ...data,
-        amount: Number(data.amount),
         userId: user?.id,
       });
       return response.json();
@@ -395,7 +394,7 @@ export default function MakePayment() {
                           <FormLabel>Amount (₦)</FormLabel>
                           <FormControl>
                             <Input 
-                              type="number" 
+                              type="text" 
                               placeholder="Enter amount in Naira" 
                               {...field} 
                               data-testid="input-amount"
