@@ -76,7 +76,7 @@ export default function MakePayment() {
   });
 
   // Find selected group details
-  const selectedGroup = userGroups.find(group => group.id === selectedGroupId);
+  const selectedGroup = userGroups.find(group => group.groupId === selectedGroupId)?.group;
   
   // Find selected project details
   const selectedPurseId = form.watch("purseId");
@@ -291,12 +291,12 @@ export default function MakePayment() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {userGroups.map((group) => (
-                                <SelectItem key={group.id} value={group.id}>
+                              {userGroups.map((membership) => (
+                                <SelectItem key={membership.id} value={membership.groupId}>
                                   <div className="flex items-center justify-between w-full">
-                                    <span>{group.name}</span>
+                                    <span>{membership.group.name}</span>
                                     <Badge variant="secondary" className="ml-2">
-                                      {group.memberCount || 0} members
+                                      {membership.group.memberCount || 0} members
                                     </Badge>
                                   </div>
                                 </SelectItem>
