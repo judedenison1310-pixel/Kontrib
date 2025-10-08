@@ -962,10 +962,12 @@ export class DbStorage implements IStorage {
       .leftJoin(groupsTable, eq(groupMembersTable.groupId, groupsTable.id))
       .where(eq(groupMembersTable.userId, userId));
 
-    return result.map(row => ({
-      ...row.group_members,
-      group: row.groups!
-    }));
+    return result
+      .filter(row => row.groups !== null)
+      .map(row => ({
+        ...row.group_members,
+        group: row.groups!
+      }));
   }
 
   async addGroupMember(member: InsertGroupMember): Promise<GroupMember> {
