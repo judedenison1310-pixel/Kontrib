@@ -50,6 +50,8 @@ export function PaymentApprovalModal({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/contributions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/groups"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
       toast({
         title: "Payment Confirmed",
@@ -75,6 +77,8 @@ export function PaymentApprovalModal({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/contributions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/groups"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
       toast({
         title: "Payment Rejected",
@@ -181,12 +185,12 @@ export function PaymentApprovalModal({
               <div>
                 <Label className="flex items-center gap-2 text-sm font-medium text-gray-700">
                   <FileText className="h-4 w-4" />
-                  Group/Purse
+                  Group/Project
                 </Label>
                 <p className="mt-1 text-sm font-medium text-gray-900">
                   {contribution.groupName}
-                  {contribution.purseName && (
-                    <span className="text-gray-600"> → {contribution.purseName}</span>
+                  {contribution.projectName && (
+                    <span className="text-gray-600"> → {contribution.projectName}</span>
                   )}
                 </p>
               </div>
