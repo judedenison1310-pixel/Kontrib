@@ -37,34 +37,3 @@ waitForPort = 5000
 [[ports]]
 localPort = 5000
 externalPort = 80
-
-[[ports]]
-localPort = 33511
-externalPort = 5000
-
-[[ports]]
-localPort = 35941
-externalPort = 3002
-
-[[ports]]
-localPort = 36071
-externalPort = 5173
-
-[[ports]]
-localPort = 36353
-externalPort = 3000
-
-[[ports]]
-localPort = 39759
-externalPort = 3001
-
-[[ports]]
-localPort = 41135
-externalPort = 3003
-
-[[ports]]
-localPort = 46167
-externalPort = 4200
-
-[agent]
-integrations = ["javascript_mem_db==1.0.0", "javascript_websocket==1.0.0", "javascript_object_storage==1.0.0"]
