@@ -64,6 +64,7 @@ export interface IStorage {
   // Notification methods
   getUserNotifications(userId: string): Promise<Notification[]>;
   createNotification(notification: InsertNotification): Promise<Notification>;
+  createRejectionNotification(contribution: Contribution, reason?: string): Promise<void>;
   markNotificationRead(notificationId: string): Promise<void>;
   
   getUserContributions(userId: string): Promise<ContributionWithDetails[]>;
