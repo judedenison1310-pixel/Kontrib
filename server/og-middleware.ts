@@ -125,7 +125,12 @@ export async function handleDynamicOGTags(
   }
   
   try {
-    const group = await storage.getGroupByRegistrationLink(groupLink);
+    // Try custom slug first, then fall back to registration link
+    let group = await storage.getGroupByCustomSlug(groupLink);
+    
+    if (!group) {
+      group = await storage.getGroupByRegistrationLink(groupLink);
+    }
     
     if (!group) {
       return false;
