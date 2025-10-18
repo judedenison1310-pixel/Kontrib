@@ -104,28 +104,15 @@ export default function Groups() {
   };
 
   const handleShareGroup = (group: any) => {
-    const shareUrl = `${window.location.origin}/join/${group.registrationLink}`;
+    const shareUrl = `${window.location.origin}/${group.customSlug || group.registrationLink}`;
     
-    // For WhatsApp to show link preview, include URL in text instead of separate url field
+    // WhatsApp-specific share (opens WhatsApp directly with pre-filled message)
     const shareText = `🎯 You're invited to join "${group.name}" on Kontrib!\n\n💰 Manage contributions with transparency and ease.\n\n${shareUrl}`;
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
     
-    if (navigator.share) {
-      // Include URL in text for better WhatsApp preview support
-      navigator.share({
-        title: `Join ${group.name}`,
-        text: shareText,
-      });
-    } else if (navigator.clipboard) {
-      navigator.clipboard.writeText(shareUrl);
-      toast({
-        title: "Link Copied!",
-        description: "Group registration link copied to clipboard.",
-      });
-    } else {
-      // Fallback: Open WhatsApp directly with pre-filled message
-      const whatsappMessage = encodeURIComponent(shareText);
-      window.open(`https://wa.me/?text=${whatsappMessage}`, '_blank');
-    }
+    // Open WhatsApp directly instead of using navigator.share
+    // This ensures the URL is in the message where WhatsApp can detect it
+    window.open(whatsappUrl, '_blank');
   };
 
   if (isLoading) {
