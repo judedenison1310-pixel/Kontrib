@@ -78,6 +78,18 @@ function Router() {
         </>
       )}
       
+      {/* Short URL pattern - catches custom slugs like /newgroup */}
+      <Route path="/:groupSlug">
+        {(params) => {
+          // Skip if it matches known routes
+          const knownRoutes = ['api', 'assets', 'login', 'register', 'join', 'admin', 'dashboard', 'member', 'groups', 'make-payment', 'my-contributions', 'updates', 'whatsapp', 'join-group', 'member-payment'];
+          if (knownRoutes.includes(params.groupSlug?.toLowerCase() || '')) {
+            return <NotFound />;
+          }
+          return <GroupLanding />;
+        }}
+      </Route>
+      
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>
