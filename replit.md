@@ -48,17 +48,19 @@ The application follows a component-based architecture for the frontend and a RE
 
 ## Recent Technical Updates
 
-### Dynamic OG Image Generation (October 22, 2025)
+### Dynamic OG Image Generation (October 22-23, 2025)
 Implemented visual WhatsApp link previews that display the Join Card design instead of generic text. When users share group links on WhatsApp, Facebook, or Twitter, the preview now shows a dynamically generated image featuring:
-- Kontrib logo and branding
+- Official Kontrib logo (centered at top)
 - Group name and project details
-- Progress bar with Nigerian English phrasing
+- Progress bar with Nigerian English phrasing ("don enter", "out of")
 - Deadline countdown and member count
 - Professional card-style layout matching the Join Page design
 
 **Technical Implementation:**
 - Canvas-based PNG generation (1200x630px) at `/api/og-image/:identifier`
+- Official Kontrib logo loaded from `server/assets/kontrib-logo.jpg`
 - OG middleware updated to serve dynamic image URLs to social media crawlers
 - 24-hour browser caching for optimal performance
 - Text truncation and progress bar clamping for edge cases
 - System dependencies: libuuid, cairo, pango, libpng, libjpeg
+- Fallback hexagon logo if official logo fails to load

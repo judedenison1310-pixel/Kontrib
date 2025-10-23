@@ -71,32 +71,50 @@ export async function generateOGImage(groupIdentifier: string): Promise<Buffer |
     // === LOGO HEADER ===
     let yPos = 60;
 
-    // Draw hexagon logo
-    const hexCenterX = 100;
-    const hexCenterY = yPos + 30;
-    const hexRadius = 30;
-    
-    ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-      const angle = (Math.PI / 3) * i;
-      const x = hexCenterX + hexRadius * Math.cos(angle);
-      const y = hexCenterY + hexRadius * Math.sin(angle);
-      if (i === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
+    // Load and draw official Kontrib logo
+    try {
+      const logoPath = path.join(process.cwd(), 'server', 'assets', 'kontrib-logo.jpg');
+      const logo = await loadImage(logoPath);
+      
+      // Calculate logo dimensions (maintain aspect ratio)
+      const logoHeight = 80;
+      const logoWidth = (logo.width / logo.height) * logoHeight;
+      
+      // Center the logo horizontally
+      const logoX = (width - logoWidth) / 2;
+      
+      ctx.drawImage(logo, logoX, yPos, logoWidth, logoHeight);
+      yPos += logoHeight + 40; // Logo height + padding
+    } catch (error) {
+      console.error('Error loading Kontrib logo, using fallback:', error);
+      
+      // Fallback: Draw hexagon logo if image fails to load
+      const hexCenterX = width / 2 - 150;
+      const hexCenterY = yPos + 30;
+      const hexRadius = 30;
+      
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const angle = (Math.PI / 3) * i;
+        const x = hexCenterX + hexRadius * Math.cos(angle);
+        const y = hexCenterY + hexRadius * Math.sin(angle);
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
       }
+      ctx.closePath();
+      ctx.fillStyle = '#16a34a';
+      ctx.fill();
+
+      // Draw "Kontrib" text
+      ctx.fillStyle = '#000000';
+      ctx.font = 'bold 48px sans-serif';
+      ctx.fillText('Kontrib', hexCenterX + 60, yPos + 45);
+      
+      yPos += 110;
     }
-    ctx.closePath();
-    ctx.fillStyle = '#16a34a';
-    ctx.fill();
-
-    // Draw "Kontrib" text
-    ctx.fillStyle = '#000000';
-    ctx.font = 'bold 48px sans-serif';
-    ctx.fillText('Kontrib', 160, yPos + 45);
-
-    yPos += 110;
 
     // === GROUP CARD ===
     const cardX = 60;
