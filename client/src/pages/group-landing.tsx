@@ -105,14 +105,14 @@ export default function GroupLanding() {
       {/* Kontrib Logo Header */}
       <div className="bg-white py-8">
         <div className="max-w-md mx-auto px-4">
-          <div className="flex items-center justify-center gap-2">
-            {/* Hexagon-style logo */}
-            <div className="w-12 h-12 bg-green-600 rounded-lg flex items-center justify-center shadow-md transform rotate-45">
-              <div className="transform -rotate-45">
-                <Users className="w-6 h-6 text-white" />
-              </div>
-            </div>
-            <span className="text-3xl font-bold text-gray-900">Kontrib</span>
+          <div className="flex items-center justify-center">
+            {/* Official Kontrib Logo */}
+            <img 
+              src="/kontrib-logo.jpg" 
+              alt="Kontrib" 
+              className="h-16 w-auto"
+              data-testid="img-kontrib-logo"
+            />
           </div>
         </div>
       </div>
