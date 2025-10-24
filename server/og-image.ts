@@ -69,22 +69,22 @@ export async function generateOGImage(groupIdentifier: string): Promise<Buffer |
     ctx.fillRect(0, 0, width, height);
 
     // === LOGO HEADER ===
-    let yPos = 60;
+    let yPos = 35;
 
     // Load and draw official Kontrib logo
     try {
       const logoPath = path.join(process.cwd(), 'server', 'assets', 'kontrib-logo.jpg');
       const logo = await loadImage(logoPath);
       
-      // Calculate logo dimensions (maintain aspect ratio)
-      const logoHeight = 80;
+      // Calculate logo dimensions (maintain aspect ratio) - increased by 50%
+      const logoHeight = 120;
       const logoWidth = (logo.width / logo.height) * logoHeight;
       
       // Center the logo horizontally
       const logoX = (width - logoWidth) / 2;
       
       ctx.drawImage(logo, logoX, yPos, logoWidth, logoHeight);
-      yPos += logoHeight + 40; // Logo height + padding
+      yPos += logoHeight + 30; // Logo height + reduced padding
     } catch (error) {
       console.error('Error loading Kontrib logo, using fallback:', error);
       

@@ -103,14 +103,14 @@ export default function GroupLanding() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Kontrib Logo Header */}
-      <div className="bg-white py-8">
+      <div className="bg-white py-4">
         <div className="max-w-md mx-auto px-4">
           <div className="flex items-center justify-center">
             {/* Official Kontrib Logo */}
             <img 
-              src="/kontrib-logo.jpg?v=2" 
+              src="/kontrib-logo.jpg?v=3" 
               alt="Kontrib" 
-              className="h-16 w-auto object-contain"
+              className="h-24 w-auto object-contain"
               data-testid="img-kontrib-logo"
               onError={(e) => {
                 console.error('Logo failed to load');
