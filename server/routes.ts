@@ -244,6 +244,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get group by ID
+  app.get("/api/groups/:groupId", async (req, res) => {
+    try {
+      const { groupId } = req.params;
+      const group = await storage.getGroup(groupId);
+      
+      if (!group) {
+        return res.status(404).json({ message: "Group not found" });
+      }
+      
+      res.json(group);
+    } catch (error) {
+      console.error("Get group by ID error:", error);
+      res.status(500).json({ message: "Failed to fetch group" });
+    }
+  });
+
   app.get("/api/groups/:groupId/members", async (req, res) => {
     try {
       const { groupId } = req.params;
