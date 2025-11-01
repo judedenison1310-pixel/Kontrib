@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Navigation } from "@/components/navigation";
 import { GroupCard } from "@/components/group-card";
 import { PaymentModal } from "@/components/payment-modal";
+import { ProjectSelectionModal } from "@/components/project-selection-modal";
 import { 
   DollarSign, 
   Users, 
@@ -14,32 +15,48 @@ import {
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { formatNaira } from "@/lib/currency";
-import { Group } from "@shared/schema";
+import { Group, GroupMember, GroupWithStats, Project, MemberWithContributions, ContributionWithDetails } from "@shared/schema";
 import { Button } from "@/components/ui/button";
+
+type UserGroupMembership = GroupMember & { group: GroupWithStats };
 
 export default function MemberDashboard() {
   const user = getCurrentUser();
+  const [projectSelectionOpen, setProjectSelectionOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
-  const { data: userGroups = [], isLoading: groupsLoading } = useQuery({
+  const { data: userGroups = [], isLoading: groupsLoading } = useQuery<UserGroupMembership[]>({
     queryKey: ["/api/groups", "user", user?.id],
     enabled: !!user,
   });
 
-  const { data: userStats, isLoading: statsLoading } = useQuery({
+  const { data: userStats, isLoading: statsLoading } = useQuery<MemberWithContributions>({
     queryKey: ["/api/stats", "user", user?.id],
     enabled: !!user,
   });
 
-  const { data: paymentHistory = [], isLoading: historyLoading } = useQuery({
+  const { data: paymentHistory = [], isLoading: historyLoading } = useQuery<ContributionWithDetails[]>({
     queryKey: ["/api/contributions", "user", user?.id],
     enabled: !!user,
   });
 
   const handleMakePayment = (group: Group) => {
     setSelectedGroup(group);
+    setProjectSelectionOpen(true);
+  };
+
+  const handleSelectProject = (project: Project) => {
+    setSelectedProject(project);
     setPaymentModalOpen(true);
+  };
+
+  const handlePaymentModalClose = (open: boolean) => {
+    setPaymentModalOpen(open);
+    if (!open) {
+      setSelectedProject(null);
+    }
   };
 
   if (groupsLoading || statsLoading) {
@@ -214,11 +231,19 @@ export default function MemberDashboard() {
         </Card>
       </div>
 
+      {/* Project Selection Modal */}
+      <ProjectSelectionModal
+        open={projectSelectionOpen}
+        onOpenChange={setProjectSelectionOpen}
+        group={selectedGroup}
+        onSelectProject={handleSelectProject}
+      />
+
       {/* Payment Modal */}
       <PaymentModal
         open={paymentModalOpen}
-        onOpenChange={setPaymentModalOpen}
-        group={selectedGroup}
+        onOpenChange={handlePaymentModalClose}
+        project={selectedProject}
       />
     </div>
   );
