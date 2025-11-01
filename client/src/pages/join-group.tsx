@@ -65,31 +65,69 @@ export default function JoinGroupPage() {
       return { value: trimmedInput, type: 'registration' };
     }
     
+    // Handle kontrib.app/register/[uuid] format (registration link)
+    const kontribRegisterMatch = trimmedInput.match(/kontrib\.app\/register\/([^/?]+)/);
+    if (kontribRegisterMatch) {
+      return { value: kontribRegisterMatch[1], type: 'registration' };
+    }
+    
     // Handle kontrib.app/join/[identifier] format (could be slug or UUID)
-    const kontribMatch = trimmedInput.match(/kontrib\.app\/join\/([^/?]+)/);
-    if (kontribMatch) {
-      const identifier = kontribMatch[1];
+    const kontribJoinMatch = trimmedInput.match(/kontrib\.app\/join\/([^/?]+)/);
+    if (kontribJoinMatch) {
+      const identifier = kontribJoinMatch[1];
       const type = identifier.match(/^[a-f0-9-]{36}$/) ? 'registration' : 'slug';
       return { value: identifier, type };
     }
     
-    // Handle full URL with /join/[identifier] path (including replit.app URLs)
+    // Handle kontrib.app/[slug] format (direct group landing page)
+    const kontribDirectMatch = trimmedInput.match(/kontrib\.app\/([^/?]+)/);
+    if (kontribDirectMatch) {
+      const identifier = kontribDirectMatch[1];
+      // Skip common paths like 'join', 'register', 'dashboard', etc.
+      if (!['join', 'register', 'dashboard', 'login', 'admin'].includes(identifier.toLowerCase())) {
+        return { value: identifier, type: 'slug' };
+      }
+    }
+    
+    // Handle full URL with /register/[identifier] path
     try {
       const url = new URL(trimmedInput);
+      const registerMatch = url.pathname.match(/\/register\/([^/?]+)/);
+      if (registerMatch) {
+        return { value: registerMatch[1], type: 'registration' };
+      }
+      
+      // Handle full URL with /join/[identifier] path (including replit.app URLs)
       const joinMatch = url.pathname.match(/\/join\/([^/?]+)/);
       if (joinMatch) {
         const identifier = joinMatch[1];
         const type = identifier.match(/^[a-f0-9-]{36}$/) ? 'registration' : 'slug';
         return { value: identifier, type };
       }
+      
+      // Handle full URL with direct /[slug] path (group landing page)
+      const pathSegments = url.pathname.split('/').filter(s => s.length > 0);
+      if (pathSegments.length === 1) {
+        const identifier = pathSegments[0];
+        // Skip common paths
+        if (!['join', 'register', 'dashboard', 'login', 'admin'].includes(identifier.toLowerCase())) {
+          return { value: identifier, type: 'slug' };
+        }
+      }
     } catch {
       // Not a valid URL, continue
     }
     
+    // Handle /register/[identifier] format
+    const registerPathMatch = trimmedInput.match(/^\/register\/([^/?]+)/);
+    if (registerPathMatch) {
+      return { value: registerPathMatch[1], type: 'registration' };
+    }
+    
     // Handle /join/[identifier] format
-    const pathMatch = trimmedInput.match(/^\/join\/([^/?]+)/);
-    if (pathMatch) {
-      const identifier = pathMatch[1];
+    const joinPathMatch = trimmedInput.match(/^\/join\/([^/?]+)/);
+    if (joinPathMatch) {
+      const identifier = joinPathMatch[1];
       const type = identifier.match(/^[a-f0-9-]{36}$/) ? 'registration' : 'slug';
       return { value: identifier, type };
     }
