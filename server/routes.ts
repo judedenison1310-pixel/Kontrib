@@ -72,6 +72,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/groups/registration/:link", async (req, res) => {
     try {
       const { link } = req.params;
+      const { userId } = req.query; // Get userId from query parameter
       const group = await storage.getGroupByRegistrationLink(link);
       
       if (!group) {
@@ -85,9 +86,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const members = await storage.getGroupMembers(group.id);
       
       // Check if current user is already a member
-      const userId = (req.session as any)?.userId;
       let isMember = false;
-      if (userId) {
+      if (userId && typeof userId === 'string') {
         const membership = await storage.getGroupMember(group.id, userId);
         isMember = !!membership;
       }
@@ -126,6 +126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/groups/slug/:slug", async (req, res) => {
     try {
       const { slug } = req.params;
+      const { userId } = req.query; // Get userId from query parameter
       let group = await storage.getGroupByCustomSlug(slug);
       
       // If not found by custom slug, try registration link as fallback
@@ -144,9 +145,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const members = await storage.getGroupMembers(group.id);
       
       // Check if current user is already a member
-      const userId = (req.session as any)?.userId;
       let isMember = false;
-      if (userId) {
+      if (userId && typeof userId === 'string') {
         const membership = await storage.getGroupMember(group.id, userId);
         isMember = !!membership;
       }

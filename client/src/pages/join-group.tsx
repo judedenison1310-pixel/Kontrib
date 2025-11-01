@@ -142,12 +142,28 @@ export default function JoinGroupPage() {
   };
 
   // Preview group data when identifier is detected
-  const { data: groupPreview, isLoading: isLoadingPreview, error: previewError } = useQuery<GroupData>({
+  const { data: groupPreview, isLoading: isLoadingPreview, error: previewError} = useQuery<GroupData>({
     queryKey: extractedIdentifier 
       ? extractedIdentifier.type === 'slug' 
-        ? ['/api/groups/slug', extractedIdentifier.value]
-        : ['/api/groups/registration', extractedIdentifier.value]
+        ? ['/api/groups/slug', extractedIdentifier.value, user?.id]
+        : ['/api/groups/registration', extractedIdentifier.value, user?.id]
       : ['/api/groups/none'],
+    queryFn: async () => {
+      if (!extractedIdentifier) return null;
+      
+      const endpoint = extractedIdentifier.type === 'slug' 
+        ? `/api/groups/slug/${extractedIdentifier.value}`
+        : `/api/groups/registration/${extractedIdentifier.value}`;
+      
+      // Add userId as query parameter if user is logged in
+      const url = user ? `${endpoint}?userId=${user.id}` : endpoint;
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Group not found');
+      }
+      return response.json();
+    },
     enabled: !!extractedIdentifier,
   });
 
