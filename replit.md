@@ -81,3 +81,39 @@ Fixed critical membership detection bug and added UX improvement to group landin
 - **Functionality**: Redirects users to root page (`/`) for login/registration
 - **Purpose**: Provides clear exit path for visitors who land on group pages while not authenticated
 - **Location**: `client/src/pages/group-landing.tsx`
+
+### Payment Flow Enhancement (November 1, 2025)
+Fixed unresponsive "Make Payment" button and implemented proper project selection workflow:
+
+**Bug Fix - Make Payment Button:**
+- **Root Cause**: PaymentModal component expected `project` prop but was receiving `group` prop, causing type mismatch and non-functional button
+- **Solution**: Implemented two-modal workflow with project selection step
+- **Impact**: Members can now successfully make payments to specific projects within their groups
+
+**Technical Implementation:**
+- **New Component**: `ProjectSelectionModal` (`client/src/components/project-selection-modal.tsx`)
+  - Fetches projects for selected group via `/api/groups/:groupId/projects`
+  - Displays project cards with progress bars, targets, deadlines, and stats
+  - Includes loading states, error handling, and empty state messaging
+  - Mobile-responsive card layout with visual progress indicators
+- **Updated Flow**: Member Dashboard → Click "Make Payment" → Select Project → Fill Payment Form → Submit
+- **State Management**: Added proper TypeScript types (`UserGroupMembership`, `MemberWithContributions`, `ContributionWithDetails`)
+- **Error Handling**: Network errors display user-friendly messages with retry/close options
+- **State Cleanup**: Selected project cleared when payment modal closes to prevent stale data
+- **Code Quality**: All TypeScript LSP errors resolved, full type safety implemented
+
+**User Experience:**
+1. Member clicks "Make Payment" on a group card in dashboard
+2. Modal opens showing all active projects in that group
+3. Each project card displays: name, description, progress bar, target amount, collected amount, deadline
+4. Member selects a project by clicking the card or "Contribute to this Project" button
+5. Payment modal opens with selected project details pre-filled
+6. Member enters amount, transaction reference (optional), note (optional), and uploads proof of payment
+7. Submission creates contribution record with "pending" status awaiting admin approval
+8. Success toast confirms submission, modal closes, dashboard refreshes with updated data
+
+**Files Modified:**
+- `client/src/pages/member-dashboard.tsx` - Enhanced with project selection logic
+- `client/src/components/project-selection-modal.tsx` - New component for project selection
+- `client/src/components/group-card.tsx` - Make Payment button properly wired
+- `client/src/components/payment-modal.tsx` - Receives project prop correctly
