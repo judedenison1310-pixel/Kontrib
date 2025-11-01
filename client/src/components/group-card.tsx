@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { MessageCircle, Settings, Users, Target } from "lucide-react";
+import { MessageCircle, Settings, Users, Target, Eye } from "lucide-react";
 import { formatNaira } from "@/lib/currency";
 
 interface GroupCardProps {
@@ -12,6 +12,7 @@ interface GroupCardProps {
   onManage?: (group: Group) => void;
   onShare?: (group: Group) => void;
   onMakePayment?: (group: Group) => void;
+  onViewDetails?: (group: Group) => void;
   userContribution?: string;
 }
 
@@ -21,6 +22,7 @@ export function GroupCard({
   onManage, 
   onShare, 
   onMakePayment,
+  onViewDetails,
   userContribution 
 }: GroupCardProps) {
   const getStatusColor = (status: string) => {
@@ -142,13 +144,24 @@ export function GroupCard({
               </Button>
             </>
           ) : (
-            <Button
-              onClick={() => onMakePayment?.(group)}
-              className="flex-1 bg-nigerian-green hover:bg-forest-green"
-              data-testid={`make-payment-${group.id}`}
-            >
-              Make Payment
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                onClick={() => onViewDetails?.(group)}
+                className="flex-1"
+                data-testid={`view-group-${group.id}`}
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                View Details
+              </Button>
+              <Button
+                onClick={() => onMakePayment?.(group)}
+                className="flex-1 bg-nigerian-green hover:bg-forest-green"
+                data-testid={`make-payment-${group.id}`}
+              >
+                Make Payment
+              </Button>
+            </>
           )}
         </div>
       </CardContent>

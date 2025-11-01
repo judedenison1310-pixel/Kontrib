@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Navigation } from "@/components/navigation";
@@ -22,6 +23,7 @@ type UserGroupMembership = GroupMember & { group: GroupWithStats };
 
 export default function MemberDashboard() {
   const user = getCurrentUser();
+  const [, setLocation] = useLocation();
   const [projectSelectionOpen, setProjectSelectionOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
@@ -45,6 +47,10 @@ export default function MemberDashboard() {
   const handleMakePayment = (group: Group) => {
     setSelectedGroup(group);
     setProjectSelectionOpen(true);
+  };
+
+  const handleViewDetails = (group: Group) => {
+    setLocation(`/group/${group.id}`);
   };
 
   const handleSelectProject = (project: Project) => {
@@ -171,6 +177,7 @@ export default function MemberDashboard() {
                     group={membership.group}
                     isAdmin={false}
                     onMakePayment={handleMakePayment}
+                    onViewDetails={handleViewDetails}
                     userContribution={membership.contributedAmount}
                   />
                 ))}

@@ -117,3 +117,52 @@ Fixed unresponsive "Make Payment" button and implemented proper project selectio
 - `client/src/components/project-selection-modal.tsx` - New component for project selection
 - `client/src/components/group-card.tsx` - Make Payment button properly wired
 - `client/src/components/payment-modal.tsx` - Receives project prop correctly
+
+### Group Details Page Enhancement (November 1, 2025)
+Implemented interactive group details page allowing members to view comprehensive group information:
+
+**Feature Enhancement:**
+- **Requirement**: Members needed ability to select a group and view detailed status, members, and contributions
+- **Solution**: Added clickable "View Details" button to group cards that navigates to dedicated Group Details page
+- **Impact**: Enhanced dashboard interactivity and provides members with real-time visibility into group financial data
+
+**Technical Implementation:**
+- **New Page**: `client/src/pages/group-details.tsx` - Comprehensive group information display
+  - Group header with name, description, status badge, member count, project count
+  - Three-panel stats overview: Total Target, Amount Collected, Total Contributions
+  - Overall progress bar with completion percentage
+  - Projects section showing all projects with individual progress bars and deadlines
+  - Members section displaying all members with their contribution amounts
+  - Recent contributions timeline with status badges (approved/pending)
+  - Back to Dashboard navigation
+- **Data Fetching**: Parallel queries using existing API endpoints
+  - `/api/groups/:groupId` - Basic group information
+  - `/api/groups/:groupId/projects` - All projects in the group
+  - `/api/groups/:groupId/members` - Member list with contributions
+  - `/api/contributions/group/:groupId` - Contribution history
+- **UI/UX Features**:
+  - Loading skeletons for smooth data loading experience
+  - Visual progress indicators for projects and overall group goal
+  - Member avatars with contribution amounts
+  - Status badges for contributions (confirmed/pending)
+  - Responsive grid layout for desktop and mobile
+  - Empty states for groups with no projects/members/contributions
+
+**User Experience:**
+1. Member views "My Groups" section on dashboard
+2. Each group card shows "View Details" button (eye icon)
+3. Clicking "View Details" navigates to `/group/:groupId`
+4. Group Details page displays:
+   - Group name, description, and status
+   - Total target amount across all projects
+   - Total amount collected and completion percentage
+   - List of all projects with individual progress
+   - List of all members with their contributions
+   - Recent contribution activity with approval status
+5. "Back to Dashboard" button returns to member dashboard
+
+**Files Modified:**
+- `client/src/pages/group-details.tsx` - New comprehensive group details page
+- `client/src/pages/member-dashboard.tsx` - Added handleViewDetails navigation
+- `client/src/components/group-card.tsx` - Added "View Details" button for members
+- `client/src/App.tsx` - Registered `/group/:groupId` route

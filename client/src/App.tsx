@@ -21,6 +21,7 @@ import WhatsAppIntegration from "@/pages/whatsapp-integration";
 import GroupLanding from "@/pages/group-landing";
 import MemberPayment from "@/pages/member-payment";
 import JoinGroup from "@/pages/join-group";
+import GroupDetails from "@/pages/group-details";
 
 function Router() {
   const [user, setUser] = useState<User | null>(getCurrentUser());
@@ -71,6 +72,7 @@ function Router() {
           <Route path="/my-contributions" component={MyContributions} />
           <Route path="/updates" component={Updates} />
           <Route path="/groups" component={Groups} />
+          <Route path="/group/:groupId" component={GroupDetails} />
           
           {/* Legacy admin specific route */}
           <Route path="/admin" component={AdminDashboard} />
@@ -82,7 +84,7 @@ function Router() {
       <Route path="/:groupSlug">
         {(params) => {
           // Skip if it matches known routes
-          const knownRoutes = ['api', 'assets', 'login', 'register', 'join', 'admin', 'dashboard', 'member', 'groups', 'make-payment', 'my-contributions', 'updates', 'whatsapp', 'join-group', 'member-payment'];
+          const knownRoutes = ['api', 'assets', 'login', 'register', 'join', 'admin', 'dashboard', 'member', 'groups', 'group', 'make-payment', 'my-contributions', 'updates', 'whatsapp', 'join-group', 'member-payment'];
           if (knownRoutes.includes(params.groupSlug?.toLowerCase() || '')) {
             return <NotFound />;
           }
