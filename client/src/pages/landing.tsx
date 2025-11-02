@@ -138,7 +138,7 @@ export default function Landing() {
       setRegistrationStep("otp-verification");
       toast({
         title: "OTP Sent!",
-        description: `Verification code sent to ${phoneNumber} via SMS.`,
+        description: `Verification code sent via WhatsApp.`,
       });
       
       // For development, show the OTP in console
@@ -479,7 +479,7 @@ export default function Landing() {
                                   </FormControl>
                                   <FormMessage />
                                   <p className="text-xs text-gray-500 mt-1">
-                                    We'll send an OTP to this number via SMS text message for verification
+                                    We'll send an OTP to this number via WhatsApp for verification
                                   </p>
                                 </FormItem>
                               )}
