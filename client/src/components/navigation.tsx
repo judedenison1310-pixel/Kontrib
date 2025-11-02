@@ -24,13 +24,14 @@ export function Navigation() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <Link href="/">
-            <div className="flex items-center py-2">
+            <div className="flex flex-col items-start justify-center py-2">
               <img 
                 src={kontribLogo} 
-                alt="Kontrib - Group Financial Management" 
-                className="h-9 w-auto object-contain sm:h-10"
+                alt="Kontrib" 
+                className="h-7 w-auto object-contain sm:h-8"
                 data-testid="img-kontrib-logo"
               />
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Group Financial Management</p>
             </div>
           </Link>
 
