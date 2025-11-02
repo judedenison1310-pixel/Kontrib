@@ -3,22 +3,26 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Settings, Target, Calendar, TrendingUp } from "lucide-react";
+import { Settings, Target, Calendar, TrendingUp, Users } from "lucide-react";
 import { formatNaira, calculateProgress } from "@/lib/currency";
+import { useLocation } from "wouter";
 
 interface ProjectCardProps {
   project: Project | ProjectWithStats;
   isAdmin?: boolean;
   onManage?: (project: Project) => void;
   onContribute?: (project: Project) => void;
+  showViewContributors?: boolean;
 }
 
 export function ProjectCard({ 
   project, 
   isAdmin = false, 
   onManage, 
-  onContribute
+  onContribute,
+  showViewContributors = true
 }: ProjectCardProps) {
+  const [, setLocation] = useLocation();
   const progress = calculateProgress(project.collectedAmount, project.targetAmount);
   const contributionCount = 'contributionCount' in project ? project.contributionCount : 0;
   
@@ -92,22 +96,37 @@ export function ProjectCard({
           </div>
         )}
 
-        <div className="flex space-x-2">
-          <Button
-            onClick={() => onContribute?.(project)}
-            className="flex-1 bg-nigerian-green hover:bg-forest-green"
-          >
-            Contribute
-          </Button>
-          {isAdmin && (
+        <div className="space-y-2">
+          <div className="flex space-x-2">
+            <Button
+              onClick={() => onContribute?.(project)}
+              className="flex-1 bg-nigerian-green hover:bg-forest-green"
+              data-testid="button-contribute"
+            >
+              Contribute
+            </Button>
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onManage?.(project)}
+                className="flex-1"
+                data-testid="button-manage"
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Manage
+              </Button>
+            )}
+          </div>
+          {showViewContributors && (
             <Button
               variant="outline"
-              size="sm"
-              onClick={() => onManage?.(project)}
-              className="flex-1"
+              onClick={() => setLocation(`/project/${project.id}`)}
+              className="w-full"
+              data-testid="button-view-contributors"
             >
-              <Settings className="h-4 w-4 mr-2" />
-              Manage
+              <Users className="h-4 w-4 mr-2" />
+              View Contributors
             </Button>
           )}
         </div>

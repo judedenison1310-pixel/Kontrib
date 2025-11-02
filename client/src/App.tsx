@@ -22,6 +22,7 @@ import GroupLanding from "@/pages/group-landing";
 import MemberPayment from "@/pages/member-payment";
 import JoinGroup from "@/pages/join-group";
 import GroupDetails from "@/pages/group-details";
+import ProjectDetails from "@/pages/project-details";
 
 function Router() {
   const [user, setUser] = useState<User | null>(getCurrentUser());
@@ -73,6 +74,7 @@ function Router() {
           <Route path="/updates" component={Updates} />
           <Route path="/groups" component={Groups} />
           <Route path="/group/:groupId" component={GroupDetails} />
+          <Route path="/project/:projectId" component={ProjectDetails} />
           
           {/* Legacy admin specific route */}
           <Route path="/admin" component={AdminDashboard} />
