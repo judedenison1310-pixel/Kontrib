@@ -58,7 +58,7 @@ export function Navigation() {
                       onClick={() => {/* TODO: Implement send reminders */}}
                     >
                       <Bell className="h-4 w-4 mr-1" />
-                      Send Reminders
+                      Send Reminders <span className="text-xs text-gray-500 ml-1">(Coming Soon)</span>
                     </Button>
                     <Button 
                       variant="ghost"
@@ -66,7 +66,7 @@ export function Navigation() {
                       onClick={() => {/* TODO: Implement generate report */}}
                     >
                       <FileText className="h-4 w-4 mr-1" />
-                      Generate Report
+                      Generate Report <span className="text-xs text-gray-500 ml-1">(Coming Soon)</span>
                     </Button>
                   </>
                 ) : (
@@ -88,7 +88,7 @@ export function Navigation() {
                         className={location === "/make-payment" ? "bg-nigerian-green text-white" : ""}
                       >
                         <CreditCard className="h-4 w-4 mr-1" />
-                        Make Payment
+                        Submit Payment Proof
                       </Button>
                     </Link>
                     <Link href="/my-contributions">
@@ -160,7 +160,7 @@ export function Navigation() {
                             }}
                           >
                             <Bell className="h-4 w-4 mr-2" />
-                            Send Reminders
+                            Send Reminders <span className="text-xs text-gray-500 ml-1">(Coming Soon)</span>
                           </Button>
                           <Button 
                             variant="ghost" 
@@ -171,7 +171,7 @@ export function Navigation() {
                             }}
                           >
                             <FileText className="h-4 w-4 mr-2" />
-                            Generate Report
+                            Generate Report <span className="text-xs text-gray-500 ml-1">(Coming Soon)</span>
                           </Button>
                         </>
                       ) : (
@@ -185,7 +185,7 @@ export function Navigation() {
                           <Link href="/make-payment" onClick={() => setMobileMenuOpen(false)}>
                             <Button variant="ghost" className="w-full justify-start">
                               <CreditCard className="h-4 w-4 mr-2" />
-                              Make Payment
+                              Submit Payment Proof
                             </Button>
                           </Link>
                           <Link href="/my-contributions" onClick={() => setMobileMenuOpen(false)}>
