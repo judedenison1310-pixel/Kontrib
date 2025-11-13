@@ -173,7 +173,18 @@ export default function MemberDashboard() {
         {/* My Groups */}
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle>My Groups</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>My Groups</CardTitle>
+              <Button
+                onClick={() => setLocation("/join-group")}
+                variant="outline"
+                size="sm"
+                data-testid="button-join-group-header"
+              >
+                <Users className="h-4 w-4 mr-2" />
+                Join Group
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {userGroups.length === 0 ? (
