@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +37,7 @@ import { useToast } from "@/hooks/use-toast";
 export default function AdminDashboard() {
   const user = getCurrentUser();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [createGroupModalOpen, setCreateGroupModalOpen] = useState(false);
   const [createProjectModalOpen, setCreateProjectModalOpen] = useState(false);
   const [managePartnersModalOpen, setManagePartnersModalOpen] = useState(false);
@@ -135,14 +137,10 @@ export default function AdminDashboard() {
             Add Project
           </Button>
           <Button
-            onClick={() =>
-              toast({
-                title: "View Members",
-                description: "Member management feature coming soon",
-              })
-            }
+            onClick={() => setLocation(`/groups/${group.id}`)}
             variant="outline"
             size="sm"
+            data-testid={`view-members-${group.id}`}
           >
             <Users className="h-4 w-4 mr-1" />
             View Members
