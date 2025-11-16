@@ -101,7 +101,24 @@ export default function MemberDashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Dashboard Header */}
+
+        {/* Dashboard Header */}
         <div className="mb-8">
+          <div className="rounded-xl p-6 bg-gray-100 border border-gray-200">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-gray-900 font-semibold">
+                  Welcome, {user?.fullName}
+                </p>
+                <p className="text-gray-600 text-sm">
+                  Member of {userGroups.length} active groups
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* <div className="mb-8">
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-6 text-white">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -112,7 +129,63 @@ export default function MemberDashboard() {
               </div>
             </div>
           </div>
-        </div>
+        </div> */}
+
+        {/* Member Stats */}
+        {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Total Contributions</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {userStats ? formatNaira(userStats.totalContributions) : "₦0"}
+                  </p>
+                  <p className="text-xs text-green-600">All groups combined</p>
+                </div>
+                <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center overflow-hidden">
+                  <img 
+                    src="/kontrib-logo.jpg?v=3" 
+                    alt="Kontrib Logo" 
+                    className="w-8 h-8 object-contain"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Active Groups</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {userStats?.groupCount || 0}
+                  </p>
+                  <p className="text-xs text-blue-600">Contributing regularly</p>
+                </div>
+                <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center">
+                  <Users className="text-green-500 h-6 w-6" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Payment Status</p>
+                  <p className="text-2xl font-bold text-green-600">Up to Date</p>
+                  <p className="text-xs text-green-600">No pending payments</p>
+                </div>
+                <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center">
+                  <CheckCircle className="text-green-500 h-6 w-6" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div> */}
 
         {/* My Groups */}
         <Card className="mb-8">
