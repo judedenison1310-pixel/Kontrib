@@ -12,15 +12,16 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getCurrentUser } from "@/lib/auth";
 import { formatNaira } from "@/lib/currency";
 import { cn } from "@/lib/utils";
-import { 
-  Users, 
-  Target, 
-  Clock, 
-  Link2, 
-  CheckCircle2, 
+import { ArrowLeft } from "lucide-react";
+import {
+  Users,
+  Target,
+  Clock,
+  Link2,
+  CheckCircle2,
   ArrowRight,
   AlertCircle,
-  Loader2
+  Loader2,
 } from "lucide-react";
 
 interface GroupData {
@@ -45,7 +46,10 @@ interface GroupData {
 
 export default function JoinGroupPage() {
   const [groupLink, setGroupLink] = useState("");
-  const [extractedIdentifier, setExtractedIdentifier] = useState<{ value: string; type: 'slug' | 'registration' } | null>(null);
+  const [extractedIdentifier, setExtractedIdentifier] = useState<{
+    value: string;
+    type: "slug" | "registration";
+  } | null>(null);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const user = getCurrentUser();
@@ -58,109 +62,132 @@ export default function JoinGroupPage() {
   };
 
   // Extract group identifier (custom slug or registration link) from various URL formats
-  const extractGroupIdentifier = (input: string): { value: string; type: 'slug' | 'registration' } | null => {
+  const extractGroupIdentifier = (
+    input: string,
+  ): { value: string; type: "slug" | "registration" } | null => {
     const trimmedInput = input.trim();
-    
+
     // Handle direct UUID registration link format
     if (trimmedInput.match(/^[a-f0-9-]{36}$/)) {
-      return { value: trimmedInput, type: 'registration' };
+      return { value: trimmedInput, type: "registration" };
     }
-    
+
     // Handle kontrib.app/register/[uuid] format (registration link)
-    const kontribRegisterMatch = trimmedInput.match(/kontrib\.app\/register\/([^/?]+)/);
+    const kontribRegisterMatch = trimmedInput.match(
+      /kontrib\.app\/register\/([^/?]+)/,
+    );
     if (kontribRegisterMatch) {
-      return { value: kontribRegisterMatch[1], type: 'registration' };
+      return { value: kontribRegisterMatch[1], type: "registration" };
     }
-    
+
     // Handle kontrib.app/join/[identifier] format (could be slug or UUID)
     const kontribJoinMatch = trimmedInput.match(/kontrib\.app\/join\/([^/?]+)/);
     if (kontribJoinMatch) {
       const identifier = kontribJoinMatch[1];
-      const type = identifier.match(/^[a-f0-9-]{36}$/) ? 'registration' : 'slug';
+      const type = identifier.match(/^[a-f0-9-]{36}$/)
+        ? "registration"
+        : "slug";
       return { value: identifier, type };
     }
-    
+
     // Handle kontrib.app/[slug] format (direct group landing page)
     const kontribDirectMatch = trimmedInput.match(/kontrib\.app\/([^/?]+)/);
     if (kontribDirectMatch) {
       const identifier = kontribDirectMatch[1];
       // Skip common paths like 'join', 'register', 'dashboard', etc.
-      if (!['join', 'register', 'dashboard', 'login', 'admin'].includes(identifier.toLowerCase())) {
-        return { value: identifier, type: 'slug' };
+      if (
+        !["join", "register", "dashboard", "login", "admin"].includes(
+          identifier.toLowerCase(),
+        )
+      ) {
+        return { value: identifier, type: "slug" };
       }
     }
-    
+
     // Handle full URL with /register/[identifier] path
     try {
       const url = new URL(trimmedInput);
       const registerMatch = url.pathname.match(/\/register\/([^/?]+)/);
       if (registerMatch) {
-        return { value: registerMatch[1], type: 'registration' };
+        return { value: registerMatch[1], type: "registration" };
       }
-      
+
       // Handle full URL with /join/[identifier] path (including replit.app URLs)
       const joinMatch = url.pathname.match(/\/join\/([^/?]+)/);
       if (joinMatch) {
         const identifier = joinMatch[1];
-        const type = identifier.match(/^[a-f0-9-]{36}$/) ? 'registration' : 'slug';
+        const type = identifier.match(/^[a-f0-9-]{36}$/)
+          ? "registration"
+          : "slug";
         return { value: identifier, type };
       }
-      
+
       // Handle full URL with direct /[slug] path (group landing page)
-      const pathSegments = url.pathname.split('/').filter(s => s.length > 0);
+      const pathSegments = url.pathname.split("/").filter((s) => s.length > 0);
       if (pathSegments.length === 1) {
         const identifier = pathSegments[0];
         // Skip common paths
-        if (!['join', 'register', 'dashboard', 'login', 'admin'].includes(identifier.toLowerCase())) {
-          return { value: identifier, type: 'slug' };
+        if (
+          !["join", "register", "dashboard", "login", "admin"].includes(
+            identifier.toLowerCase(),
+          )
+        ) {
+          return { value: identifier, type: "slug" };
         }
       }
     } catch {
       // Not a valid URL, continue
     }
-    
+
     // Handle /register/[identifier] format
     const registerPathMatch = trimmedInput.match(/^\/register\/([^/?]+)/);
     if (registerPathMatch) {
-      return { value: registerPathMatch[1], type: 'registration' };
+      return { value: registerPathMatch[1], type: "registration" };
     }
-    
+
     // Handle /join/[identifier] format
     const joinPathMatch = trimmedInput.match(/^\/join\/([^/?]+)/);
     if (joinPathMatch) {
       const identifier = joinPathMatch[1];
-      const type = identifier.match(/^[a-f0-9-]{36}$/) ? 'registration' : 'slug';
+      const type = identifier.match(/^[a-f0-9-]{36}$/)
+        ? "registration"
+        : "slug";
       return { value: identifier, type };
     }
-    
+
     // Handle direct custom slug (alphanumeric, hyphens, underscores)
     if (trimmedInput.match(/^[a-zA-Z0-9_-]+$/)) {
-      return { value: trimmedInput, type: 'slug' };
+      return { value: trimmedInput, type: "slug" };
     }
-    
+
     return null;
   };
 
   // Preview group data when identifier is detected
-  const { data: groupPreview, isLoading: isLoadingPreview, error: previewError} = useQuery<GroupData>({
-    queryKey: extractedIdentifier 
-      ? extractedIdentifier.type === 'slug' 
-        ? ['/api/groups/slug', extractedIdentifier.value, user?.id]
-        : ['/api/groups/registration', extractedIdentifier.value, user?.id]
-      : ['/api/groups/none'],
+  const {
+    data: groupPreview,
+    isLoading: isLoadingPreview,
+    error: previewError,
+  } = useQuery<GroupData>({
+    queryKey: extractedIdentifier
+      ? extractedIdentifier.type === "slug"
+        ? ["/api/groups/slug", extractedIdentifier.value, user?.id]
+        : ["/api/groups/registration", extractedIdentifier.value, user?.id]
+      : ["/api/groups/none"],
     queryFn: async () => {
       if (!extractedIdentifier) return null;
-      
-      const endpoint = extractedIdentifier.type === 'slug' 
-        ? `/api/groups/slug/${extractedIdentifier.value}`
-        : `/api/groups/registration/${extractedIdentifier.value}`;
-      
+
+      const endpoint =
+        extractedIdentifier.type === "slug"
+          ? `/api/groups/slug/${extractedIdentifier.value}`
+          : `/api/groups/registration/${extractedIdentifier.value}`;
+
       // Add userId as query parameter if user is logged in
       const url = user ? `${endpoint}?userId=${user.id}` : endpoint;
-      
+
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error('Group not found');
+        throw new Error("Group not found");
       }
       return response.json();
     },
@@ -170,10 +197,11 @@ export default function JoinGroupPage() {
   // Join group mutation
   const joinGroupMutation = useMutation({
     mutationFn: async () => {
-      if (!extractedIdentifier || !user || !groupPreview) throw new Error("Missing data");
-      
+      if (!extractedIdentifier || !user || !groupPreview)
+        throw new Error("Missing data");
+
       return apiRequest("POST", `/api/groups/${groupPreview.group.id}/join`, {
-        userId: user.id
+        userId: user.id,
       });
     },
     onSuccess: () => {
@@ -181,11 +209,11 @@ export default function JoinGroupPage() {
         title: "Successfully joined group!",
         description: `You are now a member of ${groupPreview?.group.name}`,
       });
-      
+
       // Invalidate relevant queries
-      queryClient.invalidateQueries({ queryKey: ['/api/groups/user'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/stats/user'] });
-      
+      queryClient.invalidateQueries({ queryKey: ["/api/groups/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats/user"] });
+
       // Navigate to member dashboard
       setLocation("/dashboard");
     },
@@ -211,35 +239,48 @@ export default function JoinGroupPage() {
 
   const getDaysRemaining = (): number | null => {
     if (!groupPreview?.projects.length) return null;
-    
+
     const earliestDeadline = groupPreview.projects
       .filter((p: any) => p.deadline)
       .map((p: any) => new Date(p.deadline))
       .sort((a: Date, b: Date) => a.getTime() - b.getTime())[0];
-    
+
     if (!earliestDeadline) return null;
-    
+
     const today = new Date();
     const diffTime = earliestDeadline.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     return diffDays > 0 ? diffDays : 0;
   };
 
-  const progressPercentage = groupPreview 
+  const progressPercentage = groupPreview
     ? calculateProgress(groupPreview.totalCollected, groupPreview.totalTarget)
     : 0;
-  
+
   const daysRemaining = getDaysRemaining();
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-md mx-auto px-4 space-y-6">
-        
+        {/* Back button */}
+        <button
+          type="button"
+          onClick={() => window.history.back()}
+          className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-2 bg-gray-50 border border-gray-200 hover:bg-gray-100 rounded-lg px-3 py-2"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Dashboard
+        </button>
+
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Join a Group</h1>
-          <p className="text-gray-600">Enter a group link to join and start contributing</p>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            Join a Group
+          </h1>
+          <p className="text-gray-600">
+            Enter a group link to join and start contributing
+          </p>
         </div>
 
         {/* Link Input Form */}
@@ -288,7 +329,9 @@ export default function JoinGroupPage() {
           <Card className="border-red-200">
             <CardContent className="py-8 text-center">
               <AlertCircle className="w-12 h-12 mx-auto mb-4 text-red-500" />
-              <h3 className="font-semibold text-red-800 mb-2">Group Not Found</h3>
+              <h3 className="font-semibold text-red-800 mb-2">
+                Group Not Found
+              </h3>
               <p className="text-red-600 text-sm">
                 The group link is invalid or the group no longer exists.
               </p>
@@ -312,13 +355,15 @@ export default function JoinGroupPage() {
                 </p>
               )}
             </CardHeader>
-            
+
             <CardContent className="space-y-6">
               {/* Goal Amount */}
               <div className="text-center">
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <Target className="w-5 h-5 text-green-600" />
-                  <span className="text-sm font-medium text-gray-600">Target Goal</span>
+                  <span className="text-sm font-medium text-gray-600">
+                    Target Goal
+                  </span>
                 </div>
                 <div className="text-2xl font-bold text-green-600">
                   {formatNaira(groupPreview.totalTarget)}
@@ -328,15 +373,25 @@ export default function JoinGroupPage() {
               {/* Progress Bar */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-gray-600">Progress</span>
+                  <span className="text-sm font-medium text-gray-600">
+                    Progress
+                  </span>
                   <span className="text-sm font-bold text-green-600">
                     {progressPercentage}%
                   </span>
                 </div>
                 <Progress value={progressPercentage} className="h-2" />
                 <div className="flex justify-between text-xs text-gray-500">
-                  <span>Raised: {formatNaira(groupPreview.totalCollected)}</span>
-                  <span>Remaining: {formatNaira(parseInt(groupPreview.totalTarget) - parseInt(groupPreview.totalCollected))}</span>
+                  <span>
+                    Raised: {formatNaira(groupPreview.totalCollected)}
+                  </span>
+                  <span>
+                    Remaining:{" "}
+                    {formatNaira(
+                      parseInt(groupPreview.totalTarget) -
+                        parseInt(groupPreview.totalCollected),
+                    )}
+                  </span>
                 </div>
               </div>
 
@@ -349,7 +404,7 @@ export default function JoinGroupPage() {
                   </div>
                   <div className="text-xs text-gray-600">Members</div>
                 </div>
-                
+
                 <div className="bg-blue-50 rounded-lg p-3 text-center">
                   <Target className="w-4 h-4 text-blue-600 mx-auto mb-1" />
                   <div className="text-lg font-bold text-blue-600">
@@ -364,11 +419,13 @@ export default function JoinGroupPage() {
                 <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <Clock className="w-4 h-4 text-orange-600" />
-                    <span className="text-sm font-medium text-orange-800">Time Remaining</span>
+                    <span className="text-sm font-medium text-orange-800">
+                      Time Remaining
+                    </span>
                   </div>
                   <div className="text-center">
                     <div className="text-xl font-bold text-orange-600 mb-1">
-                      {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'}
+                      {daysRemaining} {daysRemaining === 1 ? "day" : "days"}
                     </div>
                     <div className="text-xs text-orange-700">
                       Until first deadline
@@ -396,7 +453,7 @@ export default function JoinGroupPage() {
                     </Button>
                   </div>
                 ) : (
-                  <Button 
+                  <Button
                     onClick={handleJoinGroup}
                     disabled={joinGroupMutation.isPending}
                     className="w-full bg-green-600 hover:bg-green-700 text-white py-6 text-lg font-semibold rounded-lg shadow-lg"
@@ -424,10 +481,11 @@ export default function JoinGroupPage() {
                       Please log in to join this group
                     </p>
                     <p className="text-xs text-blue-600">
-                      You'll need an account to become a member and start contributing
+                      You'll need an account to become a member and start
+                      contributing
                     </p>
                   </div>
-                  <Button 
+                  <Button
                     onClick={() => setLocation("/")}
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4"
                     data-testid="button-login-to-join"
@@ -440,19 +498,29 @@ export default function JoinGroupPage() {
               {/* Projects Preview */}
               {groupPreview.projects.length > 0 && (
                 <div className="space-y-2">
-                  <h3 className="font-medium text-gray-900 text-sm">Projects in this group</h3>
+                  <h3 className="font-medium text-gray-900 text-sm">
+                    Projects in this group
+                  </h3>
                   <div className="space-y-2">
                     {groupPreview.projects.slice(0, 3).map((project: any) => (
-                      <div key={project.id} className="bg-gray-50 rounded-lg p-3">
+                      <div
+                        key={project.id}
+                        className="bg-gray-50 rounded-lg p-3"
+                      >
                         <div className="flex justify-between items-center mb-1">
-                          <span className="text-sm font-medium text-gray-900">{project.name}</span>
+                          <span className="text-sm font-medium text-gray-900">
+                            {project.name}
+                          </span>
                           <span className="text-sm font-bold text-green-600">
                             {formatNaira(project.targetAmount)}
                           </span>
                         </div>
-                        <Progress 
-                          value={calculateProgress(project.collectedAmount, project.targetAmount)} 
-                          className="h-1" 
+                        <Progress
+                          value={calculateProgress(
+                            project.collectedAmount,
+                            project.targetAmount,
+                          )}
+                          className="h-1"
                         />
                       </div>
                     ))}

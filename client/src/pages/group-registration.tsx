@@ -5,8 +5,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Users, Calendar, Target, CheckCircle, AlertCircle, Phone, MessageSquare, ArrowLeft } from "lucide-react";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Users,
+  Calendar,
+  Target,
+  CheckCircle,
+  AlertCircle,
+  Phone,
+  MessageSquare,
+  ArrowLeft,
+} from "lucide-react";
 import { formatNaira, calculateProgress } from "@/lib/currency";
 import { getCurrentUser } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
@@ -20,8 +36,16 @@ import { z } from "zod";
 // Form validation schemas
 const registrationFormSchema = z.object({
   fullName: z.string().min(2, "Full name is required"),
-  username: z.string().min(3, "Username must be at least 3 characters").max(20, "Username must be less than 20 characters"),
-  phoneNumber: z.string().regex(/^\+?[1-9]\d{1,14}$/, "Please enter a valid phone number with country code (e.g., +234, +1, +44)"),
+  username: z
+    .string()
+    .min(3, "Username must be at least 3 characters")
+    .max(20, "Username must be less than 20 characters"),
+  phoneNumber: z
+    .string()
+    .regex(
+      /^\+?[1-9]\d{1,14}$/,
+      "Please enter a valid phone number with country code (e.g., +234, +1, +44)",
+    ),
 });
 
 const otpFormSchema = z.object({
@@ -39,11 +63,20 @@ export default function GroupRegistration() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const user = getCurrentUser();
-  const [step, setStep] = useState<"group-info" | "registration" | "otp-verification" | "success">("group-info");
-  const [otpData, setOtpData] = useState<{ phoneNumber: string; expiresAt: string } | null>(null);
+  const [step, setStep] = useState<
+    "group-info" | "registration" | "otp-verification" | "success"
+  >("group-info");
+  const [otpData, setOtpData] = useState<{
+    phoneNumber: string;
+    expiresAt: string;
+  } | null>(null);
   const [newUser, setNewUser] = useState<any>(null);
 
-  const { data: groupData, isLoading, error } = useQuery({
+  const {
+    data: groupData,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ["/api/groups/registration", registrationLink],
     enabled: !!registrationLink,
   });
@@ -83,11 +116,11 @@ export default function GroupRegistration() {
       setStep("otp-verification");
       toast({
         title: "OTP Sent!",
-        description: data.fallback 
+        description: data.fallback
           ? `Verification code sent (development mode). Check console for OTP.`
           : `Verification code sent to ${phoneNumber} via WhatsApp.`,
       });
-      
+
       // For development, show the OTP in console
       if (data.developmentOtp) {
         console.log("Development OTP:", data.developmentOtp);
@@ -110,8 +143,12 @@ export default function GroupRegistration() {
   const registerMutation = useMutation({
     mutationFn: async (data: RegistrationFormData & { otp: string }) => {
       if (!group) throw new Error("Group not found");
-      
-      const response = await apiRequest("POST", `/api/groups/${group.id}/register-with-otp`, data);
+
+      const response = await apiRequest(
+        "POST",
+        `/api/groups/${group.id}/register-with-otp`,
+        data,
+      );
       return response.json();
     },
     onSuccess: (data) => {
@@ -134,14 +171,20 @@ export default function GroupRegistration() {
   const joinGroupMutation = useMutation({
     mutationFn: async () => {
       if (!group || !user) throw new Error("Missing group or user data");
-      
-      const response = await apiRequest("POST", `/api/groups/${group.id}/join`, {
-        userId: user.id,
-      });
+
+      const response = await apiRequest(
+        "POST",
+        `/api/groups/${group.id}/join`,
+        {
+          userId: user.id,
+        },
+      );
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/groups", "user", user?.id] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/groups", "user", user?.id],
+      });
       toast({
         title: "Successfully Joined!",
         description: `You are now a member of ${group?.name}`,
@@ -162,7 +205,7 @@ export default function GroupRegistration() {
       setStep("registration");
       return;
     }
-    
+
     joinGroupMutation.mutate();
   };
 
@@ -179,7 +222,7 @@ export default function GroupRegistration() {
   };
 
   const handleLoginRedirect = () => {
-    localStorage.setItem('pendingGroupJoin', params?.link || '');
+    localStorage.setItem("pendingGroupJoin", params?.link || "");
     setLocation("/");
   };
 
@@ -188,7 +231,9 @@ export default function GroupRegistration() {
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-300">Loading group details...</p>
+          <p className="text-gray-600 dark:text-gray-300">
+            Loading group details...
+          </p>
         </div>
       </div>
     );
@@ -206,9 +251,14 @@ export default function GroupRegistration() {
           </CardHeader>
           <CardContent>
             <p className="text-gray-600 dark:text-gray-300 mb-4">
-              The group you're looking for doesn't exist or the link has expired.
+              The group you're looking for doesn't exist or the link has
+              expired.
             </p>
-            <Button onClick={() => setLocation("/")} className="w-full" data-testid="go-home">
+            <Button
+              onClick={() => setLocation("/")}
+              className="w-full"
+              data-testid="go-home"
+            >
               Go Home
             </Button>
           </CardContent>
@@ -227,8 +277,12 @@ export default function GroupRegistration() {
               <Users className="text-white h-6 w-6" />
             </div>
             <div>
-              <CardTitle className="text-2xl text-green-600 dark:text-green-400">{group.name}</CardTitle>
-              <p className="text-gray-600 dark:text-gray-300">{group.description}</p>
+              <CardTitle className="text-2xl text-green-600 dark:text-green-400">
+                {group.name}
+              </CardTitle>
+              <p className="text-gray-600 dark:text-gray-300">
+                {group.description}
+              </p>
             </div>
           </div>
         </CardHeader>
@@ -237,28 +291,45 @@ export default function GroupRegistration() {
       {/* Purses List */}
       {purses.length > 0 && (
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Available Purses</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Available Purses
+          </h3>
           {purses.map((purse) => (
             <Card key={purse.id} className="p-4">
               <div className="space-y-3">
                 <div className="flex justify-between items-start">
-                  <h4 className="font-medium text-gray-900 dark:text-white">{purse.name}</h4>
+                  <h4 className="font-medium text-gray-900 dark:text-white">
+                    {purse.name}
+                  </h4>
                   <Badge variant="outline">
-                    {Math.round((Number(purse.collectedAmount) / Number(purse.targetAmount)) * 100)}%
+                    {Math.round(
+                      (Number(purse.collectedAmount) /
+                        Number(purse.targetAmount)) *
+                        100,
+                    )}
+                    %
                   </Badge>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-500">Target</p>
-                    <p className="font-semibold">{formatNaira(Number(purse.targetAmount))}</p>
+                    <p className="font-semibold">
+                      {formatNaira(Number(purse.targetAmount))}
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Deadline</p>
-                    <p className="font-semibold">{new Date(purse.deadline || '').toLocaleDateString()}</p>
+                    <p className="font-semibold">
+                      {new Date(purse.deadline || "").toLocaleDateString()}
+                    </p>
                   </div>
                 </div>
-                <Progress 
-                  value={Math.round((Number(purse.collectedAmount) / Number(purse.targetAmount)) * 100)} 
+                <Progress
+                  value={Math.round(
+                    (Number(purse.collectedAmount) /
+                      Number(purse.targetAmount)) *
+                      100,
+                  )}
                   className="h-2"
                 />
               </div>
@@ -269,8 +340,8 @@ export default function GroupRegistration() {
 
       {/* Action Buttons */}
       <div className="space-y-3">
-        <Button 
-          onClick={handleJoinGroup} 
+        <Button
+          onClick={handleJoinGroup}
           className="w-full bg-green-600 hover:bg-green-700 text-white"
           data-testid="join-group"
         >
@@ -278,8 +349,8 @@ export default function GroupRegistration() {
           Join Group
         </Button>
         {user && (
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={handleLoginRedirect}
             className="w-full"
             data-testid="login-existing"
@@ -294,8 +365,8 @@ export default function GroupRegistration() {
   const renderRegistration = () => (
     <div className="space-y-6">
       <div className="text-center">
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           onClick={() => setStep("group-info")}
           className="mb-4"
           data-testid="back-to-group"
@@ -303,8 +374,12 @@ export default function GroupRegistration() {
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Group Info
         </Button>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Join {group.name}</h2>
-        <p className="text-gray-600 dark:text-gray-300">Create your account to join this group</p>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+          Join {group.name}
+        </h2>
+        <p className="text-gray-600 dark:text-gray-300">
+          Create your account to join this group
+        </p>
       </div>
 
       <Card>
@@ -313,7 +388,10 @@ export default function GroupRegistration() {
         </CardHeader>
         <CardContent>
           <Form {...registrationForm}>
-            <form onSubmit={registrationForm.handleSubmit(handleRegistrationSubmit)} className="space-y-4">
+            <form
+              onSubmit={registrationForm.handleSubmit(handleRegistrationSubmit)}
+              className="space-y-4"
+            >
               <FormField
                 control={registrationForm.control}
                 name="fullName"
@@ -321,13 +399,17 @@ export default function GroupRegistration() {
                   <FormItem>
                     <FormLabel>Full Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter your full name" {...field} data-testid="input-fullname" />
+                      <Input
+                        placeholder="Enter your full name"
+                        {...field}
+                        data-testid="input-fullname"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={registrationForm.control}
                 name="username"
@@ -335,7 +417,11 @@ export default function GroupRegistration() {
                   <FormItem>
                     <FormLabel>Username (WhatsApp Group Nickname)</FormLabel>
                     <FormControl>
-                      <Input placeholder="Your nickname in the WhatsApp group" {...field} data-testid="input-username" />
+                      <Input
+                        placeholder="Your nickname in the WhatsApp group"
+                        {...field}
+                        data-testid="input-username"
+                      />
                     </FormControl>
                     <FormMessage />
                     <p className="text-sm text-gray-500">
@@ -344,7 +430,7 @@ export default function GroupRegistration() {
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={registrationForm.control}
                 name="phoneNumber"
@@ -352,23 +438,24 @@ export default function GroupRegistration() {
                   <FormItem>
                     <FormLabel>WhatsApp Phone Number</FormLabel>
                     <FormControl>
-                      <Input 
-                        placeholder="e.g., +2348012345678, +1234567890, +441234567890" 
-                        {...field} 
+                      <Input
+                        placeholder="e.g., +2348012345678, +1234567890, +441234567890"
+                        {...field}
                         data-testid="input-phone"
                       />
                     </FormControl>
                     <FormMessage />
                     <p className="text-sm text-gray-500">
-                      We'll send an OTP to this number via WhatsApp for verification
+                      We'll send an OTP to this number via WhatsApp for
+                      verification
                     </p>
                   </FormItem>
                 )}
               />
-              
-              <Button 
-                type="submit" 
-                className="w-full bg-green-600 hover:bg-green-700" 
+
+              <Button
+                type="submit"
+                className="w-full bg-green-600 hover:bg-green-700"
                 disabled={sendOtpMutation.isPending}
                 data-testid="send-otp"
               >
@@ -391,8 +478,8 @@ export default function GroupRegistration() {
   const renderOtpVerification = () => (
     <div className="space-y-6">
       <div className="text-center">
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           onClick={() => setStep("registration")}
           className="mb-4"
           data-testid="back-to-registration"
@@ -400,7 +487,9 @@ export default function GroupRegistration() {
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Registration
         </Button>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Verify Your Phone</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+          Verify Your Phone
+        </h2>
         <p className="text-gray-600 dark:text-gray-300">
           Enter the 6-digit code sent to {otpData?.phoneNumber}
         </p>
@@ -415,7 +504,10 @@ export default function GroupRegistration() {
         </CardHeader>
         <CardContent>
           <Form {...otpForm}>
-            <form onSubmit={otpForm.handleSubmit(handleOtpSubmit)} className="space-y-4">
+            <form
+              onSubmit={otpForm.handleSubmit(handleOtpSubmit)}
+              className="space-y-4"
+            >
               <FormField
                 control={otpForm.control}
                 name="otp"
@@ -423,9 +515,9 @@ export default function GroupRegistration() {
                   <FormItem>
                     <FormLabel>Verification Code</FormLabel>
                     <FormControl>
-                      <Input 
-                        placeholder="Enter 6-digit code" 
-                        {...field} 
+                      <Input
+                        placeholder="Enter 6-digit code"
+                        {...field}
                         maxLength={6}
                         className="text-center text-2xl tracking-widest"
                         data-testid="input-otp"
@@ -435,21 +527,23 @@ export default function GroupRegistration() {
                   </FormItem>
                 )}
               />
-              
-              <Button 
-                type="submit" 
-                className="w-full bg-green-600 hover:bg-green-700" 
+
+              <Button
+                type="submit"
+                className="w-full bg-green-600 hover:bg-green-700"
                 disabled={registerMutation.isPending}
                 data-testid="verify-otp"
               >
-                {registerMutation.isPending ? "Verifying..." : "Verify & Join Group"}
+                {registerMutation.isPending
+                  ? "Verifying..."
+                  : "Verify & Join Group"}
               </Button>
             </form>
           </Form>
 
           <div className="mt-4 text-center">
-            <Button 
-              variant="link" 
+            <Button
+              variant="link"
               onClick={() => sendOtpMutation.mutate(otpData?.phoneNumber || "")}
               disabled={sendOtpMutation.isPending}
               data-testid="resend-otp"
@@ -468,7 +562,9 @@ export default function GroupRegistration() {
         <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <CheckCircle className="h-8 w-8 text-green-600" />
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Welcome to {group.name}!</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+          Welcome to {group.name}!
+        </h2>
         <p className="text-gray-600 dark:text-gray-300">
           You've successfully joined the group and can now make contributions
         </p>
@@ -485,11 +581,15 @@ export default function GroupRegistration() {
               <p className="font-medium">{newUser?.fullName}</p>
             </div>
             <div>
-              <Label className="text-sm text-gray-500">Username (WhatsApp Group Nickname)</Label>
+              <Label className="text-sm text-gray-500">
+                Username (WhatsApp Group Nickname)
+              </Label>
               <p className="font-medium">{newUser?.username}</p>
             </div>
             <div>
-              <Label className="text-sm text-gray-500">WhatsApp Phone Number</Label>
+              <Label className="text-sm text-gray-500">
+                WhatsApp Phone Number
+              </Label>
               <p className="font-medium">{newUser?.phoneNumber}</p>
             </div>
           </div>
@@ -497,15 +597,15 @@ export default function GroupRegistration() {
       </Card>
 
       <div className="space-y-3">
-        <Button 
-          onClick={() => setLocation("/member")} 
+        <Button
+          onClick={() => setLocation("/member")}
           className="w-full bg-green-600 hover:bg-green-700"
           data-testid="go-to-dashboard"
         >
           Go to Dashboard
         </Button>
-        <Button 
-          onClick={() => setLocation("/join-group")} 
+        <Button
+          onClick={() => setLocation("/join-group")}
           variant="outline"
           className="w-full"
           data-testid="join-another-group"
