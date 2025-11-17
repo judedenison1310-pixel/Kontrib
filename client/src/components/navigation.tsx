@@ -1,6 +1,18 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Users, Bell, Menu, X, MessageCircle, CreditCard, History, Megaphone, LogOut, FileText, UserPlus } from "lucide-react";
+import {
+  Users,
+  Bell,
+  Menu,
+  X,
+  MessageCircle,
+  CreditCard,
+  History,
+  Megaphone,
+  LogOut,
+  FileText,
+  UserPlus,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { NotificationBell } from "@/components/notification-bell";
@@ -25,13 +37,15 @@ export function Navigation() {
         <div className="flex justify-between items-center h-16">
           <Link href="/">
             <div className="flex flex-col items-start justify-center py-2">
-              <img 
-                src={kontribLogo} 
-                alt="Kontrib" 
+              <img
+                src={kontribLogo}
+                alt="Kontrib"
                 className="h-7 w-auto object-contain sm:h-8"
                 data-testid="img-kontrib-logo"
               />
-              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Group Financial Management</p>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+                Group Financial Management
+              </p>
             </div>
           </Link>
 
@@ -39,79 +53,114 @@ export function Navigation() {
             {/* Desktop Navigation */}
             <div className="hidden sm:flex items-center space-x-4">
               <div className="bg-gray-100 p-1 rounded-lg">
-                
                 {isAdmin() ? (
                   <>
                     <Link href="/groups">
-                      <Button 
+                      <Button
                         variant={location === "/groups" ? "default" : "ghost"}
                         size="sm"
-                        className={location === "/groups" ? "bg-nigerian-green text-white" : ""}
+                        className={
+                          location === "/groups"
+                            ? "bg-nigerian-green text-white"
+                            : ""
+                        }
                       >
                         <Users className="h-4 w-4 mr-1" />
                         Groups
                       </Button>
                     </Link>
                     <Link href="/admin">
-                      <Button 
+                      <Button
                         variant={location === "/admin" ? "default" : "ghost"}
                         size="sm"
-                        className={location === "/admin" ? "bg-nigerian-green text-white" : ""}
+                        className={
+                          location === "/admin"
+                            ? "bg-nigerian-green text-white"
+                            : ""
+                        }
                       >
                         <FileText className="h-4 w-4 mr-1" />
                         Projects
                       </Button>
                     </Link>
-                    <Button 
+                    <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => {/* TODO: Implement send reminders */}}
+                      onClick={() => {
+                        /* TODO: Implement send reminders */
+                      }}
                     >
                       <Bell className="h-4 w-4 mr-1" />
-                      Send Reminders <span className="text-xs text-gray-500 ml-1">(Coming Soon)</span>
+                      Send Reminders{" "}
+                      <span className="text-xs text-gray-500 ml-1">
+                        (Coming Soon)
+                      </span>
                     </Button>
-                    <Button 
+                    <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => {/* TODO: Implement generate report */}}
+                      onClick={() => {
+                        /* TODO: Implement generate report */
+                      }}
                     >
                       <FileText className="h-4 w-4 mr-1" />
-                      Generate Report <span className="text-xs text-gray-500 ml-1">(Coming Soon)</span>
+                      Generate Report{" "}
+                      <span className="text-xs text-gray-500 ml-1">
+                        (Coming Soon)
+                      </span>
                     </Button>
                   </>
                 ) : (
                   <>
                     <Link href="/join-group">
-                      <Button 
-                        variant={location === "/join-group" ? "default" : "ghost"}
+                      <Button
+                        variant={
+                          location === "/join-group" ? "default" : "ghost"
+                        }
                         size="sm"
-                        className={location === "/join-group" ? "bg-nigerian-green text-white" : ""}
+                        className={
+                          location === "/join-group"
+                            ? "bg-nigerian-green text-white"
+                            : ""
+                        }
                       >
                         <UserPlus className="h-4 w-4 mr-1" />
                         Join Group
                       </Button>
                     </Link>
                     <Link href="/make-payment">
-                      <Button 
-                        variant={location === "/make-payment" ? "default" : "ghost"}
+                      <Button
+                        variant={
+                          location === "/make-payment" ? "default" : "ghost"
+                        }
                         size="sm"
-                        className={location === "/make-payment" ? "bg-nigerian-green text-white" : ""}
+                        className={
+                          location === "/make-payment"
+                            ? "bg-nigerian-green text-white"
+                            : ""
+                        }
                       >
                         <CreditCard className="h-4 w-4 mr-1" />
                         Submit Payment Proof
                       </Button>
                     </Link>
                     <Link href="/my-contributions">
-                      <Button 
-                        variant={location === "/my-contributions" ? "default" : "ghost"}
+                      <Button
+                        variant={
+                          location === "/my-contributions" ? "default" : "ghost"
+                        }
                         size="sm"
-                        className={location === "/my-contributions" ? "bg-nigerian-green text-white" : ""}
+                        className={
+                          location === "/my-contributions"
+                            ? "bg-nigerian-green text-white"
+                            : ""
+                        }
                       >
                         <History className="h-4 w-4 mr-1" />
                         My Contributions
                       </Button>
                     </Link>
-                    <Link href="/updates">
+                    {/* <Link href="/updates">
                       <Button 
                         variant={location === "/updates" ? "default" : "ghost"}
                         size="sm"
@@ -120,14 +169,12 @@ export function Navigation() {
                         <Megaphone className="h-4 w-4 mr-1" />
                         Updates
                       </Button>
-                    </Link>
+                    </Link> */}
                   </>
                 )}
               </div>
-              
-              {isAdmin() && (
-                <NotificationBell userId={user.id} />
-              )}
+
+              {isAdmin() && <NotificationBell userId={user.id} />}
 
               <div className="flex items-center space-x-2">
                 <span className="text-sm font-medium">{user.fullName}</span>
@@ -150,25 +197,37 @@ export function Navigation() {
                     <p className="font-medium">{user.fullName}</p>
                     <p className="text-sm text-gray-600">{user.role}</p>
                   </div>
-                  
+
                   {user && (
                     <>
                       {isAdmin() ? (
                         <>
-                          <Link href="/groups" onClick={() => setMobileMenuOpen(false)}>
-                            <Button variant="ghost" className="w-full justify-start">
+                          <Link
+                            href="/groups"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                            >
                               <Users className="h-4 w-4 mr-2" />
                               Groups
                             </Button>
                           </Link>
-                          <Link href="/admin" onClick={() => setMobileMenuOpen(false)}>
-                            <Button variant="ghost" className="w-full justify-start">
+                          <Link
+                            href="/admin"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                            >
                               <FileText className="h-4 w-4 mr-2" />
                               Projects
                             </Button>
                           </Link>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             className="w-full justify-start"
                             onClick={() => {
                               setMobileMenuOpen(false);
@@ -176,10 +235,13 @@ export function Navigation() {
                             }}
                           >
                             <Bell className="h-4 w-4 mr-2" />
-                            Send Reminders <span className="text-xs text-gray-500 ml-1">(Coming Soon)</span>
+                            Send Reminders{" "}
+                            <span className="text-xs text-gray-500 ml-1">
+                              (Coming Soon)
+                            </span>
                           </Button>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             className="w-full justify-start"
                             onClick={() => {
                               setMobileMenuOpen(false);
@@ -187,31 +249,58 @@ export function Navigation() {
                             }}
                           >
                             <FileText className="h-4 w-4 mr-2" />
-                            Generate Report <span className="text-xs text-gray-500 ml-1">(Coming Soon)</span>
+                            Generate Report{" "}
+                            <span className="text-xs text-gray-500 ml-1">
+                              (Coming Soon)
+                            </span>
                           </Button>
                         </>
                       ) : (
                         <>
-                          <Link href="/join-group" onClick={() => setMobileMenuOpen(false)}>
-                            <Button variant="ghost" className="w-full justify-start">
+                          <Link
+                            href="/join-group"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                            >
                               <UserPlus className="h-4 w-4 mr-2" />
                               Join Group
                             </Button>
                           </Link>
-                          <Link href="/make-payment" onClick={() => setMobileMenuOpen(false)}>
-                            <Button variant="ghost" className="w-full justify-start">
+                          <Link
+                            href="/make-payment"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                            >
                               <CreditCard className="h-4 w-4 mr-2" />
                               Submit Payment Proof
                             </Button>
                           </Link>
-                          <Link href="/my-contributions" onClick={() => setMobileMenuOpen(false)}>
-                            <Button variant="ghost" className="w-full justify-start">
+                          <Link
+                            href="/my-contributions"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                            >
                               <History className="h-4 w-4 mr-2" />
                               My Contributions
                             </Button>
                           </Link>
-                          <Link href="/updates" onClick={() => setMobileMenuOpen(false)}>
-                            <Button variant="ghost" className="w-full justify-start">
+                          <Link
+                            href="/updates"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start"
+                            >
                               <Megaphone className="h-4 w-4 mr-2" />
                               Updates
                             </Button>
@@ -220,8 +309,12 @@ export function Navigation() {
                       )}
                     </>
                   )}
-                  
-                  <Button variant="outline" onClick={handleLogout} className="w-full">
+
+                  <Button
+                    variant="outline"
+                    onClick={handleLogout}
+                    className="w-full"
+                  >
                     <LogOut className="h-4 w-4 mr-2" />
                     Log Out
                   </Button>

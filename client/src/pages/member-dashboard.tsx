@@ -250,12 +250,12 @@ export default function MemberDashboard() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Payment History</CardTitle>
-              {paymentHistory.length > 0 && (
+              {/* {paymentHistory.length > 0 && (
                 <Button variant="outline" size="sm">
                   <Download className="h-4 w-4 mr-2" />
                   Export
                 </Button>
-              )}
+              )} */}
             </div>
           </CardHeader>
           <CardContent>
@@ -286,7 +286,7 @@ export default function MemberDashboard() {
                           {payment.groupName}
                         </p>
                         <p className="text-sm text-gray-600">
-                          {payment.description || "Contribution"}
+                          {payment.projectName || payment.description || "Contribution"}
                         </p>
                         <p className="text-xs text-gray-500">
                           {new Date(payment.createdAt).toLocaleDateString()}
