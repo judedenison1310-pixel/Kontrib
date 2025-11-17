@@ -293,7 +293,7 @@ export function Navigation() {
                               My Contributions
                             </Button>
                           </Link>
-                          <Link
+                          {/* <Link
                             href="/updates"
                             onClick={() => setMobileMenuOpen(false)}
                           >
@@ -304,7 +304,7 @@ export function Navigation() {
                               <Megaphone className="h-4 w-4 mr-2" />
                               Updates
                             </Button>
-                          </Link>
+                          </Link> */}
                         </>
                       )}
                     </>
