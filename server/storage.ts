@@ -203,6 +203,11 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       whatsappLink,
     };
+    // Automatically add admin as first group member
+    await this.addGroupMember({
+      groupId: id,
+      userId: adminId,
+    });
     this.groups.set(id, group);
     return group;
   }
@@ -928,14 +933,22 @@ export class DbStorage implements IStorage {
       whatsappLink = `https://wa.me/?text=${encodeURIComponent(message)}`;
     }
 
-    const result = await db.insert(groupsTable).values({
+     const result = await db.insert(groupsTable).values({
       ...insertGroup,
       registrationLink,
       customSlug: groupSlug,
       adminId,
       whatsappLink,
     }).returning();
-    return result[0];
+    
+    const group = result[0];
+    
+    // Automatically add admin as first group member
+    await this.addGroupMember({
+      groupId: group.id,
+      userId: adminId,
+    });
+    return group;
   }
 
   async updateGroup(id: string, updates: Partial<Group>): Promise<Group | undefined> {
