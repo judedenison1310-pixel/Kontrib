@@ -104,24 +104,29 @@ export async function handleDynamicOGTags(
   // Match multiple route patterns:
   // 1. /register/:groupLink
   // 2. /join/:groupLink
-  // 3. /:groupLink (short URL pattern, but exclude reserved routes)
+  // 3. /join/:groupLink/:projectSlug
+  // 4. /:groupLink (short URL pattern, but exclude reserved routes)
+  // 5. /:groupLink/:projectSlug
   const registerMatch = urlPath.match(/^\/register\/([^\/]+)/);
-  const joinMatch = urlPath.match(/^\/join\/([^\/]+)/);
-  const shortMatch = urlPath.match(/^\/([^\/]+)$/);
+  const joinMatch = urlPath.match(/^\/join\/([^\/]+)(?:\/([^\/]+))?/);
+  const shortMatch = urlPath.match(/^\/([^\/]+)(?:\/([^\/]+))?$/);
   
   let groupLink: string | null = null;
+  let projectSlug: string | null = null;
   
   if (registerMatch) {
     groupLink = registerMatch[1];
   } else if (joinMatch) {
     groupLink = joinMatch[1];
+    projectSlug = joinMatch[2] || null;
   } else if (shortMatch) {
     // Exclude reserved routes like /api, /assets, etc.
-    const reservedRoutes = ['api', 'assets', 'login', 'register', 'join', 'admin', 'dashboard'];
+    const reservedRoutes = ['api', 'assets', 'login', 'register', 'join', 'admin', 'dashboard', 'groups', 'group', 'project', 'pay', 'history'];
     const potentialLink = shortMatch[1];
     
     if (!reservedRoutes.includes(potentialLink.toLowerCase())) {
       groupLink = potentialLink;
+      projectSlug = shortMatch[2] || null;
     }
   }
   
@@ -141,15 +146,40 @@ export async function handleDynamicOGTags(
       return false;
     }
 
+    // Get projects for this group
+    const projects = await storage.getProjectsByGroup(group.id);
+    let targetProject = projects[0];
+    
+    // If projectSlug is provided, find that specific project
+    // Slug generation: lowercase, remove special chars, remove spaces, limit 50 chars
+    if (projectSlug && projects.length > 0) {
+      const matchedProject = projects.find(p => {
+        const generatedSlug = p.name
+          .toLowerCase()
+          .replace(/[^a-z0-9\s-]/g, '')
+          .replace(/\s+/g, '')
+          .slice(0, 50);
+        return generatedSlug === projectSlug;
+      });
+      if (matchedProject) {
+        targetProject = matchedProject;
+      }
+    }
+
     const host = req.get('host');
     const protocol = host.includes('localhost') ? 'http' : 'https';
     const baseUrl = `${protocol}://${host}`;
     const pageUrl = `${baseUrl}${urlPath}`;
-    const imageUrl = `${baseUrl}/api/og-image/${groupLink}`;
+    const imageUrl = `${baseUrl}/api/og-image`;
     
-    const title = `Join ${group.name} on Kontrib`;
-    const description = group.description || 
-      `Join ${group.name} for group financial contributions. Easily manage payments and track progress together.`;
+    // Title format
+    const title = "Let's track our group money together";
+    
+    // Get project name for description
+    const projectName = targetProject?.name || 'this project';
+    
+    // Description format with group name and project name
+    const description = `You've been invited to join ${group.name} on Kontrib! 🎉 Click to submit your payment to ${projectName} and track how others are contributing to the project.`;
     
     const html = generateOGHtml({
       title,

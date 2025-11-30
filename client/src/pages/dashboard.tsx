@@ -1,62 +1,64 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Navigation } from "@/components/navigation";
 import {
   TrendingUp,
   Users,
-  Target,
-  Calendar,
   CreditCard,
-  CheckCircle,
   Clock,
-  AlertCircle,
+  Bell,
+  ChevronRight,
+  Shield,
+  UserCheck,
+  FolderKanban,
 } from "lucide-react";
-import { getCurrentUser, isAdmin } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { formatNaira } from "@/lib/currency";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import type { GroupWithRole, ContributionWithDetails } from "@shared/schema";
 
 export default function Dashboard() {
   const user = getCurrentUser();
-  const userIsAdmin = isAdmin();
+  const [, setLocation] = useLocation();
 
-  // Fetch user-specific data for members or admin data for admins
-  const { data: userStats = {}, isLoading: statsLoading } = useQuery<any>({
-    queryKey: userIsAdmin
-      ? ["/api/stats", "admin", user?.id]
-      : ["/api/stats", "user", user?.id],
+  const { data: allGroups = [], isLoading: groupsLoading } = useQuery<GroupWithRole[]>({
+    queryKey: ["/api/groups", "all", user?.id],
     enabled: !!user,
   });
 
-  const { data: userGroups = [], isLoading: groupsLoading } = useQuery<any[]>({
-    queryKey: userIsAdmin
-      ? ["/api/groups", "admin", user?.id]
-      : ["/api/groups", "user", user?.id],
+  const { data: adminStats = {} } = useQuery<any>({
+    queryKey: ["/api/stats", "admin", user?.id],
     enabled: !!user,
   });
 
-  const { data: recentContributions = [], isLoading: contributionsLoading } =
-    useQuery<any[]>({
-      queryKey: userIsAdmin
-        ? ["/api/contributions/admin", user?.id]
-        : ["/api/contributions/user", user?.id],
-      enabled: !!user,
-    });
+  const { data: userStats = {} } = useQuery<any>({
+    queryKey: ["/api/stats", "user", user?.id],
+    enabled: !!user,
+  });
 
-  if (statsLoading || groupsLoading) {
+  const { data: recentContributions = [] } = useQuery<ContributionWithDetails[]>({
+    queryKey: ["/api/contributions/user", user?.id],
+    enabled: !!user,
+  });
+
+  const adminGroups = allGroups.filter(g => g.role === 'admin' || g.role === 'both');
+  const memberGroups = allGroups.filter(g => g.role === 'member' || g.role === 'both');
+  
+  const totalPendingApprovals = adminGroups.reduce((sum, g) => sum + (g.pendingApprovals || 0), 0);
+  const myPendingPayments = recentContributions.filter(c => c.status === 'pending').length;
+  const myConfirmedTotal = recentContributions
+    .filter(c => c.status === 'confirmed')
+    .reduce((sum, c) => sum + parseFloat(c.amount), 0);
+
+  if (groupsLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="animate-pulse space-y-6">
-            <div className="h-32 bg-gray-200 rounded-xl"></div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="h-24 bg-gray-200 rounded-xl"></div>
-              ))}
-            </div>
+        <div className="max-w-lg mx-auto px-4 py-6">
+          <div className="flex items-center justify-center py-12">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-solid border-green-600 border-r-transparent"></div>
           </div>
         </div>
       </div>
@@ -64,349 +66,284 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 sm:pb-0">
+    <div className="min-h-screen bg-gray-50 pb-24 sm:pb-8">
       <Navigation />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Dashboard Header */}
-        <div className="mb-8">
-          <div className="bg-gradient-to-r from-nigerian-green to-forest-green rounded-xl p-6 text-white">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-2xl font-bold mb-2">
-                  {userIsAdmin ? "Admin Dashboard" : "My Dashboard"}
-                </h2>
-                <p className="text-green-100">Welcome back, {user?.fullName}</p>
-                <p className="text-green-200 text-sm">
-                  {userIsAdmin
-                    ? `Managing ${userGroups.length} active groups`
-                    : `Member of ${userGroups.length} groups`}
-                </p>
-              </div>
-              <div className="mt-4 sm:mt-0">
-                <div className="text-right">
-                  <p className="text-green-100 text-sm">Your Role</p>
-                  <Badge
-                    variant="secondary"
-                    className="bg-white/20 text-white border-white/30"
-                  >
-                    {userIsAdmin ? "Group Admin" : "Group Member"}
-                  </Badge>
-                </div>
-              </div>
-            </div>
+      <main className="max-w-lg mx-auto px-4 py-6 space-y-6">
+        <div className="bg-gradient-to-r from-green-600 to-green-700 rounded-2xl p-6 text-white">
+          <h1 className="text-2xl font-bold mb-1" data-testid="text-welcome">
+            Welcome back, {user?.fullName?.split(' ')[0] || 'there'}!
+          </h1>
+          <p className="text-green-100">
+            {allGroups.length} {allGroups.length === 1 ? 'group' : 'groups'} connected
+          </p>
+          <div className="flex gap-2 mt-3">
+            {adminGroups.length > 0 && (
+              <Badge className="bg-white/20 text-white border-white/30">
+                <Shield className="h-3 w-3 mr-1" />
+                Admin of {adminGroups.length}
+              </Badge>
+            )}
+            {memberGroups.length > 0 && (
+              <Badge className="bg-white/20 text-white border-white/30">
+                <UserCheck className="h-3 w-3 mr-1" />
+                Member of {memberGroups.length}
+              </Badge>
+            )}
           </div>
         </div>
 
-        {userIsAdmin ? (
-          // Admin Dashboard Content
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">
-                      Total Collections
-                    </p>
-                    <p className="text-2xl font-bold text-nigerian-green">
-                      {formatNaira(userStats.totalCollections || 0)}
-                    </p>
-                    <p className="text-xs text-green-600">
-                      All groups combined
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center">
-                    <TrendingUp className="text-nigerian-green h-6 w-6" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+        {adminGroups.length > 0 && (
+          <section className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-green-600" />
+              <h2 className="text-lg font-bold text-gray-900">Groups You Manage</h2>
+            </div>
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">
-                      Active Members
-                    </p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {userStats.activeMembers || 0}
-                    </p>
-                    <p className="text-xs text-blue-600">Across all groups</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Card className="bg-white rounded-2xl">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                      <TrendingUp className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Total Collected</p>
+                      <p className="font-bold text-gray-900">{formatNaira(adminStats.totalCollections || "0")}</p>
+                    </div>
                   </div>
-                  <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center">
-                    <Users className="text-blue-500 h-6 w-6" />
+                </CardContent>
+              </Card>
+              
+              <Card className="bg-white rounded-2xl">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                      <Users className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Total Members</p>
+                      <p className="font-bold text-gray-900">{adminStats.activeMembers || 0}</p>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">
-                      Pending Approvals
-                    </p>
-                    <p className="text-2xl font-bold text-orange-600">
-                      {userStats.pendingPayments || 0}
-                    </p>
-                    <p className="text-xs text-orange-600">Need attention</p>
-                  </div>
-                  <div className="w-12 h-12 bg-orange-50 rounded-full flex items-center justify-center">
-                    <Clock className="text-orange-500 h-6 w-6" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">
-                      Success Rate
-                    </p>
-                    <p className="text-2xl font-bold text-green-600">
-                      {userStats.completionRate || 0}%
-                    </p>
-                    <p className="text-xs text-green-600">Collection rate</p>
-                  </div>
-                  <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center">
-                    <Target className="text-green-500 h-6 w-6" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        ) : (
-          // Member Dashboard Content
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">
-                      My Total Contributions
-                    </p>
-                    <p className="text-2xl font-bold text-nigerian-green">
-                      {formatNaira(userStats.totalContributed || 0)}
-                    </p>
-                    <p className="text-xs text-green-600">Across all groups</p>
-                  </div>
-                  <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center">
-                    <CreditCard className="text-nigerian-green h-6 w-6" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">
-                      Active Groups
-                    </p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {userGroups.length}
-                    </p>
-                    <p className="text-xs text-blue-600">Currently joined</p>
-                  </div>
-                  <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center">
-                    <Users className="text-blue-500 h-6 w-6" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">
-                      Pending Payments
-                    </p>
-                    <p className="text-2xl font-bold text-orange-600">
-                      {userStats.pendingContributions || 0}
-                    </p>
-                    <p className="text-xs text-orange-600">Awaiting approval</p>
-                  </div>
-                  <div className="w-12 h-12 bg-orange-50 rounded-full flex items-center justify-center">
-                    <Clock className="text-orange-500 h-6 w-6" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Groups Overview */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>
-                  {userIsAdmin ? "My Groups" : "Groups I've Joined"}
-                </CardTitle>
-                {userIsAdmin && (
-                  <Link href="/groups">
-                    <Button variant="outline" size="sm">
-                      Manage All
-                    </Button>
-                  </Link>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {userGroups.length === 0 ? (
-                <div className="text-center py-6">
-                  <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    {userIsAdmin ? "No groups created" : "No groups joined"}
-                  </h3>
-                  <p className="text-gray-600 mb-4">
-                    {userIsAdmin
-                      ? "Create your first group to start collecting contributions."
-                      : "Join a group to start contributing and track your progress."}
-                  </p>
-                  {userIsAdmin && (
-                    <Link href="/groups">
-                      <Button className="bg-nigerian-green hover:bg-forest-green">
-                        Create Group
-                      </Button>
-                    </Link>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {userGroups.slice(0, 3).map((group: any) => (
-                    <div
-                      key={group.id}
-                      className="p-4 border rounded-lg hover:bg-gray-50"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium text-gray-900">
-                          {group.name}
-                        </h4>
-                        <Badge variant="secondary" className="text-xs">
-                          {group.memberCount || 0} members
-                        </Badge>
+            {totalPendingApprovals > 0 && (
+              <Card className="bg-orange-50 border-orange-200 rounded-2xl cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => setLocation('/admin/projects')}
+                data-testid="card-pending-approvals"
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                        <Bell className="h-5 w-5 text-orange-600" />
                       </div>
-                      {!userIsAdmin && group.targetAmount && (
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Progress</span>
-                            <span className="font-medium">
-                              {formatNaira(group.collectedAmount || 0)} /{" "}
-                              {formatNaira(group.targetAmount)}
-                            </span>
-                          </div>
-                          <Progress
-                            value={
-                              ((group.collectedAmount || 0) /
-                                group.targetAmount) *
-                              100
-                            }
-                            className="h-2"
-                          />
+                      <div>
+                        <h3 className="font-bold text-orange-900">{totalPendingApprovals} Pending Approval{totalPendingApprovals > 1 ? 's' : ''}</h3>
+                        <p className="text-sm text-orange-700">Payment proofs need review</p>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-orange-400" />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="space-y-2">
+              {adminGroups.slice(0, 3).map((group) => (
+                <Card
+                  key={group.id}
+                  className="bg-white rounded-2xl border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => setLocation(`/group/${group.id}`)}
+                  data-testid={`admin-group-${group.id}`}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
+                          <Users className="h-5 w-5 text-green-600" />
                         </div>
+                        <div>
+                          <h3 className="font-bold text-gray-900">{group.name}</h3>
+                          <div className="flex items-center gap-2 text-sm text-gray-500">
+                            <span>{group.memberCount} members</span>
+                            <span>•</span>
+                            <span>{group.projectCount} projects</span>
+                          </div>
+                        </div>
+                      </div>
+                      {group.pendingApprovals ? (
+                        <Badge className="bg-orange-100 text-orange-700">
+                          {group.pendingApprovals} pending
+                        </Badge>
+                      ) : (
+                        <ChevronRight className="h-5 w-5 text-gray-300" />
                       )}
                     </div>
-                  ))}
-                  {userGroups.length > 3 && (
-                    <div className="text-center pt-2">
-                      <Link href="/groups">
-                        <Button variant="ghost" size="sm">
-                          View All Groups ({userGroups.length})
-                        </Button>
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            
+            {adminGroups.length > 3 && (
+              <Button variant="outline" className="w-full" onClick={() => setLocation('/groups')} data-testid="button-view-all-admin">
+                View all {adminGroups.length} groups
+              </Button>
+            )}
+          </section>
+        )}
 
-          {/* Recent Activity */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Recent Activity</CardTitle>
-                <Link href={userIsAdmin ? "/groups" : "/my-contributions"}>
-                  <Button variant="outline" size="sm">
-                    View All
-                  </Button>
-                </Link>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {recentContributions.length === 0 ? (
-                <div className="text-center py-6">
-                  <CheckCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    No recent activity
-                  </h3>
-                  <p className="text-gray-600 mb-4">
-                    {userIsAdmin
-                      ? "Contributions will appear here when members start making payments."
-                      : "Your contributions and updates will appear here."}
-                  </p>
-                  {!userIsAdmin && (
-                    <Link href="/make-payment">
-                      <Button className="bg-nigerian-green hover:bg-forest-green">
-                        Make Payment
+        {memberGroups.length > 0 && (
+          <section className="space-y-4">
+            <div className="flex items-center gap-2">
+              <UserCheck className="h-5 w-5 text-blue-600" />
+              <h2 className="text-lg font-bold text-gray-900">Your Contributions</h2>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Card className="bg-white rounded-2xl">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                      <CreditCard className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Total Paid</p>
+                      <p className="font-bold text-gray-900">{formatNaira(myConfirmedTotal.toString())}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="bg-white rounded-2xl">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                      <FolderKanban className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Active Groups</p>
+                      <p className="font-bold text-gray-900">{memberGroups.length}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {myPendingPayments > 0 && (
+              <Card className="bg-yellow-50 border-yellow-200 rounded-2xl">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
+                      <Clock className="h-5 w-5 text-yellow-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-yellow-900">{myPendingPayments} Pending Payment{myPendingPayments > 1 ? 's' : ''}</h3>
+                      <p className="text-sm text-yellow-700">Awaiting admin approval</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="space-y-2">
+              {memberGroups.slice(0, 3).map((group) => (
+                <Card
+                  key={group.id}
+                  className="bg-white rounded-2xl border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => setLocation(`/group/${group.id}`)}
+                  data-testid={`member-group-${group.id}`}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                          <Users className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-gray-900">{group.name}</h3>
+                          <div className="flex items-center gap-2 text-sm text-gray-500">
+                            <span>{group.memberCount} members</span>
+                            <span>•</span>
+                            <span>{group.projectCount} projects</span>
+                          </div>
+                        </div>
+                      </div>
+                      <Button size="sm" className="bg-primary hover:bg-primary/90" data-testid={`button-pay-${group.id}`}>
+                        Submit a Payment
                       </Button>
-                    </Link>
-                  )}
-                </div>
-              ) : (
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            
+            {memberGroups.length > 3 && (
+              <Button variant="outline" className="w-full" onClick={() => setLocation('/groups')} data-testid="button-view-all-member">
+                View all {memberGroups.length} groups
+              </Button>
+            )}
+          </section>
+        )}
+
+        {allGroups.length === 0 && (
+          <Card className="border-2 border-dashed border-gray-300 rounded-2xl">
+            <CardContent className="py-12 text-center">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Users className="h-8 w-8 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2" data-testid="text-empty-state">
+                No groups yet
+              </h3>
+              <p className="text-gray-500 mb-6">
+                Create a group to manage contributions, or ask someone to invite you to theirs
+              </p>
+              <Link href="/groups">
+                <Button className="bg-primary hover:bg-primary/90" data-testid="button-get-started">
+                  Get Started
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        )}
+
+        {recentContributions.length > 0 && (
+          <section className="space-y-4">
+            <h2 className="text-lg font-bold text-gray-900">Recent Activity</h2>
+            <Card className="bg-white rounded-2xl">
+              <CardContent className="p-4">
                 <div className="space-y-3">
-                  {recentContributions.slice(0, 5).map((contribution: any) => (
-                    <div
-                      key={contribution.id}
-                      className="flex items-center space-x-3 p-3 border rounded-lg"
-                    >
-                      <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                          contribution.status === "confirmed"
-                            ? "bg-green-100"
-                            : contribution.status === "pending"
-                              ? "bg-orange-100"
-                              : "bg-red-100"
-                        }`}
-                      >
-                        {contribution.status === "confirmed" ? (
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                        ) : contribution.status === "pending" ? (
-                          <Clock className="h-4 w-4 text-orange-600" />
-                        ) : (
-                          <AlertCircle className="h-4 w-4 text-red-600" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {userIsAdmin
-                            ? contribution.userName
-                            : contribution.groupName}
-                        </p>
+                  {recentContributions.slice(0, 5).map((contribution) => (
+                    <div key={contribution.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                      <div>
+                        <p className="font-medium text-gray-900">{contribution.groupName}</p>
                         <p className="text-xs text-gray-500">
-                          {new Date(
-                            contribution.createdAt,
-                          ).toLocaleDateString()}
+                          {contribution.projectName || "General"} • {new Date(contribution.createdAt).toLocaleDateString("en-NG", { 
+                            day: "numeric", month: "short" 
+                          })}
                         </p>
                       </div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {formatNaira(Number(contribution.amount))}
+                      <div className="text-right">
+                        <p className="font-bold text-gray-900">{formatNaira(contribution.amount)}</p>
+                        <Badge className={
+                          contribution.status === "confirmed" 
+                            ? "bg-green-100 text-green-700" 
+                            : "bg-yellow-100 text-yellow-700"
+                        }>
+                          {contribution.status}
+                        </Badge>
                       </div>
                     </div>
                   ))}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+              </CardContent>
+            </Card>
+          </section>
+        )}
+      </main>
     </div>
   );
 }

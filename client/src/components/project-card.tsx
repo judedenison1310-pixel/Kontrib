@@ -1,10 +1,8 @@
 import { Project, ProjectWithStats } from "@shared/schema";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Settings, Target, Calendar, TrendingUp, Users } from "lucide-react";
-import { formatNaira, calculateProgress } from "@/lib/currency";
+import { Target, Calendar, TrendingUp, ChevronRight, CreditCard } from "lucide-react";
+import { formatNaira } from "@/lib/currency";
 import { useLocation } from "wouter";
 
 interface ProjectCardProps {
@@ -23,8 +21,11 @@ export function ProjectCard({
   showViewContributors = true
 }: ProjectCardProps) {
   const [, setLocation] = useLocation();
-  const progress = calculateProgress(project.collectedAmount, project.targetAmount);
-  const contributionCount = 'contributionCount' in project ? project.contributionCount : 0;
+  
+  const hasTarget = project.targetAmount && parseFloat(project.targetAmount) > 0;
+  const progress = hasTarget 
+    ? Math.min(Math.round((parseFloat(project.collectedAmount) / parseFloat(project.targetAmount!)) * 100), 100)
+    : 0;
   
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -39,98 +40,100 @@ export function ProjectCard({
     }
   };
 
+  const getProjectTypeLabel = (type: string | undefined) => {
+    switch (type) {
+      case "monthly": return "Monthly Dues";
+      case "yearly": return "Yearly Dues";
+      case "event": return "Event";
+      case "emergency": return "Emergency";
+      default: return "Target Goal";
+    }
+  };
+
+  const handleCardClick = () => {
+    setLocation(`/project/${project.id}`);
+  };
+
   return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex-1">
-            <div className="flex items-center space-x-3 mb-2">
-              <h4 className="font-semibold text-gray-900">{project.name}</h4>
-              <Badge className={getStatusColor(project.status)}>
-                {project.status}
-              </Badge>
-            </div>
-            {project.description && (
-              <p className="text-sm text-gray-600 mb-3">{project.description}</p>
-            )}
+    <div 
+      className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all cursor-pointer active:bg-gray-50"
+      onClick={handleCardClick}
+      data-testid={`project-card-${project.id}`}
+    >
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <h4 className="font-bold text-gray-900">{project.name}</h4>
+            <Badge className={`${getStatusColor(project.status)} text-xs`}>
+              {project.status}
+            </Badge>
           </div>
+          <p className="text-sm text-gray-500">{getProjectTypeLabel(project.projectType)}</p>
         </div>
+        <ChevronRight className="h-5 w-5 text-gray-300 shrink-0" />
+      </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm mb-4">
-          <div>
-            <p className="text-gray-600 flex items-center">
-              <Target className="h-4 w-4 mr-1" />
-              Target
-            </p>
-            <p className="font-semibold">{formatNaira(project.targetAmount)}</p>
-          </div>
-          <div>
-            <p className="text-gray-600">Collected</p>
-            <p className="font-semibold text-green-600">{formatNaira(project.collectedAmount)}</p>
-          </div>
-          <div>
-            <p className="text-gray-600 flex items-center">
-              <TrendingUp className="h-4 w-4 mr-1" />
-              Progress
-            </p>
-            <div className="flex items-center space-x-2">
-              <Progress value={progress} className="flex-1 h-2" />
-              <span className="text-xs font-medium">{progress}%</span>
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        {hasTarget ? (
+          <>
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-xs text-gray-500 flex items-center gap-1">
+                <Target className="h-3 w-3" />
+                Target
+              </p>
+              <p className="font-bold text-gray-900">{formatNaira(project.targetAmount!)}</p>
             </div>
-          </div>
-        </div>
-
-        {project.deadline && (
-          <div className="mb-4 p-2 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-600 flex items-center">
-              <Calendar className="h-4 w-4 mr-1" />
-              Deadline: {new Date(project.deadline).toLocaleDateString()}
-            </p>
+            <div className="bg-green-50 rounded-xl p-3">
+              <p className="text-xs text-gray-500">Collected</p>
+              <p className="font-bold text-primary">{formatNaira(project.collectedAmount)}</p>
+            </div>
+          </>
+        ) : (
+          <div className="col-span-2 bg-green-50 rounded-xl p-3">
+            <p className="text-xs text-gray-500">Total Collected</p>
+            <p className="font-bold text-xl text-primary">{formatNaira(project.collectedAmount)}</p>
           </div>
         )}
+      </div>
 
-        {('contributionCount' in project || 'completionRate' in project) && (
-          <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
-            {'contributionCount' in project && <span>{(project as any).contributionCount} contributions</span>}
-            {'completionRate' in project && <span>Completion: {(project as any).completionRate}%</span>}
+      {/* Progress bar - only for target-based projects */}
+      {hasTarget && (
+        <div className="mb-4">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-xs text-gray-500">Progress</span>
+            <span className="text-xs font-medium text-primary">{progress}%</span>
           </div>
-        )}
-
-        <div className="space-y-2">
-          <div className="flex space-x-2">
-            <Button
-              onClick={() => onContribute?.(project)}
-              className="flex-1 bg-nigerian-green hover:bg-forest-green"
-              data-testid="button-contribute"
-            >
-              Contribute
-            </Button>
-            {isAdmin && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onManage?.(project)}
-                className="flex-1"
-                data-testid="button-share"
-              >
-                <Settings className="h-4 w-4 mr-2" />
-                Share
-              </Button>
-            )}
-          </div>
-          {showViewContributors && (
-            <Button
-              variant="outline"
-              onClick={() => setLocation(`/project/${project.id}`)}
-              className="w-full"
-              data-testid="button-view-contributors"
-            >
-              <Users className="h-4 w-4 mr-2" />
-              View Contributors
-            </Button>
-          )}
+          <Progress value={progress} className="h-2" />
         </div>
-      </CardContent>
-    </Card>
+      )}
+
+      {/* Deadline */}
+      {project.deadline && (
+        <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
+          <Calendar className="h-4 w-4" />
+          <span>Due: {new Date(project.deadline).toLocaleDateString("en-NG", { 
+            day: "numeric", 
+            month: "short", 
+            year: "numeric" 
+          })}</span>
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="pt-3 border-t border-gray-100 flex gap-2">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onContribute?.(project);
+          }}
+          className="flex-1 bg-primary hover:bg-primary/90 text-white font-medium py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors"
+          data-testid={`button-contribute-${project.id}`}
+        >
+          <CreditCard className="h-4 w-4" />
+          Submit Proof
+        </button>
+      </div>
+    </div>
   );
 }

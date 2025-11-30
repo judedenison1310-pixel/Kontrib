@@ -9,6 +9,8 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        "2xl": "1rem",
+        "3xl": "1.5rem",
       },
       colors: {
         background: "var(--background)",
@@ -44,6 +46,15 @@ export default {
         border: "var(--border)",
         input: "var(--input)",
         ring: "var(--ring)",
+        kontrib: {
+          green: "#008000",
+          "green-dark": "#006400",
+          "green-light": "#00a000",
+          surface: "#f0fdf4",
+        },
+        whatsapp: "#25D366",
+        "nigerian-green": "#008000",
+        "forest-green": "#006400",
         chart: {
           "1": "var(--chart-1)",
           "2": "var(--chart-2)",
@@ -61,6 +72,19 @@ export default {
           border: "var(--sidebar-border)",
           ring: "var(--sidebar-ring)",
         },
+      },
+      spacing: {
+        "safe-bottom": "env(safe-area-inset-bottom)",
+        "safe-top": "env(safe-area-inset-top)",
+      },
+      minHeight: {
+        "touch": "48px",
+        "btn": "56px",
+      },
+      fontSize: {
+        "mobile-base": ["16px", "1.5"],
+        "mobile-lg": ["18px", "1.4"],
+        "mobile-xl": ["20px", "1.3"],
       },
       keyframes: {
         "accordion-down": {

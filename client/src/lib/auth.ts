@@ -1,7 +1,10 @@
 import { User } from "@shared/schema";
+import { apiRequest } from "./queryClient";
 
 let currentUser: User | null = null;
 let authInitialized = false;
+
+const DEVICE_TOKEN_KEY = "kontrib_device_token";
 
 export function getCurrentUser(): User | null {
   return currentUser;
@@ -15,8 +18,19 @@ export function setCurrentUser(user: User | null): void {
     localStorage.removeItem('currentUser');
   }
   
-  // Trigger a custom event to notify components of auth state change
   window.dispatchEvent(new CustomEvent('authStateChanged', { detail: user }));
+}
+
+export function getDeviceToken(): string | null {
+  return localStorage.getItem(DEVICE_TOKEN_KEY);
+}
+
+export function setDeviceToken(token: string | null): void {
+  if (token) {
+    localStorage.setItem(DEVICE_TOKEN_KEY, token);
+  } else {
+    localStorage.removeItem(DEVICE_TOKEN_KEY);
+  }
 }
 
 export function isAuthInitialized(): boolean {
@@ -24,6 +38,36 @@ export function isAuthInitialized(): boolean {
 }
 
 export async function initializeAuth(): Promise<User | null> {
+  const deviceToken = getDeviceToken();
+  
+  if (deviceToken) {
+    try {
+      console.log('[Auth] Found device token, validating...');
+      const response = await fetch('/api/auth/validate-device', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceToken }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.valid && data.user) {
+          currentUser = data.user;
+          localStorage.setItem('currentUser', JSON.stringify(data.user));
+          console.log('[Auth] Device validated, user:', data.user.fullName || data.user.phoneNumber);
+          authInitialized = true;
+          return currentUser;
+        }
+      }
+      
+      console.log('[Auth] Device token invalid, clearing...');
+      setDeviceToken(null);
+      localStorage.removeItem('currentUser');
+    } catch (error) {
+      console.warn('[Auth] Device validation failed:', error);
+    }
+  }
+  
   const stored = localStorage.getItem('currentUser');
   if (!stored) {
     authInitialized = true;
@@ -34,35 +78,32 @@ export async function initializeAuth(): Promise<User | null> {
     const storedUser = JSON.parse(stored);
     currentUser = storedUser;
     
-    // Try to validate session with backend (best-effort)
     try {
-      console.log('[App] Validating session with backend...');
+      console.log('[Auth] Validating session with backend...');
       const response = await fetch(`/api/auth/me?userId=${storedUser.id}`);
       
       if (response.ok) {
         const data = await response.json();
         currentUser = data.user;
-        console.log('[App] Session validated successfully:', currentUser?.username || 'Unknown');
+        console.log('[Auth] Session validated:', currentUser?.fullName || 'Unknown');
       } else if (response.status === 401) {
-        // User no longer exists in database - clear session
-        console.warn('[App] User not found in database, clearing session');
+        console.warn('[Auth] User not found, clearing session');
         localStorage.removeItem('currentUser');
+        setDeviceToken(null);
         currentUser = null;
       } else {
-        // Other errors - keep local session but log warning
-        console.warn('[App] Session validation failed, using cached session');
+        console.warn('[Auth] Session validation failed, using cached session');
       }
     } catch (fetchError) {
-      // Network error or server down - keep using localStorage
-      console.warn('[App] Cannot reach server, using cached session:', fetchError);
+      console.warn('[Auth] Cannot reach server, using cached session:', fetchError);
     }
     
     authInitialized = true;
     return currentUser;
   } catch (error) {
-    // localStorage parse error - clear it
-    console.error('[App] Invalid session data, clearing:', error);
+    console.error('[Auth] Invalid session data, clearing:', error);
     localStorage.removeItem('currentUser');
+    setDeviceToken(null);
     currentUser = null;
     authInitialized = true;
     return null;
@@ -77,6 +118,78 @@ export function isMember(): boolean {
   return currentUser?.role === 'member';
 }
 
-export function logout(): void {
+export async function logout(): Promise<void> {
+  const deviceToken = getDeviceToken();
+  
+  if (deviceToken) {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceToken }),
+      });
+    } catch (error) {
+      console.warn('[Auth] Logout API call failed:', error);
+    }
+  }
+  
+  setDeviceToken(null);
   setCurrentUser(null);
+}
+
+export async function sendOtp(phoneNumber: string): Promise<{ success: boolean; expiresAt?: Date; developmentOtp?: string; message?: string }> {
+  const response = await apiRequest('POST', '/api/auth/send-otp', { phoneNumber });
+  const data = await response.json();
+  
+  return {
+    success: true,
+    expiresAt: data.expiresAt ? new Date(data.expiresAt) : undefined,
+    developmentOtp: data.developmentOtp,
+    message: data.message,
+  };
+}
+
+export async function verifyOtp(phoneNumber: string, otp: string): Promise<{ 
+  verified: boolean; 
+  user?: User; 
+  isNewUser?: boolean;
+  deviceToken?: string;
+  message?: string;
+}> {
+  const deviceInfo = navigator.userAgent;
+  const response = await apiRequest('POST', '/api/auth/verify-otp', { 
+    phoneNumber, 
+    otp,
+    deviceInfo,
+  });
+  
+  const data = await response.json();
+  
+  if (data.verified && data.deviceToken) {
+    setDeviceToken(data.deviceToken);
+  }
+  
+  if (data.verified && data.user && !data.isNewUser) {
+    setCurrentUser(data.user);
+  }
+  
+  return {
+    verified: data.verified,
+    user: data.user,
+    isNewUser: data.isNewUser,
+    deviceToken: data.deviceToken,
+    message: data.message,
+  };
+}
+
+export async function updateProfile(userId: string, updates: { fullName?: string; role?: string }): Promise<User> {
+  const response = await apiRequest('POST', '/api/auth/update-profile', { userId, ...updates });
+  
+  const data = await response.json();
+  setCurrentUser(data.user);
+  return data.user;
+}
+
+export function needsProfileCompletion(): boolean {
+  return currentUser !== null && !currentUser.fullName;
 }

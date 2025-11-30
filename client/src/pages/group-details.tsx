@@ -1,30 +1,32 @@
 import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Navigation } from "@/components/navigation";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   ArrowLeft,
   Users,
-  Target,
-  TrendingUp,
-  Calendar,
-  DollarSign,
-  CheckCircle,
-  Clock,
-  User,
+  FolderKanban,
+  ChevronRight,
+  ChevronDown,
+  Shield,
+  UserCheck,
+  CreditCard,
+  Bell,
+  Plus,
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { formatNaira } from "@/lib/currency";
-import {
-  Group,
-  Project,
-  ContributionWithDetails,
-  User as UserType,
-} from "@shared/schema";
-import { format } from "date-fns";
+import { Group, Project, User as UserType, ContributionWithDetails } from "@shared/schema";
+import { useState } from "react";
+import { CreateProjectModal } from "@/components/create-project-modal";
 
 interface GroupMemberWithUser {
   id: string;
@@ -40,47 +42,44 @@ export default function GroupDetails() {
   const { groupId } = useParams();
   const [, setLocation] = useLocation();
   const user = getCurrentUser();
+  const [createProjectModalOpen, setCreateProjectModalOpen] = useState(false);
 
   const { data: group, isLoading: groupLoading } = useQuery<Group>({
     queryKey: ["/api/groups", groupId],
     enabled: !!groupId,
   });
 
-  const { data: projects = [], isLoading: projectsLoading } = useQuery<
-    Project[]
-  >({
+  const { data: projects = [], isLoading: projectsLoading } = useQuery<Project[]>({
     queryKey: ["/api/groups", groupId, "projects"],
     enabled: !!groupId,
   });
 
-  const { data: members = [], isLoading: membersLoading } = useQuery<
-    GroupMemberWithUser[]
-  >({
+  const { data: members = [], isLoading: membersLoading } = useQuery<GroupMemberWithUser[]>({
     queryKey: ["/api/groups", groupId, "members"],
     enabled: !!groupId,
   });
 
-  const { data: contributions = [], isLoading: contributionsLoading } =
-    useQuery<ContributionWithDetails[]>({
-      queryKey: ["/api/contributions/group", groupId],
-      enabled: !!groupId,
-    });
+  const { data: contributions = [] } = useQuery<ContributionWithDetails[]>({
+    queryKey: ["/api/contributions/group", groupId],
+    enabled: !!groupId,
+  });
 
-  const isLoading =
-    groupLoading || projectsLoading || membersLoading || contributionsLoading;
+  const isLoading = groupLoading || projectsLoading || membersLoading;
+  const isAdmin = user?.id === group?.adminId;
+  const isMember = members.some(m => m.userId === user?.id);
+  const isBoth = isAdmin && isMember;
+
+  const pendingApprovals = contributions.filter(c => c.status === "pending").length;
+  const myContributions = contributions.filter(c => c.userId === user?.id);
+  const myPendingPayments = myContributions.filter(c => c.status === "pending").length;
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="animate-pulse space-y-6">
-            <div className="h-32 bg-gray-200 rounded-xl"></div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="h-48 bg-gray-200 rounded-xl"></div>
-              ))}
-            </div>
+        <div className="max-w-lg mx-auto px-4 py-6">
+          <div className="flex items-center justify-center py-12">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-solid border-green-600 border-r-transparent"></div>
           </div>
         </div>
       </div>
@@ -91,17 +90,13 @@ export default function GroupDetails() {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="max-w-lg mx-auto px-4 py-6">
           <div className="text-center py-12">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Group Not Found
-            </h2>
-            <p className="text-gray-600 mb-6">
-              The group you're looking for doesn't exist.
-            </p>
-            <Button onClick={() => setLocation("/dashboard")}>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Group Not Found</h2>
+            <p className="text-gray-600 mb-6">The group you're looking for doesn't exist.</p>
+            <Button onClick={() => setLocation("/groups")} data-testid="button-back-groups">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Dashboard
+              Back to Groups
             </Button>
           </div>
         </div>
@@ -109,374 +104,440 @@ export default function GroupDetails() {
     );
   }
 
-  const totalTarget = projects.reduce(
-    (sum, project) => sum + Number(project.targetAmount),
-    0,
-  );
   const totalCollected = projects.reduce(
-    (sum, project) => sum + Number(project.collectedAmount),
+    (sum, project) => sum + (parseFloat(project.collectedAmount || "0") || 0),
     0,
   );
-  const completionRate =
-    totalTarget > 0 ? Math.round((totalCollected / totalTarget) * 100) : 0;
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "completed":
-        return "bg-green-100 text-green-800";
-      case "active":
-        return "bg-blue-100 text-blue-800";
-      case "paused":
-        return "bg-orange-100 text-orange-800";
-      default:
-        return "bg-gray-100 text-gray-800";
+      case "completed": return "bg-green-100 text-green-800";
+      case "active": return "bg-blue-100 text-blue-800";
+      case "paused": return "bg-orange-100 text-orange-800";
+      default: return "bg-gray-100 text-gray-800";
     }
   };
 
-  const approvedContributions = contributions.filter(
-    (c) => c.status === "confirmed",
-  );
-  const pendingContributions = contributions.filter(
-    (c) => c.status === "pending",
-  );
-  const totalContributions = contributions.length;
+  const getRoleBadge = () => {
+    if (isBoth) {
+      return (
+        <div className="flex gap-1">
+          <Badge className="bg-green-100 text-green-700 text-xs">
+            <Shield className="h-3 w-3 mr-1" />
+            Admin
+          </Badge>
+          <Badge className="bg-blue-100 text-blue-700 text-xs">
+            <UserCheck className="h-3 w-3 mr-1" />
+            Member
+          </Badge>
+        </div>
+      );
+    }
+    if (isAdmin) {
+      return (
+        <Badge className="bg-green-100 text-green-700 text-xs">
+          <Shield className="h-3 w-3 mr-1" />
+          Admin
+        </Badge>
+      );
+    }
+    return (
+      <Badge className="bg-blue-100 text-blue-700 text-xs">
+        <UserCheck className="h-3 w-3 mr-1" />
+        Member
+      </Badge>
+    );
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 sm:pb-0">
+    <div className="min-h-screen bg-gray-50 pb-24 sm:pb-8">
       <Navigation />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Back Button */}
+      <main className="max-w-lg mx-auto px-4 py-6 space-y-6">
         <Button
           variant="ghost"
-          onClick={() => setLocation("/dashboard")}
-          className="mb-6"
-          data-testid="back-to-dashboard"
+          onClick={() => setLocation("/groups")}
+          className="mb-2 -ml-2"
+          data-testid="button-back"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Dashboard
+          Back to Groups
         </Button>
 
-        {/* Group Header */}
-        <div className="mb-8">
-          <div className="bg-gradient-to-r from-green-600 to-green-700 rounded-xl p-6 text-white">
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <h1 className="text-2xl font-bold" data-testid="group-name">
-                    {group.name}
-                  </h1>
-                  <Badge className={getStatusColor(group.status)}>
-                    {group.status}
-                  </Badge>
-                </div>
-                {group.description && (
-                  <p
-                    className="text-green-100 mb-4"
-                    data-testid="group-description"
-                  >
-                    {group.description}
-                  </p>
-                )}
-                <div className="flex flex-wrap gap-4 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4" />
-                    <span>{members.length} Members</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Target className="w-4 h-4" />
-                    <span>{projects.length} Projects</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+        <div className={`rounded-2xl p-6 text-white ${
+          isAdmin ? 'bg-gradient-to-r from-green-600 to-green-700' : 'bg-gradient-to-r from-blue-600 to-blue-700'
+        }`}>
+          <div className="flex items-center gap-2 mb-2">
+            <h1 className="text-2xl font-bold" data-testid="text-group-name">
+              {group.name}
+            </h1>
+            <Badge className={getStatusColor(group.status)}>
+              {group.status}
+            </Badge>
+          </div>
+          {group.description && (
+            <p className="text-white/80 mb-3" data-testid="text-group-description">
+              {group.description}
+            </p>
+          )}
+          
+          <div className="bg-white/10 rounded-xl p-3 mb-4">
+            <p className="text-white/70 text-xs mb-1">Total Generated</p>
+            <p className="font-bold text-2xl" data-testid="text-total-generated">{formatNaira(totalCollected.toString())}</p>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            {getRoleBadge()}
+            <span className="text-white/70 text-sm">{members.length} members</span>
+            <span className="text-white/70 text-sm">{projects.length} projects</span>
           </div>
         </div>
 
-        {/* Stats Overview */}
-        {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">
-                    Total Target
-                  </p>
-                  <p
-                    className="text-2xl font-bold text-blue-600"
-                    data-testid="total-target"
-                  >
-                    {formatNaira(totalTarget.toString())}
-                  </p>
-                  <p className="text-xs text-gray-500">Across all projects</p>
-                </div>
-                <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center">
-                  <Target className="text-blue-500 h-6 w-6" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        {isBoth ? (
+          <Tabs defaultValue="admin" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="admin" className="flex items-center gap-2" data-testid="tab-admin">
+                <Shield className="h-4 w-4" />
+                Admin View
+                {pendingApprovals > 0 && (
+                  <span className="bg-orange-500 text-white text-xs px-1.5 rounded-full">{pendingApprovals}</span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="member" className="flex items-center gap-2" data-testid="tab-member">
+                <UserCheck className="h-4 w-4" />
+                My Contributions
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="admin" className="space-y-4 mt-4">
+              <AdminContent 
+                groupId={groupId!}
+                projects={projects}
+                members={members}
+                pendingApprovals={pendingApprovals}
+                setLocation={setLocation}
+                onCreateProject={() => setCreateProjectModalOpen(true)}
+              />
+            </TabsContent>
+            
+            <TabsContent value="member" className="space-y-4 mt-4">
+              <MemberContent
+                groupId={groupId!}
+                projects={projects}
+                myContributions={myContributions}
+                myPendingPayments={myPendingPayments}
+                setLocation={setLocation}
+              />
+            </TabsContent>
+          </Tabs>
+        ) : isAdmin ? (
+          <AdminContent 
+            groupId={groupId!}
+            projects={projects}
+            members={members}
+            pendingApprovals={pendingApprovals}
+            setLocation={setLocation}
+            onCreateProject={() => setCreateProjectModalOpen(true)}
+          />
+        ) : (
+          <MemberContent
+            groupId={groupId!}
+            projects={projects}
+            myContributions={myContributions}
+            myPendingPayments={myPendingPayments}
+            setLocation={setLocation}
+          />
+        )}
+      </main>
 
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">
-                    Amount Collected
-                  </p>
-                  <p
-                    className="text-2xl font-bold text-green-600"
-                    data-testid="total-collected"
-                  >
-                    {formatNaira(totalCollected.toString())}
-                  </p>
-                  <p className="text-xs text-green-600">
-                    {completionRate}% of target
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center">
-                  <TrendingUp className="text-green-500 h-6 w-6" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      {group && (
+        <CreateProjectModal
+          open={createProjectModalOpen}
+          onOpenChange={setCreateProjectModalOpen}
+          groupId={groupId!}
+          groupName={group.name}
+        />
+      )}
+    </div>
+  );
+}
 
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
+function AdminContent({
+  groupId,
+  projects,
+  members,
+  pendingApprovals,
+  setLocation,
+  onCreateProject,
+}: {
+  groupId: string;
+  projects: Project[];
+  members: GroupMemberWithUser[];
+  pendingApprovals: number;
+  setLocation: (path: string) => void;
+  onCreateProject: () => void;
+}) {
+  return (
+    <>
+      {pendingApprovals > 0 && (
+        <Card className="bg-orange-50 border-orange-200 rounded-2xl">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                  <Bell className="h-5 w-5 text-orange-600" />
+                </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-600">
-                    Contributions
-                  </p>
-                  <p
-                    className="text-2xl font-bold text-gray-900"
-                    data-testid="total-contributions"
-                  >
-                    {totalContributions}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {approvedContributions.length} approved,{" "}
-                    {pendingContributions.length} pending
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-purple-50 rounded-full flex items-center justify-center">
-                  <DollarSign className="text-purple-500 h-6 w-6" />
+                  <h3 className="font-bold text-orange-900">{pendingApprovals} Pending Approval{pendingApprovals > 1 ? 's' : ''}</h3>
+                  <p className="text-sm text-orange-700">Payment proofs waiting for review</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </div> */}
+              <Button
+                size="sm"
+                className="bg-orange-600 hover:bg-orange-700"
+                onClick={() => setLocation(`/admin/projects`)}
+                data-testid="button-review-payments"
+              >
+                Review
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-        {/* Progress Bar */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Overall Progress</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-600">
-                  Group Goal Progress
-                </span>
-                <span className="text-sm font-bold text-green-600">
-                  {completionRate}%
-                </span>
+      <div className="space-y-3">
+        <ProjectsDropdown 
+          groupId={groupId} 
+          projects={projects} 
+          setLocation={setLocation}
+          onCreateProject={onCreateProject}
+        />
+
+        <Card
+          className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all cursor-pointer active:scale-[0.99]"
+          onClick={() => setLocation(`/group/${groupId}/members`)}
+          data-testid="nav-card-members"
+        >
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                  <Users className="h-6 w-6 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900">Members</h3>
+                  <p className="text-sm text-gray-500">
+                    {members.length} {members.length === 1 ? "member" : "members"}
+                  </p>
+                </div>
               </div>
-              <Progress value={completionRate} className="h-3" />
-              <div className="flex justify-between text-sm text-gray-500">
-                <span>Collected: {formatNaira(totalCollected.toString())}</span>
-                <span>
-                  Remaining:{" "}
-                  {formatNaira((totalTarget - totalCollected).toString())}
-                </span>
+              <ChevronRight className="h-5 w-5 text-gray-300" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </>
+  );
+}
+
+function MemberContent({
+  groupId,
+  projects,
+  myContributions,
+  myPendingPayments,
+  setLocation,
+}: {
+  groupId: string;
+  projects: Project[];
+  myContributions: ContributionWithDetails[];
+  myPendingPayments: number;
+  setLocation: (path: string) => void;
+}) {
+  const myTotalContributed = myContributions
+    .filter(c => c.status === "confirmed")
+    .reduce((sum, c) => sum + parseFloat(c.amount), 0);
+
+  return (
+    <>
+      <Card className="bg-white rounded-2xl">
+        <CardContent className="p-4 text-center">
+          <p className="text-sm text-gray-500 mb-1">My Contributions</p>
+          <p className="text-xl font-bold text-primary">{formatNaira(myTotalContributed.toString())}</p>
+        </CardContent>
+      </Card>
+
+      {myPendingPayments > 0 && (
+        <Card className="bg-yellow-50 border-yellow-200 rounded-2xl">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
+                <Bell className="h-5 w-5 text-yellow-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-yellow-900">{myPendingPayments} Pending Payment{myPendingPayments > 1 ? 's' : ''}</h3>
+                <p className="text-sm text-yellow-700">Awaiting admin approval</p>
               </div>
             </div>
           </CardContent>
         </Card>
+      )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Projects Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Projects ({projects.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {projects.length === 0 ? (
-                <div className="text-center py-8">
-                  <Target className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">No projects yet</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {projects.map((project) => {
-                    const progress =
-                      totalTarget > 0
-                        ? Math.round(
-                            (Number(project.collectedAmount) /
-                              Number(project.targetAmount)) *
-                              100,
-                          )
-                        : 0;
-                    return (
-                      <div
-                        key={project.id}
-                        className="border rounded-lg p-4"
-                        data-testid={`project-${project.id}`}
-                      >
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <h4 className="font-semibold text-gray-900">
-                              {project.name}
-                            </h4>
-                            {project.description && (
-                              <p className="text-sm text-gray-600 mt-1">
-                                {project.description}
-                              </p>
-                            )}
-                          </div>
-                          {project.deadline && (
-                            <div className="flex items-center gap-1 text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
-                              <Calendar className="w-3 h-3" />
-                              {format(new Date(project.deadline), "MMM dd")}
-                            </div>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <Progress value={progress} className="h-2" />
-                          <div className="flex justify-between text-xs text-gray-500">
-                            <span>{formatNaira(project.collectedAmount)}</span>
-                            <span>{formatNaira(project.targetAmount)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Members Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Members ({members.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {members.length === 0 ? (
-                <div className="text-center py-8">
-                  <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">No members yet</p>
-                </div>
-              ) : (
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {members.map((member) => (
-                    <div
-                      key={member.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                      data-testid={`member-${member.userId}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                          <User className="w-5 h-5 text-green-600" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">
-                            {member.user?.fullName || "Member"}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {member.user?.username
-                              ? `@${member.user.username}`
-                              : ""}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-green-600 text-sm">
-                          {formatNaira(member.contributedAmount)}
-                        </p>
-                        <p className="text-xs text-gray-500">contributed</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Recent Contributions */}
-        <Card className="mt-8">
-          <CardHeader>
-            <CardTitle>Recent Contributions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {contributions.length === 0 ? (
-              <div className="text-center py-8">
-                <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600">No contributions yet</p>
+      <Card
+        className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all cursor-pointer active:scale-[0.99]"
+        onClick={() => setLocation(`/group/${groupId}/projects`)}
+        data-testid="nav-card-projects-member"
+      >
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
+                <CreditCard className="h-6 w-6 text-primary" />
               </div>
-            ) : (
-              <div className="space-y-3">
-                {contributions.slice(0, 10).map((contribution) => (
-                  <div
-                    key={contribution.id}
-                    className="flex items-center justify-between p-3 border-b last:border-b-0"
-                    data-testid={`contribution-${contribution.id}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                          contribution.status === "confirmed"
-                            ? "bg-green-100"
-                            : "bg-orange-100"
-                        }`}
-                      >
-                        {contribution.status === "confirmed" ? (
-                          <CheckCircle className="w-5 h-5 text-green-600" />
-                        ) : (
-                          <Clock className="w-5 h-5 text-orange-600" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {contribution.userName}
-                        </p>
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                          <span>
-                            {contribution.projectName || "General contribution"}
-                          </span>
-                          <span>•</span>
-                          <span>
-                            {format(
-                              new Date(contribution.createdAt),
-                              "MMM dd, yyyy",
-                            )}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-gray-900">
-                        {formatNaira(contribution.amount)}
-                      </p>
-                      <Badge
-                        variant={
-                          contribution.status === "confirmed"
-                            ? "default"
-                            : "secondary"
-                        }
-                        className="text-xs"
-                      >
-                        {contribution.status}
-                      </Badge>
-                    </div>
+              <div>
+                <h3 className="font-bold text-gray-900">Submit a Payment</h3>
+                <p className="text-sm text-gray-500">
+                  {projects.length} active {projects.length === 1 ? "project" : "projects"}
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="h-5 w-5 text-gray-300" />
+          </div>
+        </CardContent>
+      </Card>
+
+      {myContributions.length > 0 && (
+        <Card className="bg-white rounded-2xl">
+          <CardContent className="p-5">
+            <h3 className="font-bold text-gray-900 mb-3">Recent Payments</h3>
+            <div className="space-y-3">
+              {myContributions.slice(0, 5).map((contribution) => (
+                <div key={contribution.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                  <div>
+                    <p className="font-medium text-gray-900">{contribution.projectName || "General"}</p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(contribution.createdAt).toLocaleDateString("en-NG", { 
+                        day: "numeric", month: "short", year: "numeric" 
+                      })}
+                    </p>
                   </div>
-                ))}
-              </div>
-            )}
+                  <div className="text-right">
+                    <p className="font-bold text-gray-900">{formatNaira(contribution.amount)}</p>
+                    <Badge className={
+                      contribution.status === "confirmed" 
+                        ? "bg-green-100 text-green-700" 
+                        : "bg-yellow-100 text-yellow-700"
+                    }>
+                      {contribution.status}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
-      </div>
-    </div>
+      )}
+    </>
+  );
+}
+
+function ProjectsDropdown({
+  groupId,
+  projects,
+  setLocation,
+  onCreateProject,
+}: {
+  groupId: string;
+  projects: Project[];
+  setLocation: (path: string) => void;
+  onCreateProject: () => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "completed": return "bg-green-100 text-green-700";
+      case "active": return "bg-blue-100 text-blue-700";
+      case "paused": return "bg-orange-100 text-orange-700";
+      default: return "bg-gray-100 text-gray-700";
+    }
+  };
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <Card className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+        <CollapsibleTrigger asChild>
+          <CardContent className="p-4 cursor-pointer hover:bg-gray-50 transition-colors" data-testid="dropdown-projects">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <FolderKanban className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900">Projects</h3>
+                  <p className="text-sm text-gray-500">
+                    {projects.length} {projects.length === 1 ? "project" : "projects"}
+                  </p>
+                </div>
+              </div>
+              <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            </div>
+          </CardContent>
+        </CollapsibleTrigger>
+        
+        <CollapsibleContent>
+          <div className="px-4 pb-4 space-y-2">
+            {projects.length === 0 ? (
+              <div className="text-center py-4">
+                <p className="text-sm text-gray-500 mb-3">No projects yet</p>
+                <Button
+                  size="sm"
+                  onClick={onCreateProject}
+                  data-testid="button-create-project"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Create Project
+                </Button>
+              </div>
+            ) : (
+              <>
+                {projects.map((project) => (
+                  <div
+                    key={project.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => setLocation(`/project/${project.id}`)}
+                    data-testid={`project-item-${project.id}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 truncate">{project.name}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge className={`text-xs ${getStatusColor(project.status)}`}>
+                          {project.status}
+                        </Badge>
+                        {project.targetAmount && parseFloat(project.targetAmount) > 0 && (
+                          <span className="text-xs text-gray-500">
+                            {formatNaira(project.collectedAmount || "0")} / {formatNaira(project.targetAmount)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                  </div>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-2"
+                  onClick={onCreateProject}
+                  data-testid="button-add-project"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add New Project
+                </Button>
+              </>
+            )}
+          </div>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
   );
 }

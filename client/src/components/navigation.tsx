@@ -2,22 +2,17 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Users,
-  Bell,
   Menu,
-  X,
-  MessageCircle,
   CreditCard,
   History,
-  Megaphone,
   LogOut,
-  FileText,
-  UserPlus,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { NotificationBell } from "@/components/notification-bell";
-import { getCurrentUser, isAdmin, logout } from "@/lib/auth";
-import kontribLogo from "@assets/WhatsApp Image 2025-10-19 at 01.29.52_ced7d354_1762106313529.jpg";
+import { getCurrentUser, logout } from "@/lib/auth";
+import kontribLogo from "@assets/8_1764455185903.png";
 
 export function Navigation() {
   const [location, setLocation] = useLocation();
@@ -31,299 +26,179 @@ export function Navigation() {
 
   if (!user) return null;
 
+  const isActive = (path: string) => location === path;
+
+  const navLinks = [
+    { href: "/groups", icon: Users, label: "My Groups" },
+    { href: "/submit-proof", icon: CreditCard, label: "Submit Proof" },
+    { href: "/my-contributions", icon: History, label: "History" },
+  ];
+
   return (
-    <nav className="bg-white shadow-md sticky top-0 z-50 border-b border-gray-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          <Link href="/">
-            <div className="flex flex-col items-start justify-center py-2">
-              <img
-                src={kontribLogo}
-                alt="Kontrib"
-                className="h-7 w-auto object-contain sm:h-8"
-                data-testid="img-kontrib-logo"
-              />
-              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
-                Group Financial Management
-              </p>
-            </div>
-          </Link>
-
-          <div className="flex items-center space-x-4">
-            {/* Desktop Navigation */}
-            <div className="hidden sm:flex items-center space-x-4">
-              <div className="bg-gray-100 p-1 rounded-lg">
-                {isAdmin() ? (
-                  <>
-                    <Link href="/groups">
-                      <Button
-                        variant={location === "/groups" ? "default" : "ghost"}
-                        size="sm"
-                        className={
-                          location === "/groups"
-                            ? "bg-nigerian-green text-white"
-                            : ""
-                        }
-                      >
-                        <Users className="h-4 w-4 mr-1" />
-                        Groups
-                      </Button>
-                    </Link>
-                    <Link href="/admin">
-                      <Button
-                        variant={location === "/admin" ? "default" : "ghost"}
-                        size="sm"
-                        className={
-                          location === "/admin"
-                            ? "bg-nigerian-green text-white"
-                            : ""
-                        }
-                      >
-                        <FileText className="h-4 w-4 mr-1" />
-                        Projects
-                      </Button>
-                    </Link>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        /* TODO: Implement send reminders */
-                      }}
-                    >
-                      <Bell className="h-4 w-4 mr-1" />
-                      Send Reminders{" "}
-                      <span className="text-xs text-gray-500 ml-1">
-                        (Coming Soon)
-                      </span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        /* TODO: Implement generate report */
-                      }}
-                    >
-                      <FileText className="h-4 w-4 mr-1" />
-                      Generate Report{" "}
-                      <span className="text-xs text-gray-500 ml-1">
-                        (Coming Soon)
-                      </span>
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Link href="/join-group">
-                      <Button
-                        variant={
-                          location === "/join-group" ? "default" : "ghost"
-                        }
-                        size="sm"
-                        className={
-                          location === "/join-group"
-                            ? "bg-nigerian-green text-white"
-                            : ""
-                        }
-                      >
-                        <UserPlus className="h-4 w-4 mr-1" />
-                        Join Group
-                      </Button>
-                    </Link>
-                    <Link href="/make-payment">
-                      <Button
-                        variant={
-                          location === "/make-payment" ? "default" : "ghost"
-                        }
-                        size="sm"
-                        className={
-                          location === "/make-payment"
-                            ? "bg-nigerian-green text-white"
-                            : ""
-                        }
-                      >
-                        <CreditCard className="h-4 w-4 mr-1" />
-                        Submit Payment Proof
-                      </Button>
-                    </Link>
-                    <Link href="/my-contributions">
-                      <Button
-                        variant={
-                          location === "/my-contributions" ? "default" : "ghost"
-                        }
-                        size="sm"
-                        className={
-                          location === "/my-contributions"
-                            ? "bg-nigerian-green text-white"
-                            : ""
-                        }
-                      >
-                        <History className="h-4 w-4 mr-1" />
-                        My Contributions
-                      </Button>
-                    </Link>
-                    {/* <Link href="/updates">
-                      <Button 
-                        variant={location === "/updates" ? "default" : "ghost"}
-                        size="sm"
-                        className={location === "/updates" ? "bg-nigerian-green text-white" : ""}
-                      >
-                        <Megaphone className="h-4 w-4 mr-1" />
-                        Updates
-                      </Button>
-                    </Link> */}
-                  </>
-                )}
+    <>
+      {/* Top Header Bar - Clean White */}
+      <header className="bg-white border-b border-gray-100 sticky top-0 z-50 safe-top">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex justify-between items-center h-14">
+            {/* Logo */}
+            <Link href="/groups">
+              <div className="flex items-center gap-2" data-testid="link-home">
+                <img src={kontribLogo} alt="Kontrib" className="w-9 h-9" />
+                <span className="font-bold text-lg text-gray-900">Kontrib</span>
               </div>
+            </Link>
 
-              {isAdmin() && <NotificationBell userId={user.id} />}
-
-              <div className="flex items-center space-x-2">
-                <span className="text-sm font-medium">{user.fullName}</span>
-                <Button variant="outline" size="sm" onClick={handleLogout}>
-                  Logout
-                </Button>
-              </div>
+            {/* Secure Badge */}
+            <div className="flex items-center gap-2 text-primary border border-primary/20 rounded-full px-3 py-1.5">
+              <ShieldCheck className="h-4 w-4" />
+              <span className="text-sm font-medium">Secure</span>
             </div>
 
-            {/* Mobile Menu */}
-            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="sm" className="sm:hidden">
-                  <Menu className="h-5 w-5" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-[300px]">
-                <div className="flex flex-col space-y-4 mt-4">
-                  <div className="pb-2 border-b">
-                    <p className="font-medium">{user.fullName}</p>
-                    <p className="text-sm text-gray-600">{user.role}</p>
-                  </div>
-
-                  {user && (
-                    <>
-                      {isAdmin() ? (
-                        <>
-                          <Link
-                            href="/groups"
-                            onClick={() => setMobileMenuOpen(false)}
-                          >
-                            <Button
-                              variant="ghost"
-                              className="w-full justify-start"
-                            >
-                              <Users className="h-4 w-4 mr-2" />
-                              Groups
-                            </Button>
-                          </Link>
-                          <Link
-                            href="/admin"
-                            onClick={() => setMobileMenuOpen(false)}
-                          >
-                            <Button
-                              variant="ghost"
-                              className="w-full justify-start"
-                            >
-                              <FileText className="h-4 w-4 mr-2" />
-                              Projects
-                            </Button>
-                          </Link>
-                          <Button
-                            variant="ghost"
-                            className="w-full justify-start"
-                            onClick={() => {
-                              setMobileMenuOpen(false);
-                              /* TODO: Implement send reminders */
-                            }}
-                          >
-                            <Bell className="h-4 w-4 mr-2" />
-                            Send Reminders{" "}
-                            <span className="text-xs text-gray-500 ml-1">
-                              (Coming Soon)
-                            </span>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            className="w-full justify-start"
-                            onClick={() => {
-                              setMobileMenuOpen(false);
-                              /* TODO: Implement generate report */
-                            }}
-                          >
-                            <FileText className="h-4 w-4 mr-2" />
-                            Generate Report{" "}
-                            <span className="text-xs text-gray-500 ml-1">
-                              (Coming Soon)
-                            </span>
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Link
-                            href="/join-group"
-                            onClick={() => setMobileMenuOpen(false)}
-                          >
-                            <Button
-                              variant="ghost"
-                              className="w-full justify-start"
-                            >
-                              <UserPlus className="h-4 w-4 mr-2" />
-                              Join Group
-                            </Button>
-                          </Link>
-                          <Link
-                            href="/make-payment"
-                            onClick={() => setMobileMenuOpen(false)}
-                          >
-                            <Button
-                              variant="ghost"
-                              className="w-full justify-start"
-                            >
-                              <CreditCard className="h-4 w-4 mr-2" />
-                              Submit Payment Proof
-                            </Button>
-                          </Link>
-                          <Link
-                            href="/my-contributions"
-                            onClick={() => setMobileMenuOpen(false)}
-                          >
-                            <Button
-                              variant="ghost"
-                              className="w-full justify-start"
-                            >
-                              <History className="h-4 w-4 mr-2" />
-                              My Contributions
-                            </Button>
-                          </Link>
-                          {/* <Link
-                            href="/updates"
-                            onClick={() => setMobileMenuOpen(false)}
-                          >
-                            <Button
-                              variant="ghost"
-                              className="w-full justify-start"
-                            >
-                              <Megaphone className="h-4 w-4 mr-2" />
-                              Updates
-                            </Button>
-                          </Link> */}
-                        </>
-                      )}
-                    </>
-                  )}
-
-                  <Button
-                    variant="outline"
-                    onClick={handleLogout}
-                    className="w-full"
-                  >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Log Out
-                  </Button>
+            {/* Right side - Desktop */}
+            <div className="hidden sm:flex items-center gap-3">
+              <NotificationBell userId={user.id} />
+              
+              <div className="flex items-center gap-2 bg-gray-100 rounded-full px-3 py-1.5">
+                <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-sm font-medium text-white">
+                  {user.fullName?.charAt(0)?.toUpperCase() || "U"}
                 </div>
-              </SheetContent>
-            </Sheet>
+                <span className="text-sm font-medium text-gray-700 max-w-[100px] truncate">
+                  {user.fullName?.split(" ")[0] || "User"}
+                </span>
+              </div>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLogout}
+                className="text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                data-testid="button-logout-desktop"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Mobile - Menu */}
+            <div className="flex sm:hidden items-center gap-2">
+              <NotificationBell userId={user.id} />
+              
+              <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-700 hover:bg-gray-100 p-2"
+                    data-testid="button-mobile-menu"
+                  >
+                    <Menu className="h-6 w-6" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-[280px] p-0">
+                  <div className="flex flex-col h-full">
+                    {/* User Info Header */}
+                    <div className="bg-primary text-white p-5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-xl font-bold">
+                          {user.fullName?.charAt(0)?.toUpperCase() || "U"}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-lg">{user.fullName}</p>
+                          <p className="text-white/70 text-sm capitalize">{user.role}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Navigation Links */}
+                    <div className="flex-1 py-4">
+                      {navLinks.map((link) => (
+                        <Link
+                          key={link.href}
+                          href={link.href}
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          <div
+                            className={`flex items-center gap-4 px-5 py-4 transition-colors ${
+                              isActive(link.href)
+                                ? "bg-primary/5 text-primary border-r-4 border-primary"
+                                : "text-gray-700 hover:bg-gray-50"
+                            }`}
+                            data-testid={`link-mobile-${link.label.toLowerCase().replace(" ", "-")}`}
+                          >
+                            <link.icon className="h-5 w-5" />
+                            <span className="font-medium">{link.label}</span>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+
+                    {/* Logout Button */}
+                    <div className="p-4 border-t">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setMobileMenuOpen(false);
+                          handleLogout();
+                        }}
+                        className="w-full h-12 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                        data-testid="button-logout-mobile"
+                      >
+                        <LogOut className="h-5 w-5 mr-2" />
+                        Log Out
+                      </Button>
+                    </div>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Bottom Navigation Bar - Mobile Only */}
+      <nav className="sm:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 safe-bottom">
+        <div className="grid grid-cols-4 h-16">
+          {navLinks.map((link) => (
+            <Link key={link.href} href={link.href}>
+              <div
+                className={`flex flex-col items-center justify-center h-full gap-1 transition-colors ${
+                  isActive(link.href)
+                    ? "text-primary"
+                    : "text-gray-500"
+                }`}
+                data-testid={`nav-${link.label.toLowerCase().replace(" ", "-")}`}
+              >
+                <link.icon className={`h-5 w-5 ${isActive(link.href) ? "stroke-[2.5]" : ""}`} />
+                <span className="text-[10px] font-medium">{link.label}</span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </nav>
+
+      {/* Desktop Sidebar/Secondary Nav */}
+      <div className="hidden sm:block bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex items-center gap-1 h-12 overflow-x-auto">
+            {navLinks.map((link) => (
+              <Link key={link.href} href={link.href}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={`h-9 px-4 rounded-full transition-all ${
+                    isActive(link.href)
+                      ? "bg-primary/10 text-primary font-semibold"
+                      : "text-gray-600 hover:bg-gray-100"
+                  }`}
+                  data-testid={`nav-desktop-${link.label.toLowerCase().replace(" ", "-")}`}
+                >
+                  <link.icon className="h-4 w-4 mr-2" />
+                  {link.label}
+                </Button>
+              </Link>
+            ))}
           </div>
         </div>
       </div>
-    </nav>
+    </>
   );
 }

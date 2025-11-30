@@ -11,6 +11,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Navigation } from "@/components/navigation";
 import {
   History,
@@ -23,25 +29,30 @@ import {
   Calendar,
   CreditCard,
   TrendingUp,
+  X,
+  Users,
+  FileText,
+  Image,
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { formatNaira } from "@/lib/currency";
 import { Link } from "wouter";
+import { ContributionWithDetails, MemberWithContributions } from "@shared/schema";
 
 export default function MyContributions() {
   const user = getCurrentUser();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [selectedContribution, setSelectedContribution] = useState<any>(null);
+  const [selectedContribution, setSelectedContribution] = useState<ContributionWithDetails | null>(null);
 
   // Fetch user's contributions
-  const { data: contributions = [], isLoading } = useQuery<any[]>({
+  const { data: contributions = [], isLoading } = useQuery<ContributionWithDetails[]>({
     queryKey: ["/api/contributions", "user", user?.id],
     enabled: !!user,
   });
 
   // Fetch user's stats
-  const { data: userStats = {} } = useQuery<any>({
+  const { data: userStats } = useQuery<MemberWithContributions>({
     queryKey: ["/api/stats", "user", user?.id],
     enabled: !!user,
   });
@@ -55,7 +66,7 @@ export default function MyContributions() {
       contribution.projectName
         ?.toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
-      contribution.reference?.toLowerCase().includes(searchTerm.toLowerCase());
+      contribution.transactionRef?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus =
       statusFilter === "all" || contribution.status === statusFilter;
@@ -248,10 +259,10 @@ export default function MyContributions() {
                 <History className="h-5 w-5 mr-2 text-nigerian-green" />
                 Payment History
               </CardTitle>
-              <Link href="/make-payment">
+              <Link href="/submit-proof">
                 <Button className="bg-nigerian-green hover:bg-forest-green">
                   <CreditCard className="h-4 w-4 mr-2" />
-                  Make Payment
+                  Submit Proof
                 </Button>
               </Link>
             </div>
@@ -269,10 +280,10 @@ export default function MyContributions() {
                       You haven't made any contributions yet. Start by making
                       your first payment.
                     </p>
-                    <Link href="/make-payment">
+                    <Link href="/submit-proof">
                       <Button className="bg-nigerian-green hover:bg-forest-green">
                         <CreditCard className="h-4 w-4 mr-2" />
-                        Make Your First Payment
+                        Submit Your First Proof
                       </Button>
                     </Link>
                   </>
@@ -300,11 +311,11 @@ export default function MyContributions() {
                 )}
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {filteredContributions.map((contribution) => (
                   <div
                     key={contribution.id}
-                    className={`p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors ${
+                    className={`p-4 border rounded-xl hover:bg-gray-50 cursor-pointer transition-colors ${
                       contribution.status === "pending"
                         ? "border-orange-200 bg-orange-50/30"
                         : contribution.status === "confirmed"
@@ -316,65 +327,59 @@ export default function MyContributions() {
                     onClick={() => setSelectedContribution(contribution)}
                     data-testid={`contribution-${contribution.id}`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <div className="flex-shrink-0">
-                          {getStatusIcon(contribution.status)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center space-x-2 mb-1">
-                            <h4 className="text-lg font-medium text-gray-900 truncate">
+                    {/* Top row: Icon, Group name, and Amount */}
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 mt-0.5">
+                        {getStatusIcon(contribution.status)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <h4 className="font-semibold text-gray-900 truncate text-base">
                               {contribution.groupName}
                             </h4>
-                            <Badge
-                              className={`text-xs ${getStatusColor(contribution.status)}`}
-                            >
-                              {contribution.status.toUpperCase()}
-                            </Badge>
-                          </div>
-                          {contribution.projectName && (
-                            <p className="text-sm text-gray-600 mb-1">
-                              Project: {contribution.projectName}
-                            </p>
-                          )}
-                          <div className="flex items-center text-sm text-gray-500 space-x-4">
-                            <div className="flex items-center">
-                              <Calendar className="h-4 w-4 mr-1" />
-                              {new Date(
-                                contribution.createdAt,
-                              ).toLocaleDateString()}
-                            </div>
-                            {contribution.reference && (
-                              <div>Ref: {contribution.reference}</div>
+                            {contribution.projectName && (
+                              <p className="text-sm text-gray-500 truncate">
+                                {contribution.projectName}
+                              </p>
                             )}
                           </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-lg font-bold text-gray-900 whitespace-nowrap">
+                              {formatNaira(Number(contribution.amount))}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xl font-bold text-gray-900">
-                          {formatNaira(Number(contribution.amount))}
-                        </p>
-                        <Button variant="ghost" size="sm" className="mt-1">
-                          <Eye className="h-4 w-4 mr-1" />
-                          Details
-                        </Button>
                       </div>
                     </div>
 
-                    {contribution.notes && (
+                    {/* Bottom row: Date, Status, Details */}
+                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                      <div className="flex items-center gap-3 text-sm">
+                        <div className="flex items-center text-gray-500">
+                          <Calendar className="h-3.5 w-3.5 mr-1" />
+                          {new Date(contribution.createdAt).toLocaleDateString("en-NG", {
+                            day: "numeric",
+                            month: "short"
+                          })}
+                        </div>
+                        <Badge
+                          className={`text-xs ${getStatusColor(contribution.status)}`}
+                        >
+                          {contribution.status.toUpperCase()}
+                        </Badge>
+                      </div>
+                      <Button variant="ghost" size="sm" className="h-8 px-3 text-sm">
+                        <Eye className="h-3.5 w-3.5 mr-1" />
+                        Details
+                      </Button>
+                    </div>
+
+                    {contribution.paymentNotes && (
                       <div className="mt-3 pt-3 border-t border-gray-200">
                         <p className="text-sm text-gray-600">
                           <span className="font-medium">Notes:</span>{" "}
-                          {contribution.notes}
-                        </p>
-                      </div>
-                    )}
-
-                    {contribution.adminNotes && (
-                      <div className="mt-3 pt-3 border-t border-gray-200">
-                        <p className="text-sm text-gray-600">
-                          <span className="font-medium">Admin Notes:</span>{" "}
-                          {contribution.adminNotes}
+                          {contribution.paymentNotes}
                         </p>
                       </div>
                     )}
@@ -385,6 +390,113 @@ export default function MyContributions() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Contribution Details Dialog */}
+      <Dialog open={!!selectedContribution} onOpenChange={() => setSelectedContribution(null)}>
+        <DialogContent className="max-w-md mx-4 rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Payment Details</DialogTitle>
+          </DialogHeader>
+          
+          {selectedContribution && (
+            <div className="space-y-4">
+              {/* Status Badge */}
+              <div className="flex items-center justify-center">
+                <Badge className={`text-sm px-4 py-1.5 ${getStatusColor(selectedContribution.status)}`}>
+                  {getStatusIcon(selectedContribution.status)}
+                  <span className="ml-2">{selectedContribution.status.toUpperCase()}</span>
+                </Badge>
+              </div>
+
+              {/* Amount */}
+              <div className="text-center py-4 bg-gray-50 rounded-xl">
+                <p className="text-3xl font-bold text-gray-900">
+                  {formatNaira(Number(selectedContribution.amount))}
+                </p>
+              </div>
+
+              {/* Details List */}
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                  <Users className="h-5 w-5 text-gray-500 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-gray-500">Group</p>
+                    <p className="font-medium text-gray-900">{selectedContribution.groupName}</p>
+                  </div>
+                </div>
+
+                {selectedContribution.projectName && (
+                  <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                    <FileText className="h-5 w-5 text-gray-500 mt-0.5" />
+                    <div>
+                      <p className="text-sm text-gray-500">Project</p>
+                      <p className="font-medium text-gray-900">{selectedContribution.projectName}</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                  <Calendar className="h-5 w-5 text-gray-500 mt-0.5" />
+                  <div>
+                    <p className="text-sm text-gray-500">Date Submitted</p>
+                    <p className="font-medium text-gray-900">
+                      {new Date(selectedContribution.createdAt).toLocaleDateString("en-NG", {
+                        weekday: "long",
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric"
+                      })}
+                    </p>
+                  </div>
+                </div>
+
+                {selectedContribution.transactionRef && (
+                  <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                    <CreditCard className="h-5 w-5 text-gray-500 mt-0.5" />
+                    <div>
+                      <p className="text-sm text-gray-500">Reference</p>
+                      <p className="font-medium text-gray-900 break-all">{selectedContribution.transactionRef}</p>
+                    </div>
+                  </div>
+                )}
+
+                {selectedContribution.paymentNotes && (
+                  <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                    <FileText className="h-5 w-5 text-gray-500 mt-0.5" />
+                    <div>
+                      <p className="text-sm text-gray-500">Notes</p>
+                      <p className="font-medium text-gray-900">{selectedContribution.paymentNotes}</p>
+                    </div>
+                  </div>
+                )}
+
+                {selectedContribution.proofOfPayment && (
+                  <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                    <Image className="h-5 w-5 text-gray-500 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-500 mb-2">Payment Proof</p>
+                      <img 
+                        src={selectedContribution.proofOfPayment} 
+                        alt="Payment proof" 
+                        className="w-full rounded-lg border"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Close Button */}
+              <Button 
+                onClick={() => setSelectedContribution(null)}
+                className="w-full mt-4"
+                variant="outline"
+              >
+                Close
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

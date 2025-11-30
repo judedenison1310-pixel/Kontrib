@@ -1,18 +1,18 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useEffect, useState } from "react";
-import { initializeAuth, getCurrentUser, isAdmin } from "./lib/auth";
+import { initializeAuth, getCurrentUser } from "./lib/auth";
 import type { User } from "@shared/schema";
+
+const REDIRECT_KEY = "kontrib_redirectTo";
 
 // Pages
 import Landing from "@/pages/landing";
-import AdminDashboard from "@/pages/admin-dashboard";
-import MemberDashboard from "@/pages/member-dashboard";
 import Groups from "@/pages/groups";
-import MakePayment from "@/pages/make-payment";
+import SubmitProof from "@/pages/make-payment";
 import MyContributions from "@/pages/my-contributions";
 import Updates from "@/pages/updates";
 import GroupRegistration from "@/pages/group-registration";
@@ -23,10 +23,12 @@ import MemberPayment from "@/pages/member-payment";
 import JoinGroup from "@/pages/join-group";
 import GroupDetails from "@/pages/group-details";
 import ProjectDetails from "@/pages/project-details";
-
+import GroupMembers from "@/pages/group-members";
+import GroupProjects from "@/pages/group-projects";
 function Router() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [location] = useLocation();
 
   // Initialize auth on mount
   useEffect(() => {
@@ -58,6 +60,20 @@ function Router() {
     };
   }, []);
 
+  // Store intended destination for protected routes when user is not logged in
+  useEffect(() => {
+    if (!isAuthLoading && !user) {
+      const protectedPaths = ['/groups', '/submit-proof', '/my-contributions', '/updates', '/whatsapp'];
+      const isProjectPath = location.startsWith('/project/');
+      const isGroupPath = location.startsWith('/group/');
+      const isProtectedPath = protectedPaths.some(p => location === p) || isProjectPath || isGroupPath;
+      
+      if (isProtectedPath) {
+        localStorage.setItem(REDIRECT_KEY, location);
+      }
+    }
+  }, [location, user, isAuthLoading]);
+
   // Show loading state while auth is initializing
   if (isAuthLoading) {
     return (
@@ -73,39 +89,42 @@ function Router() {
   return (
     <Switch>
       {/* Public routes */}
-      <Route path="/" component={user ? (isAdmin() ? AdminDashboard : MemberDashboard) : Landing} />
+      <Route path="/" component={user ? Groups : Landing} />
       <Route path="/register/:link" component={GroupRegistration} />
-      <Route path="/join/:registrationId" component={GroupLanding} />
-      <Route path="/join/:link" component={GroupLanding} />
+      <Route path="/join/:groupSlug/:projectSlug" component={GroupLanding} />
+      <Route path="/join/:groupSlug" component={GroupLanding} />
       <Route path="/join-group" component={JoinGroup} />
       <Route path="/member-payment" component={MemberPayment} />
       
-      {/* Member route - accessible but shows appropriate content based on auth */}
-      <Route path="/member" component={user ? MemberDashboard : Landing} />
-      <Route path="/dashboard" component={user ? (isAdmin() ? AdminDashboard : MemberDashboard) : Landing} />
+      {/* Redirect old dashboard routes to /groups */}
+      <Route path="/dashboard">{user ? <Redirect to="/groups" /> : <Landing />}</Route>
+      <Route path="/admin">{user ? <Redirect to="/groups" /> : <Landing />}</Route>
+      <Route path="/member">{user ? <Redirect to="/groups" /> : <Landing />}</Route>
       
-      {/* Protected routes */}
-      {user && (
-        <>
-          {/* Member pages */}
-          <Route path="/make-payment" component={MakePayment} />
-          <Route path="/my-contributions" component={MyContributions} />
-          <Route path="/updates" component={Updates} />
-          <Route path="/groups" component={Groups} />
-          <Route path="/group/:groupId" component={GroupDetails} />
-          <Route path="/project/:projectId" component={ProjectDetails} />
-          
-          {/* Legacy admin specific route */}
-          <Route path="/admin" component={AdminDashboard} />
-          <Route path="/whatsapp" component={WhatsAppIntegration} />
-        </>
-      )}
+      {/* Protected routes - show Landing for unauthenticated users */}
+      <Route path="/groups">{user ? <Groups /> : <Landing />}</Route>
+      <Route path="/submit-proof">{user ? <SubmitProof /> : <Landing />}</Route>
+      <Route path="/my-contributions">{user ? <MyContributions /> : <Landing />}</Route>
+      <Route path="/updates">{user ? <Updates /> : <Landing />}</Route>
+      <Route path="/group/:groupId/members">{user ? <GroupMembers /> : <Landing />}</Route>
+      <Route path="/group/:groupId/projects">{user ? <GroupProjects /> : <Landing />}</Route>
+      <Route path="/group/:groupId">{user ? <GroupDetails /> : <Landing />}</Route>
+      <Route path="/project/:projectId">{user ? <ProjectDetails /> : <Landing />}</Route>
+      <Route path="/whatsapp">{user ? <WhatsAppIntegration /> : <Landing />}</Route>
       
-      {/* Short URL pattern - catches custom slugs like /newgroup */}
+      {/* Short URL patterns - catches custom slugs like /groupname or /groupname/projectname */}
+      <Route path="/:groupSlug/:projectSlug">
+        {(params) => {
+          const knownRoutes = ['api', 'assets', 'login', 'register', 'join', 'admin', 'dashboard', 'member', 'groups', 'group', 'project', 'submit-proof', 'my-contributions', 'updates', 'whatsapp', 'join-group', 'member-payment', 'members'];
+          if (knownRoutes.includes(params.groupSlug?.toLowerCase() || '')) {
+            return <NotFound />;
+          }
+          return <GroupLanding />;
+        }}
+      </Route>
       <Route path="/:groupSlug">
         {(params) => {
-          // Skip if it matches known routes
-          const knownRoutes = ['api', 'assets', 'login', 'register', 'join', 'admin', 'dashboard', 'member', 'groups', 'group', 'project', 'make-payment', 'my-contributions', 'updates', 'whatsapp', 'join-group', 'member-payment'];
+          const knownRoutes = ['api', 'assets', 'login', 'register', 'join', 'admin', 'dashboard', 'member', 'groups', 'group', 'project', 'submit-proof', 'my-contributions', 'updates', 'whatsapp', 'join-group', 'member-payment', 'members'];
           if (knownRoutes.includes(params.groupSlug?.toLowerCase() || '')) {
             return <NotFound />;
           }

@@ -236,7 +236,10 @@ export default function MemberPayment() {
                             <div className="flex flex-col">
                               <span className="font-medium">{project.name}</span>
                               <span className="text-sm text-gray-500">
-                                {project.groupName} • {formatNaira(project.collectedAmount)} / {formatNaira(project.targetAmount)}
+                                {project.groupName}
+                                {project.targetAmount && parseFloat(project.targetAmount) > 0 && (
+                                  <> • {formatNaira(project.collectedAmount)} / {formatNaira(project.targetAmount)}</>
+                                )}
                               </span>
                             </div>
                           </SelectItem>
@@ -249,15 +252,21 @@ export default function MemberPayment() {
                     <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg space-y-3">
                       <div className="flex items-center justify-between">
                         <h4 className="font-medium">{selectedProjectData.name}</h4>
-                        <Badge variant={getDaysLeft(selectedProjectData.deadline) < 7 ? "destructive" : "secondary"}>
-                          {getDaysLeft(selectedProjectData.deadline)} days left
-                        </Badge>
+                        {selectedProjectData.deadline && (
+                          <Badge variant={getDaysLeft(selectedProjectData.deadline) < 7 ? "destructive" : "secondary"}>
+                            {getDaysLeft(selectedProjectData.deadline)} days left
+                          </Badge>
+                        )}
                       </div>
-                      <Progress value={getProgressPercentage(selectedProjectData)} className="h-2" />
-                      <div className="flex justify-between text-sm text-gray-600">
-                        <span>{formatNaira(selectedProjectData.collectedAmount)} raised</span>
-                        <span>Goal: {formatNaira(selectedProjectData.targetAmount)}</span>
-                      </div>
+                      {selectedProjectData.targetAmount && parseFloat(selectedProjectData.targetAmount) > 0 && (
+                        <>
+                          <Progress value={getProgressPercentage(selectedProjectData)} className="h-2" />
+                          <div className="flex justify-between text-sm text-gray-600">
+                            <span>{formatNaira(selectedProjectData.collectedAmount)} raised</span>
+                            <span>Goal: {formatNaira(selectedProjectData.targetAmount)}</span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
 

@@ -5,11 +5,13 @@ import { z } from "zod";
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-  fullName: text("full_name").notNull(),
-  phoneNumber: text("phone_number").notNull(),
+  username: text("username"), // Optional - for legacy users
+  password: text("password"), // Optional - not used with instant login
+  fullName: text("full_name"), // Optional - users can add after onboarding
+  phoneNumber: text("phone_number").notNull(), // Primary identifier (find by phone)
   role: text("role").notNull().default("member"), // "admin" or "member"
+  profileCompletedAt: timestamp("profile_completed_at"), // When user added their name
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const groups = pgTable("groups", {
@@ -38,11 +40,14 @@ export const projects = pgTable("projects", {
   groupId: varchar("group_id").notNull().references(() => groups.id),
   name: text("name").notNull(),
   description: text("description"),
-  targetAmount: decimal("target_amount", { precision: 15, scale: 2 }).notNull(),
+  projectType: text("project_type").notNull().default("target"), // "target", "monthly", "yearly", "event", "emergency"
+  targetAmount: decimal("target_amount", { precision: 15, scale: 2 }), // Optional for monthly/yearly types
   collectedAmount: decimal("collected_amount", { precision: 15, scale: 2 }).notNull().default("0"),
   customSlug: text("custom_slug").unique(), // For kontrib.app/groupname/pursename URLs
   deadline: timestamp("deadline"),
   status: text("status").notNull().default("active"), // "active", "completed", "paused"
+  // Custom OG image for link previews (stored in object storage)
+  ogImage: text("og_image"), // URL to custom OG image in object storage
   // Account details for contributions
   accountName: text("account_name"),
   accountNumber: text("account_number"),
@@ -93,9 +98,32 @@ export const otpVerifications = pgTable("otp_verifications", {
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
+export const deviceTokens = pgTable("device_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  token: text("token").notNull().unique(),
+  deviceInfo: text("device_info"),
+  lastUsed: timestamp("last_used").notNull().default(sql`CURRENT_TIMESTAMP`),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
+  profileCompletedAt: true,
+  createdAt: true,
+});
+
+// Schema for instant login - just phone number
+export const instantLoginSchema = z.object({
+  phoneNumber: z.string().min(10, "Please enter a valid phone number"),
+});
+
+// Schema for updating profile after onboarding
+export const updateProfileSchema = z.object({
+  fullName: z.string().min(2, "Please enter your full name"),
+  role: z.enum(["admin", "member"]).optional(),
 });
 
 export const insertGroupSchema = createInsertSchema(groups).omit({
@@ -119,6 +147,8 @@ export const insertProjectSchema = createInsertSchema(projects).omit({
   customSlug: true,
   createdAt: true,
 }).extend({
+  projectType: z.enum(["target", "monthly", "yearly", "event", "emergency"]).default("target"),
+  targetAmount: z.string().optional().nullable(), // Optional for monthly/yearly types
   deadline: z.string().optional().or(z.date().optional()),
   allowedPaymentTypes: z.string().optional(), // JSON string of payment types
 });
@@ -177,6 +207,9 @@ export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type OtpVerification = typeof otpVerifications.$inferSelect;
 export type InsertOtpVerification = z.infer<typeof insertOtpVerificationSchema>;
+export type InstantLogin = z.infer<typeof instantLoginSchema>;
+export type UpdateProfile = z.infer<typeof updateProfileSchema>;
+export type DeviceToken = typeof deviceTokens.$inferSelect;
 
 // Extended types for UI
 export type GroupWithStats = Group & {
@@ -206,4 +239,10 @@ export type ContributionWithDetails = Contribution & {
 export type AccountabilityPartnerWithDetails = AccountabilityPartner & {
   userName: string;
   userFullName: string;
+};
+
+export type GroupWithRole = GroupWithStats & {
+  role: 'admin' | 'member' | 'both';
+  pendingApprovals?: number;
+  myPendingPayments?: number;
 };

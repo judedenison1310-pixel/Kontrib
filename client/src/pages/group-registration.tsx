@@ -32,6 +32,9 @@ import { Badge } from "@/components/ui/badge";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { type User } from "@shared/schema";
+
+const REDIRECT_KEY = "kontrib_redirectTo";
 
 // Form validation schemas
 const registrationFormSchema = z.object({
@@ -70,7 +73,7 @@ export default function GroupRegistration() {
     phoneNumber: string;
     expiresAt: string;
   } | null>(null);
-  const [newUser, setNewUser] = useState<any>(null);
+  const [newUser, setNewUser] = useState<User | null>(null);
 
   const {
     data: groupData,
@@ -222,7 +225,7 @@ export default function GroupRegistration() {
   };
 
   const handleLoginRedirect = () => {
-    localStorage.setItem("pendingGroupJoin", params?.link || "");
+    localStorage.setItem(REDIRECT_KEY, window.location.pathname);
     setLocation("/");
   };
 

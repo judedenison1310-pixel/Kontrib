@@ -4,54 +4,63 @@
 
 :root {
   --background: hsl(0, 0%, 100%);
-  --foreground: hsl(20, 14.3%, 4.1%);
-  --muted: hsl(60, 4.8%, 95.9%);
-  --muted-foreground: hsl(25, 5.3%, 44.7%);
+  --foreground: hsl(0, 0%, 10%);
+  --muted: hsl(120, 5%, 96%);
+  --muted-foreground: hsl(0, 0%, 45%);
   --popover: hsl(0, 0%, 100%);
-  --popover-foreground: hsl(20, 14.3%, 4.1%);
+  --popover-foreground: hsl(0, 0%, 10%);
   --card: hsl(0, 0%, 100%);
-  --card-foreground: hsl(20, 14.3%, 4.1%);
-  --border: hsl(20, 5.9%, 90%);
-  --input: hsl(20, 5.9%, 90%);
-  --primary: hsl(133, 100%, 24%);
+  --card-foreground: hsl(0, 0%, 10%);
+  --border: hsl(0, 0%, 90%);
+  --input: hsl(0, 0%, 90%);
+  --primary: hsl(120, 100%, 25%);
   --primary-foreground: hsl(0, 0%, 100%);
-  --secondary: hsl(60, 4.8%, 95.9%);
-  --secondary-foreground: hsl(24, 9.8%, 10%);
-  --accent: hsl(60, 4.8%, 95.9%);
-  --accent-foreground: hsl(24, 9.8%, 10%);
-  --destructive: hsl(0, 84.2%, 60.2%);
-  --destructive-foreground: hsl(60, 9.1%, 97.8%);
-  --ring: hsl(20, 14.3%, 4.1%);
-  --radius: 0.5rem;
+  --secondary: hsl(120, 20%, 95%);
+  --secondary-foreground: hsl(120, 100%, 20%);
+  --accent: hsl(120, 30%, 92%);
+  --accent-foreground: hsl(120, 100%, 20%);
+  --destructive: hsl(0, 72%, 51%);
+  --destructive-foreground: hsl(0, 0%, 100%);
+  --ring: hsl(120, 100%, 25%);
+  --radius: 0.75rem;
   
-  /* Nigerian theme colors */
-  --nigerian-green: hsl(133, 100%, 24%);
-  --forest-green: hsl(133, 56%, 29%);
-  --surface: hsl(60, 9%, 98%);
-  --naira-color: hsl(133, 100%, 24%);
+  /* WhatsApp-inspired Kontrib theme */
+  --kontrib-green: #008000;
+  --kontrib-green-dark: #006400;
+  --kontrib-green-light: #00a000;
+  --kontrib-surface: #f0fdf4;
+  --kontrib-success: #22c55e;
+  --kontrib-warning: #f59e0b;
+  --kontrib-error: #ef4444;
+  --naira-color: #008000;
+  
+  /* Legacy aliases */
+  --nigerian-green: #008000;
+  --forest-green: #006400;
+  --surface: #f0fdf4;
 }
 
 .dark {
-  --background: hsl(240, 10%, 3.9%);
-  --foreground: hsl(0, 0%, 98%);
-  --muted: hsl(240, 3.7%, 15.9%);
-  --muted-foreground: hsl(240, 5%, 64.9%);
-  --popover: hsl(240, 10%, 3.9%);
-  --popover-foreground: hsl(0, 0%, 98%);
-  --card: hsl(240, 10%, 3.9%);
-  --card-foreground: hsl(0, 0%, 98%);
-  --border: hsl(240, 3.7%, 15.9%);
-  --input: hsl(240, 3.7%, 15.9%);
-  --primary: hsl(133, 100%, 24%);
+  --background: hsl(0, 0%, 7%);
+  --foreground: hsl(0, 0%, 95%);
+  --muted: hsl(0, 0%, 15%);
+  --muted-foreground: hsl(0, 0%, 60%);
+  --popover: hsl(0, 0%, 10%);
+  --popover-foreground: hsl(0, 0%, 95%);
+  --card: hsl(0, 0%, 10%);
+  --card-foreground: hsl(0, 0%, 95%);
+  --border: hsl(0, 0%, 20%);
+  --input: hsl(0, 0%, 20%);
+  --primary: hsl(120, 100%, 35%);
   --primary-foreground: hsl(0, 0%, 100%);
-  --secondary: hsl(240, 3.7%, 15.9%);
-  --secondary-foreground: hsl(0, 0%, 98%);
-  --accent: hsl(240, 3.7%, 15.9%);
-  --accent-foreground: hsl(0, 0%, 98%);
-  --destructive: hsl(0, 62.8%, 30.6%);
-  --destructive-foreground: hsl(0, 0%, 98%);
-  --ring: hsl(240, 4.9%, 83.9%);
-  --radius: 0.5rem;
+  --secondary: hsl(0, 0%, 15%);
+  --secondary-foreground: hsl(120, 100%, 50%);
+  --accent: hsl(0, 0%, 18%);
+  --accent-foreground: hsl(120, 100%, 50%);
+  --destructive: hsl(0, 72%, 45%);
+  --destructive-foreground: hsl(0, 0%, 100%);
+  --ring: hsl(120, 100%, 35%);
+  --radius: 0.75rem;
 }
 
 @layer base {
@@ -59,8 +68,120 @@
     @apply border-border;
   }
 
+  html {
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .font-open-sauce {
+    font-family: 'Open Sans', sans-serif;
+  }
+
+  .font-circular {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-bold tracking-tight;
+  }
+
+  h1 {
+    @apply text-2xl sm:text-3xl;
+  }
+
+  h2 {
+    @apply text-xl sm:text-2xl;
+  }
+
+  h3 {
+    @apply text-lg sm:text-xl;
+  }
+}
+
+@layer components {
+  .btn-kontrib {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-4 text-lg font-semibold text-white rounded-xl transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
+    background-color: var(--kontrib-green);
+    min-height: 56px;
+    touch-action: manipulation;
+  }
+
+  .btn-kontrib:hover:not(:disabled) {
+    background-color: var(--kontrib-green-dark);
+  }
+
+  .btn-kontrib:active:not(:disabled) {
+    background-color: var(--kontrib-green-dark);
+    transform: scale(0.98);
+  }
+
+  .btn-kontrib-outline {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-4 text-lg font-semibold rounded-xl border-2 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
+    color: var(--kontrib-green);
+    border-color: var(--kontrib-green);
+    background: transparent;
+    min-height: 56px;
+    touch-action: manipulation;
+  }
+
+  .btn-kontrib-outline:hover:not(:disabled) {
+    background-color: var(--kontrib-surface);
+  }
+
+  .card-kontrib {
+    @apply bg-white rounded-2xl border border-gray-100 shadow-sm p-5;
+  }
+
+  .input-kontrib {
+    @apply w-full px-4 py-4 text-lg border-2 border-gray-200 rounded-xl transition-colors duration-200 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20;
+    min-height: 56px;
+  }
+
+  .status-paid {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full;
+    background-color: #dcfce7;
+    color: #166534;
+  }
+
+  .status-pending {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full;
+    background-color: #fef3c7;
+    color: #92400e;
+  }
+
+  .status-unpaid {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full;
+    background-color: #fee2e2;
+    color: #991b1b;
+  }
+
+  .whatsapp-btn {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-4 text-lg font-semibold text-white rounded-xl transition-all duration-200 active:scale-[0.98];
+    background-color: #25D366;
+    min-height: 56px;
+    touch-action: manipulation;
+  }
+
+  .whatsapp-btn:hover {
+    background-color: #20bd5a;
+  }
+
+  .progress-circle {
+    @apply relative inline-flex items-center justify-center;
+  }
+
+  .skeleton-kontrib {
+    @apply animate-pulse bg-gray-200 rounded-lg;
   }
 }
 
@@ -72,12 +193,50 @@
   .bg-nigerian-green {
     background-color: var(--nigerian-green);
   }
+
+  .bg-kontrib-green {
+    background-color: var(--kontrib-green);
+  }
+
+  .bg-kontrib-surface {
+    background-color: var(--kontrib-surface);
+  }
   
   .border-nigerian-green {
     border-color: var(--nigerian-green);
   }
+
+  .border-kontrib-green {
+    border-color: var(--kontrib-green);
+  }
   
   .text-naira {
     color: var(--naira-color);
+  }
+
+  .text-kontrib-green {
+    color: var(--kontrib-green);
+  }
+
+  .touch-target {
+    min-height: 48px;
+    min-width: 48px;
+  }
+
+  .safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .safe-top {
+    padding-top: max(1rem, env(safe-area-inset-top));
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 }

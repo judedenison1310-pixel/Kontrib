@@ -109,30 +109,34 @@ export function ProjectSelectionModal({
                         )}
                       </div>
 
-                      {/* Progress Bar */}
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium text-gray-600">Progress</span>
-                          <span className="text-sm font-bold text-green-600">{progress}%</span>
+                      {/* Progress Bar - only show if target exists */}
+                      {project.targetAmount && parseFloat(project.targetAmount) > 0 && (
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium text-gray-600">Progress</span>
+                            <span className="text-sm font-bold text-green-600">{progress}%</span>
+                          </div>
+                          <Progress value={progress} className="h-2" />
+                          <div className="flex justify-between text-xs text-gray-500">
+                            <span>Raised: {formatNaira(project.collectedAmount)}</span>
+                            <span>Remaining: {formatNaira(remaining.toString())}</span>
+                          </div>
                         </div>
-                        <Progress value={progress} className="h-2" />
-                        <div className="flex justify-between text-xs text-gray-500">
-                          <span>Raised: {formatNaira(project.collectedAmount)}</span>
-                          <span>Remaining: {formatNaira(remaining.toString())}</span>
-                        </div>
-                      </div>
+                      )}
 
                       {/* Project Stats */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-green-50 rounded-lg p-3">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Target className="w-4 h-4 text-green-600" />
-                            <span className="text-xs text-gray-600">Target</span>
+                      <div className={`grid gap-4 ${project.targetAmount && parseFloat(project.targetAmount) > 0 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                        {project.targetAmount && parseFloat(project.targetAmount) > 0 && (
+                          <div className="bg-green-50 rounded-lg p-3">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Target className="w-4 h-4 text-green-600" />
+                              <span className="text-xs text-gray-600">Target</span>
+                            </div>
+                            <p className="text-sm font-semibold text-green-700">
+                              {formatNaira(project.targetAmount)}
+                            </p>
                           </div>
-                          <p className="text-sm font-semibold text-green-700">
-                            {formatNaira(project.targetAmount)}
-                          </p>
-                        </div>
+                        )}
                         
                         {project.deadline && (
                           <div className="bg-blue-50 rounded-lg p-3">

@@ -1,0 +1,74 @@
+You are an expert full-stack team tasked to rebuild Kontrib from scratch in 2025 as the #1 WhatsApp-native contribution tracker in Nigeria.
+
+Core philosophy (never compromise):
+- Zero friction: joining must be 2 taps and <10 seconds
+- No email, no password, no app install → phone number from WhatsApp = identity
+- Works perfectly on 2G, MTN/Airtel/Glo
+- Green #008000 brand, big buttons, Pidgin-friendly tone
+
+### 1. Exact User Flows
+
+Admin Onboarding (first time, <2 minutes)
+→ Open https://kontrib.to → “Continue with WhatsApp” (wa.me link)
+→ Phone auto-captured → instantly logged in as admin
+→ Empty state → big button “+ Create Your First Group”
+→ Group name only → Create
+→ Immediately “+ Add Your First Project”
+→ Project name + choose type (see below) + optional target + due date → Create
+→ Success screen with magic link kontrib.to/join/{code} + [Share on WhatsApp] button
+
+Member Join Flow (2 taps, <10 seconds)
+→ Receives link kontrib.to/join/chioma-wedding
+→ Redirects to wa.me/2349012345678?text=join%20chioma-wedding (pre-filled)
+→ User presses Send
+→ Backend instantly:
+   • Adds phone to exact project
+   • Replies: “You’re in! Tap → https://kontrib.to/p/chioma-wedding?phone=2348…”
+→ User taps reply → lands straight on personal dashboard (no home page)
+
+### 2. Project Types (Admin chooses one per project)
+1. Target-based (e.g. wedding gift ₦300,000) → progress circle
+2. Free-will donation (church offering) → no target, just list
+3. Fixed-amount dues / Ajo (e.g. “₦10,000 monthly levy” or “Daily ₦1,000 × 50 people”) → shows who paid this cycle
+
+### 3. Core Screens (mobile-first only)
+
+Member Dashboard (deep-linked)
+• Project name + type
+• Progress circle or total collected
+• “You’ve paid: ₦X” + Upload Proof big green button
+• List of all members with amount + green/red tick
+• Share button
+
+Admin Dashboard
+• List of all groups → tap → list of projects
+• + New Project button
+• Proofs inbox → tap Verify/Reject
+• Export PDF/Excel per project
+
+### 4. Required Tech Stack (fastest & cheapest 2025)
+• Frontend: Next.js 15 + Tailwind + PWA (installable)
+• Backend: Supabase (Postgres + Auth + Edge Functions) or Node.js + Render
+• WhatsApp Business Cloud API (Meta-hosted, free first 1k messages)
+• Webhook: Make.com or Supabase Edge Functions
+• Short links & deep links: Vercel or Render
+• File storage: Supabase Storage (proof photos)
+
+### 5. Non-Negotiables
+• No sign-up/login screen for members ever
+• Every project has its own unique wa.me join link
+• Deep link ?phone=2348… auto-logs user and shows only that project
+• Auto-reminders for fixed-dues projects (2 days before due)
+• Admin can manually add/remove members
+• Export report button on every project
+• 100% works offline-first (PWA cache)
+
+### 6. Success Metrics You Must Optimize For
+• Join completion rate >85%
+• Avg time from link tap to dashboard <12 seconds
+• <3 second page loads on 2G
+• 500+ active groups in first 30 days
+
+Build the entire app exactly as described above. Prioritise speed of shipping and zero-friction UX over extra features. Launch-ready in maximum 10 days.
+
+Start coding now.

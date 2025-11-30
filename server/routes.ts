@@ -46,6 +46,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Instant login with phone number only - no OTP required
+  app.post("/api/auth/instant-login", async (req, res) => {
+    try {
+      const { phoneNumber } = req.body;
+      
+      if (!phoneNumber || typeof phoneNumber !== 'string' || phoneNumber.length < 10) {
+        return res.status(400).json({ message: "Please enter a valid phone number" });
+      }
+      
+      // Normalize phone number (remove spaces, ensure + prefix for international)
+      let normalizedPhone = phoneNumber.replace(/\s+/g, '');
+      if (!normalizedPhone.startsWith('+')) {
+        // Default to Nigerian country code if no prefix
+        normalizedPhone = '+234' + normalizedPhone.replace(/^0/, '');
+      }
+      
+      // Find or create user by phone number
+      const user = await storage.findOrCreateUserByPhone(normalizedPhone);
+      
+      res.json({ 
+        user: { ...user, password: undefined },
+        isNewUser: !user.fullName, // If no fullName, they need to complete profile
+      });
+    } catch (error) {
+      console.error("Instant login error:", error);
+      res.status(500).json({ message: "Login failed. Please try again." });
+    }
+  });
+
+  // Update user profile (name, role) after instant login
+  app.post("/api/auth/update-profile", async (req, res) => {
+    try {
+      const { userId, fullName, role } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
+      }
+      
+      if (fullName && (typeof fullName !== 'string' || fullName.length < 2)) {
+        return res.status(400).json({ message: "Please enter your full name" });
+      }
+      
+      // Validate role - only allow 'admin' or 'member'
+      const validRoles = ['admin', 'member'];
+      if (role && !validRoles.includes(role)) {
+        return res.status(400).json({ message: "Invalid role" });
+      }
+      
+      const user = await storage.updateUserProfile(userId, { fullName, role });
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json({ user: { ...user, password: undefined } });
+    } catch (error) {
+      console.error("Update profile error:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
   // Group routes
   app.get("/api/groups/admin/:adminId", async (req, res) => {
     try {
@@ -66,6 +127,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Get user groups error:", error);
       res.status(500).json({ message: "Failed to fetch user groups" });
+    }
+  });
+
+  app.get("/api/groups/all/:userId", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const allGroups = await storage.getAllUserGroups(userId);
+      res.json(allGroups);
+    } catch (error) {
+      console.error("Get all user groups error:", error);
+      res.status(500).json({ message: "Failed to fetch groups" });
     }
   });
 
@@ -182,6 +254,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // New clean deep link format: /join/groupname/projectname
+  app.get("/api/groups/join/:groupSlug/:projectSlug", async (req, res) => {
+    try {
+      const { groupSlug, projectSlug } = req.params;
+      const { userId } = req.query;
+      
+      // Find group by custom slug or registration link
+      let group = await storage.getGroupByCustomSlug(groupSlug);
+      if (!group) {
+        group = await storage.getGroupByRegistrationLink(groupSlug);
+      }
+      
+      if (!group) {
+        return res.status(404).json({ message: "Group not found" });
+      }
+
+      // Get projects for this group
+      const projects = await storage.getProjectsByGroup(group.id);
+      
+      // Find specific project by slug match
+      const targetProject = projects.find((project: any) => {
+        const slug = project.name
+          .toLowerCase()
+          .replace(/[^a-z0-9\s-]/g, '')
+          .replace(/\s+/g, '')
+          .slice(0, 50);
+        return slug === projectSlug;
+      });
+      
+      // Get member count
+      const members = await storage.getGroupMembers(group.id);
+      
+      // Check if current user is already a member
+      let isMember = false;
+      if (userId && typeof userId === 'string') {
+        const membership = await storage.getGroupMember(group.id, userId);
+        isMember = !!membership;
+      }
+      
+      // Calculate totals - if project found, use its data; otherwise use group totals
+      const projectsToShow = targetProject ? [targetProject] : projects;
+      const totalTarget = projectsToShow.reduce((sum: number, project: any) => 
+        sum + parseFloat(project.targetAmount || "0"), 0
+      ).toString();
+      
+      const totalCollected = projectsToShow.reduce((sum: number, project: any) => 
+        sum + parseFloat(project.collectedAmount || "0"), 0
+      ).toString();
+      
+      const landingData = {
+        group,
+        projects: projectsToShow.map((project: any) => ({
+          id: project.id,
+          name: project.name,
+          description: project.description,
+          targetAmount: project.targetAmount,
+          collectedAmount: project.collectedAmount,
+          deadline: project.deadline
+        })),
+        memberCount: members.length,
+        totalTarget,
+        totalCollected,
+        isMember
+      };
+      
+      res.json(landingData);
+    } catch (error) {
+      console.error("Get group by join link error:", error);
+      res.status(500).json({ message: "Failed to fetch group" });
+    }
+  });
+
   app.post("/api/groups", async (req, res) => {
     try {
       const { adminId, deadline, ...restData } = req.body;
@@ -272,7 +416,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Remove member from group (admin only)
+  app.delete("/api/groups/:groupId/members/:memberId", async (req, res) => {
+    try {
+      const { groupId, memberId } = req.params;
+      const { adminId } = req.body; // The requesting user's ID
+      
+      if (!adminId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Get the group to verify admin
+      const group = await storage.getGroup(groupId);
+      if (!group) {
+        return res.status(404).json({ message: "Group not found" });
+      }
+      
+      // Verify the requesting user is the group admin
+      if (group.adminId !== adminId) {
+        return res.status(403).json({ message: "Only the group admin can remove members" });
+      }
+      
+      // Get the member to get user info for notification
+      const members = await storage.getGroupMembers(groupId);
+      const memberToRemove = members.find(m => m.id === memberId);
+      
+      if (!memberToRemove) {
+        return res.status(404).json({ message: "Member not found" });
+      }
+      
+      // Don't allow removing the group admin
+      if (memberToRemove.userId === group.adminId) {
+        return res.status(400).json({ message: "Cannot remove the group admin" });
+      }
+      
+      // Remove the member
+      const success = await storage.removeGroupMember(memberId);
+      
+      if (!success) {
+        return res.status(500).json({ message: "Failed to remove member" });
+      }
+      
+      // Send notification to the removed member
+      await storage.createNotification({
+        userId: memberToRemove.userId,
+        type: "member_removed",
+        title: "Removed from Group",
+        message: `You have been removed from the group "${group.name}"`
+      });
+      
+      res.json({ success: true, message: "Member removed successfully" });
+    } catch (error) {
+      console.error("Remove member error:", error);
+      res.status(500).json({ message: "Failed to remove member" });
+    }
+  });
+
   // Project routes
+  
+  // Get all projects for an admin (across all their groups)
+  app.get("/api/projects/admin/:adminId", async (req, res) => {
+    try {
+      const { adminId } = req.params;
+      const groups = await storage.getGroupsByAdmin(adminId);
+      const projectsWithGroup: any[] = [];
+      
+      for (const group of groups) {
+        const groupProjects = await storage.getProjectsByGroup(group.id);
+        for (const project of groupProjects) {
+          projectsWithGroup.push({
+            ...project,
+            groupId: group.id,
+            groupName: group.name,
+          });
+        }
+      }
+      
+      res.json(projectsWithGroup);
+    } catch (error) {
+      console.error("Get admin projects error:", error);
+      res.status(500).json({ message: "Failed to fetch admin projects" });
+    }
+  });
+  
   app.get("/api/groups/:groupId/projects", async (req, res) => {
     try {
       const { groupId } = req.params;
@@ -621,7 +847,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/verify-otp", async (req, res) => {
     try {
-      const { phoneNumber, otp } = req.body;
+      const { phoneNumber, otp, deviceInfo } = req.body;
       
       if (!phoneNumber || !otp) {
         return res.status(400).json({ message: "Phone number and OTP are required" });
@@ -630,13 +856,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isValid = await storage.verifyOtp(phoneNumber, otp);
       
       if (isValid) {
-        res.json({ message: "OTP verified successfully", verified: true });
+        // Find or create user
+        const user = await storage.findOrCreateUserByPhone(phoneNumber);
+        const isNewUser = !user.fullName;
+        
+        // Create device token for "remember this device"
+        const deviceToken = await storage.createDeviceToken(user.id, deviceInfo);
+        
+        res.json({ 
+          message: "OTP verified successfully", 
+          verified: true,
+          user: { ...user, password: undefined },
+          isNewUser,
+          deviceToken
+        });
       } else {
         res.status(400).json({ message: "Invalid or expired OTP", verified: false });
       }
     } catch (error) {
       console.error("Verify OTP error:", error);
       res.status(500).json({ message: "OTP verification failed" });
+    }
+  });
+
+  // Validate device token for auto-login (remembered device)
+  app.post("/api/auth/validate-device", async (req, res) => {
+    try {
+      const { deviceToken } = req.body;
+      
+      if (!deviceToken) {
+        return res.status(400).json({ message: "Device token is required", valid: false });
+      }
+      
+      const user = await storage.validateDeviceToken(deviceToken);
+      
+      if (user) {
+        res.json({ 
+          valid: true, 
+          user: { ...user, password: undefined },
+          isNewUser: !user.fullName
+        });
+      } else {
+        res.status(401).json({ message: "Invalid or expired device token", valid: false });
+      }
+    } catch (error) {
+      console.error("Validate device error:", error);
+      res.status(500).json({ message: "Device validation failed", valid: false });
+    }
+  });
+
+  // Logout - remove device token
+  app.post("/api/auth/logout", async (req, res) => {
+    try {
+      const { deviceToken } = req.body;
+      
+      if (deviceToken) {
+        await storage.removeDeviceToken(deviceToken);
+      }
+      
+      res.json({ message: "Logged out successfully" });
+    } catch (error) {
+      console.error("Logout error:", error);
+      res.status(500).json({ message: "Logout failed" });
     }
   });
 
@@ -891,20 +1172,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // OG Image Generation
-  const { generateOGImage } = await import('./og-image');
-  
-  app.get("/api/og-image/:identifier", async (req, res) => {
-    try {
-      const { identifier } = req.params;
-      const imageBuffer = await generateOGImage(identifier);
-      
-      if (!imageBuffer) {
-        return res.status(404).json({ message: "Group not found" });
-      }
+  // Object Storage - Public objects serving
+  const { ObjectStorageService, ObjectNotFoundError } = await import('./objectStorage');
 
-      res.setHeader('Content-Type', 'image/png');
-      res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+  app.get("/public-objects/:filePath(*)", async (req, res) => {
+    const filePath = req.params.filePath;
+    const objectStorageService = new ObjectStorageService();
+    try {
+      const file = await objectStorageService.searchPublicObject(filePath);
+      if (!file) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      objectStorageService.downloadObject(file, res);
+    } catch (error) {
+      console.error("Error serving public object:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Serve private objects (for OG images)
+  app.get("/objects/:objectPath(*)", async (req, res) => {
+    const objectStorageService = new ObjectStorageService();
+    try {
+      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
+      objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error("Error serving object:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
+  // Static OG Image - single image for all links
+  const { generateStaticOGImage } = await import('./og-image');
+  
+  app.get("/api/og-image", async (req, res) => {
+    try {
+      const imageBuffer = await generateStaticOGImage();
+
+      res.setHeader('Content-Type', 'image/jpeg');
+      res.setHeader('Cache-Control', 'public, max-age=604800'); // Cache for 7 days
       res.send(imageBuffer);
     } catch (error) {
       console.error("OG image generation error:", error);

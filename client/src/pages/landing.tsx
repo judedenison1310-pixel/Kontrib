@@ -1,659 +1,501 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Shield, MessageSquare, TrendingUp, CheckCircle, Phone } from "lucide-react";
-import { insertUserSchema } from "@shared/schema";
-import { apiRequest } from "@/lib/queryClient";
-import { setCurrentUser } from "@/lib/auth";
+import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
+import { Users, Shield, ArrowRight, Quote, User, Lock } from "lucide-react";
+import { SiWhatsapp } from "react-icons/si";
+import { type User as UserType } from "@shared/schema";
+import { sendOtp, verifyOtp, updateProfile } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
-import kontribLogo from "@assets/WhatsApp Image 2025-10-19 at 01.29.52_ced7d354_1762106313529.jpg";
+import kontribLogo from "@assets/8_1764455185903.png";
 
-const loginSchema = z.object({
-  username: z.string().min(1, "Username is required"),
-  phoneNumber: z.string().regex(/^\+?[1-9]\d{1,14}$/, "Please enter a valid phone number with country code (e.g., +234, +1, +44)"),
-});
-
-// OTP-based registration schema - no passwords needed
-const registerSchema = z.object({
-  fullName: z.string().min(2, "Full name is required"),
-  username: z.string().min(3, "Username must be at least 3 characters").max(20, "Username must be less than 20 characters"),
-  phoneNumber: z.string().regex(/^\+?[1-9]\d{1,14}$/, "Please enter a valid phone number with country code (e.g., +234, +1, +44)"),
-  role: z.enum(["admin", "member"], { required_error: "Please select your role" }),
+const phoneSchema = z.object({
+  phoneNumber: z.string().min(10, "Enter your WhatsApp number"),
 });
 
 const otpSchema = z.object({
-  otp: z.string().length(6, "OTP must be 6 digits"),
+  otp: z.string().length(6, "Enter the 6-digit code"),
 });
 
-type LoginFormData = z.infer<typeof loginSchema>;
-type RegisterFormData = z.infer<typeof registerSchema>;
+const profileSchema = z.object({
+  fullName: z.string().min(2, "Enter your name"),
+});
+
+type PhoneFormData = z.infer<typeof phoneSchema>;
 type OtpFormData = z.infer<typeof otpSchema>;
+type ProfileFormData = z.infer<typeof profileSchema>;
+
+const REDIRECT_KEY = "kontrib_redirectTo";
 
 export default function Landing() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"login" | "register">("login");
-  const [registrationStep, setRegistrationStep] = useState<"form" | "otp-verification" | "success">("form");
-  const [loginStep, setLoginStep] = useState<"form" | "otp-verification">("form");
-  const [otpData, setOtpData] = useState<{ phoneNumber: string; expiresAt: string; username?: string } | null>(null);
-  const [newUser, setNewUser] = useState<any>(null);
+  const [step, setStep] = useState<"phone" | "otp" | "profile" | "role">("phone");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [newUser, setNewUser] = useState<UserType | null>(null);
+  const [devOtp, setDevOtp] = useState<string | null>(null);
+  const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  const loginForm = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: { username: "", phoneNumber: "" },
-  });
+  const getRedirectPath = () => {
+    const storedPath = localStorage.getItem(REDIRECT_KEY);
+    if (storedPath) {
+      localStorage.removeItem(REDIRECT_KEY);
+      return storedPath;
+    }
+    return "/groups";
+  };
 
-  const registerForm = useForm<RegisterFormData>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: {
-      fullName: "",
-      username: "",
-      phoneNumber: "",
-      role: "member",
-    },
+  const phoneForm = useForm<PhoneFormData>({
+    resolver: zodResolver(phoneSchema),
+    defaultValues: { phoneNumber: "" },
   });
 
   const otpForm = useForm<OtpFormData>({
     resolver: zodResolver(otpSchema),
-    defaultValues: {
-      otp: "",
-    },
+    defaultValues: { otp: "" },
   });
 
-  const sendLoginOtpMutation = useMutation({
-    mutationFn: async (data: LoginFormData) => {
-      const response = await apiRequest("POST", "/api/auth/send-login-otp", data);
-      return response.json();
-    },
-    onSuccess: (data, variables) => {
-      setOtpData({ 
-        phoneNumber: variables.phoneNumber, 
-        username: variables.username,
-        expiresAt: data.expiresAt 
-      });
-      setLoginStep("otp-verification");
-      toast({
-        title: "OTP Sent!",
-        description: `Verification code sent to ${variables.phoneNumber} via WhatsApp.`,
-      });
-      
-      // For development, show the OTP in console
-      if (data.developmentOtp) {
-        console.log("Development Login OTP:", data.developmentOtp);
-        toast({
-          title: "Development Mode",
-          description: `Login OTP: ${data.developmentOtp}`,
-          variant: "default",
-        });
-      }
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Login Failed",
-        description: error.message || "Invalid username or phone number.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const loginMutation = useMutation({
-    mutationFn: async (data: { username: string; phoneNumber: string; otp: string }) => {
-      const response = await apiRequest("POST", "/api/auth/login-with-otp", data);
-      return response.json();
-    },
-    onSuccess: (data) => {
-      setCurrentUser(data.user);
-      toast({
-        title: "Welcome back!",
-        description: "You have been successfully logged in.",
-      });
-      setLocation(data.user.role === "admin" ? "/admin" : "/member");
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Login Failed",
-        description: error.message || "Invalid OTP or login details.",
-        variant: "destructive",
-      });
-    },
+  const profileForm = useForm<ProfileFormData>({
+    resolver: zodResolver(profileSchema),
+    defaultValues: { fullName: "" },
   });
 
   const sendOtpMutation = useMutation({
-    mutationFn: async (phoneNumber: string) => {
-      const response = await apiRequest("POST", "/api/auth/send-otp", {
-        phoneNumber,
-      });
-      return response.json();
-    },
-    onSuccess: (data, phoneNumber) => {
-      setOtpData({ phoneNumber, expiresAt: data.expiresAt });
-      setRegistrationStep("otp-verification");
-      toast({
-        title: "OTP Sent!",
-        description: `Verification code sent via WhatsApp.`,
-      });
-      
-      // For development, show the OTP in console
-      if (data.developmentOtp) {
-        console.log("Development OTP:", data.developmentOtp);
-        toast({
-          title: "Development Mode",
-          description: `OTP: ${data.developmentOtp} (Check console for details)`,
-          variant: "default",
-        });
-      }
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Failed to Send OTP",
-        description: error.message || "Please try again later.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const registerMutation = useMutation({
-    mutationFn: async (data: RegisterFormData & { otp: string }) => {
-      // Create account with OTP verification
-      const userData = {
-        ...data,
-        password: "otp-auth", // OTP-based auth marker
-        role: data.role
-      };
-      
-      const response = await apiRequest("POST", "/api/auth/register-with-otp", userData);
-      return response.json();
+    mutationFn: async (phone: string) => {
+      return sendOtp(phone);
     },
     onSuccess: (data) => {
-      setNewUser(data.user);
-      setCurrentUser(data.user);
-      setRegistrationStep("success");
-      toast({
-        title: "Account Created!",
-        description: `Welcome ${data.user.role === "admin" ? "Admin" : "Member"}! Your account has been created successfully.`,
+      setStep("otp");
+      if (data.developmentOtp) {
+        setDevOtp(data.developmentOtp);
+      }
+      toast({ 
+        title: "Code sent!", 
+        description: "Check your WhatsApp for the 6-digit code" 
       });
-      
-      // Redirect based on role after a short delay
-      setTimeout(() => {
-        setLocation(data.user.role === "admin" ? "/admin" : "/member");
-      }, 2000);
     },
-    onError: (error: any) => {
-      toast({
-        title: "Registration Failed",
-        description: error.message || "Please try again later.",
-        variant: "destructive",
+    onError: (error: Error) => {
+      toast({ 
+        title: "Couldn't send code", 
+        description: error.message || "Please check your number and try again", 
+        variant: "destructive" 
       });
     },
   });
 
-  const onLoginForm = (data: LoginFormData) => {
-    sendLoginOtpMutation.mutate(data);
-  };
+  const verifyOtpMutation = useMutation({
+    mutationFn: async (otp: string) => {
+      return verifyOtp(phoneNumber, otp);
+    },
+    onSuccess: (data) => {
+      if (data.verified && data.user) {
+        setNewUser(data.user);
+        if (data.isNewUser) {
+          setStep("profile");
+          toast({ title: "Phone verified!", description: "Let's set up your profile" });
+        } else {
+          toast({ 
+            title: "Welcome back!", 
+            description: `Good to see you, ${data.user.fullName || 'friend'}!` 
+          });
+          setLocation(getRedirectPath());
+        }
+      }
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Invalid code", 
+        description: error.message || "Please check and try again", 
+        variant: "destructive" 
+      });
+      otpForm.reset();
+    },
+  });
 
-  const onLoginOtpVerify = (data: OtpFormData) => {
-    if (!otpData?.username || !otpData?.phoneNumber) return;
-    
-    loginMutation.mutate({
-      username: otpData.username,
-      phoneNumber: otpData.phoneNumber,
-      otp: data.otp,
-    });
-  };
+  const profileMutation = useMutation({
+    mutationFn: async (data: { fullName: string; role?: string }) => {
+      if (!newUser) throw new Error("No user");
+      return updateProfile(newUser.id, data);
+    },
+    onSuccess: (user) => {
+      toast({ title: "Welcome to Kontrib!", description: `You're all set, ${user.fullName}!` });
+      setLocation(getRedirectPath());
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Try again", variant: "destructive" });
+    },
+  });
 
-  const onRegister = (data: RegisterFormData) => {
+  const onPhoneSubmit = (data: PhoneFormData) => {
+    setPhoneNumber(data.phoneNumber);
     sendOtpMutation.mutate(data.phoneNumber);
   };
 
-  const onOtpVerify = (data: OtpFormData) => {
-    const registrationData = registerForm.getValues();
-    registerMutation.mutate({
-      ...registrationData,
-      otp: data.otp,
-    });
+  const onOtpSubmit = (data: OtpFormData) => {
+    verifyOtpMutation.mutate(data.otp);
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* Header */}
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col items-start mb-8">
-          <img 
-            src={kontribLogo} 
-            alt="Kontrib" 
-            className="h-10 w-auto object-contain mb-1"
-            data-testid="img-landing-logo"
-          />
-          <p className="text-[13px] text-gray-500">Group Financial Management</p>
-        </div>
+  const onProfileSubmit = (data: ProfileFormData) => {
+    setStep("role");
+    profileForm.setValue("fullName", data.fullName);
+  };
 
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
-          {/* Left side - Features */}
-          <div className="space-y-8">
-            <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                Manage Group Contributions with Transparency
-              </h2>
-              <p className="text-lg text-gray-600 mb-6">
-                A mobile-optimized platform for managing financial contributions in WhatsApp groups with accountability and ease.
+  const selectRole = (role: "member" | "admin") => {
+    const fullName = profileForm.getValues("fullName");
+    profileMutation.mutate({ fullName, role });
+  };
+
+  const handleOtpChange = (index: number, value: string) => {
+    if (!/^\d*$/.test(value)) return;
+    
+    const currentOtp = otpForm.getValues("otp").split("");
+    currentOtp[index] = value.slice(-1);
+    const newOtp = currentOtp.join("").slice(0, 6);
+    otpForm.setValue("otp", newOtp);
+    
+    if (value && index < 5) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
+    
+    if (newOtp.length === 6) {
+      verifyOtpMutation.mutate(newOtp);
+    }
+  };
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === "Backspace" && !otpForm.getValues("otp")[index] && index > 0) {
+      otpInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleOtpPaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    otpForm.setValue("otp", pasted);
+    if (pasted.length === 6) {
+      verifyOtpMutation.mutate(pasted);
+    }
+  };
+
+  useEffect(() => {
+    if (step === "otp") {
+      otpInputRefs.current[0]?.focus();
+    }
+  }, [step]);
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <header className="px-6 py-5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <img src={kontribLogo} alt="Kontrib" className="w-10 h-10" />
+          <span className="text-2xl font-bold text-gray-900">Kontrib</span>
+        </div>
+      </header>
+
+      <main className="flex-1 flex flex-col items-center px-6 pb-8">
+        
+        {step === "phone" && (
+          <div className="w-full max-w-lg text-center pt-8 sm:pt-12 flex-1 flex flex-col">
+            <div className="space-y-6 mb-10">
+              <h1 className="text-4xl sm:text-5xl font-black text-gray-900 leading-tight font-circular">
+                Track Group Money With Ease
+              </h1>
+              <p className="text-gray-600 text-base sm:text-lg max-w-md mx-auto leading-relaxed font-sans">
+                No more "who has paid?" Everyone sees every kobo instantly. Payment proofs, updates, and history – all in one place.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div className="flex items-start space-x-3">
-                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                  <Users className="h-5 w-5 text-green-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">Group Management</h3>
-                  <p className="text-sm text-gray-600">Create and manage multiple contribution groups with shareable links</p>
-                </div>
-              </div>
+            <div className="space-y-4 mb-10">
+              <Form {...phoneForm}>
+                <form onSubmit={phoneForm.handleSubmit(onPhoneSubmit)} className="space-y-4">
+                  <FormField
+                    control={phoneForm.control}
+                    name="phoneNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input 
+                            placeholder="Type in Whatsapp number eg. +2349056783314" 
+                            className="h-14 text-base px-5 rounded-xl border-2 border-gray-200 focus:border-primary bg-white text-center font-medium" 
+                            type="tel"
+                            {...field}
+                            data-testid="input-phone"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <button
+                    type="submit"
+                    disabled={sendOtpMutation.isPending}
+                    className="btn-kontrib w-full rounded-xl px-2"
+                    data-testid="button-continue"
+                  >
+                    {sendOtpMutation.isPending ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <SiWhatsapp className="h-5 w-5" />
+                        Continue with WhatsApp
+                      </>
+                    )}
+                  </button>
+                </form>
+              </Form>
+            </div>
 
-              <div className="flex items-start space-x-3">
-                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <Shield className="h-5 w-5 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">Transparency</h3>
-                  <p className="text-sm text-gray-600">Real-time tracking of contributions and payment status</p>
-                </div>
-              </div>
+            <div className="pt-6 pb-4">
+              <p className="text-gray-500 text-base italic font-sans">"Let's keep it transparent"</p>
+            </div>
 
-              <div className="flex items-start space-x-3">
-                <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                  <Phone className="h-5 w-5 text-yellow-600" />
+            <div className="flex-1 -mx-6 px-6 mt-2">
+              <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide" style={{ scrollSnapType: 'x mandatory' }}>
+                <div className="bg-white rounded-xl p-5 text-left border-2 border-gray-200 relative shadow-sm flex-shrink-0 w-72" style={{ borderLeftColor: 'var(--kontrib-green)', borderLeftWidth: '4px', scrollSnapAlign: 'start' }}>
+                  <div className="absolute top-4 left-4 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                    <User className="h-4 w-4 text-gray-600" />
+                  </div>
+                  <Quote className="h-6 w-6 text-primary/20 absolute top-4 right-4" />
+                  <p className="text-gray-800 text-base font-medium italic leading-relaxed pr-8 pl-10 font-sans">
+                    "Everything just dey flow. No more stress for admin"
+                  </p>
+                  <p className="text-gray-900 text-sm mt-3 font-semibold pl-10 font-sans">Ada, Ajo treasurer</p>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">WhatsApp Integration</h3>
-                  <p className="text-sm text-gray-600">Seamless integration with WhatsApp groups for easy sharing</p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-3">
-                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <TrendingUp className="h-5 w-5 text-purple-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">Financial Tracking</h3>
-                  <p className="text-sm text-gray-600">Comprehensive reporting and contribution history</p>
+                
+                <div className="bg-white rounded-xl p-5 text-left border-2 border-gray-200 relative shadow-sm flex-shrink-0 w-72" style={{ borderLeftColor: 'var(--kontrib-green)', borderLeftWidth: '4px', scrollSnapAlign: 'start' }}>
+                  <div className="absolute top-4 left-4 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                    <User className="h-4 w-4 text-gray-600" />
+                  </div>
+                  <Quote className="h-6 w-6 text-primary/20 absolute top-4 right-4" />
+                  <p className="text-gray-800 text-base font-medium italic leading-relaxed pr-8 pl-10 font-sans">
+                    "This tracker is brilliant! My Whatsapp group loves it"
+                  </p>
+                  <p className="text-gray-900 text-sm mt-3 font-semibold pl-10 font-sans">Ayo, Delta FC Admin</p>
                 </div>
               </div>
             </div>
           </div>
+        )}
 
-          {/* Right side - Auth Forms */}
-          <div className="max-w-md mx-auto w-full">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-center">Access Your Account</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "login" | "register")}>
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="login">Login</TabsTrigger>
-                    <TabsTrigger value="register">Sign Up</TabsTrigger>
-                  </TabsList>
+        {step === "otp" && (
+          <div className="w-full max-w-md pt-12">
+            <button
+              onClick={() => {
+                setStep("phone");
+                otpForm.reset();
+                setDevOtp(null);
+              }}
+              className="flex items-center gap-2 text-gray-500 hover:text-primary mb-8 transition-colors"
+              data-testid="button-back-phone"
+            >
+              <ArrowRight className="h-4 w-4 rotate-180" />
+              <span className="text-sm font-medium">Back</span>
+            </button>
+            
+            <div className="space-y-8">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Lock className="h-8 w-8 text-primary" />
+                </div>
+                <h2 className="text-3xl font-black text-gray-900">
+                  Enter the code
+                </h2>
+                <p className="text-gray-500 mt-3 text-lg">
+                  We sent a 6-digit code to<br />
+                  <span className="font-semibold text-gray-700">{phoneNumber}</span>
+                </p>
+              </div>
 
-                  <TabsContent value="login">
-                    {loginStep === "form" && (
-                      <Form {...loginForm}>
-                        <form onSubmit={loginForm.handleSubmit(onLoginForm)} className="space-y-4">
-                          <FormField
-                            control={loginForm.control}
-                            name="username"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Username</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="Enter your username" {...field} data-testid="login-input-username" />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
+              {devOtp && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-center">
+                  <p className="text-sm text-yellow-800">
+                    Development mode: <span className="font-bold tracking-wider">{devOtp}</span>
+                  </p>
+                </div>
+              )}
 
-                          <FormField
-                            control={loginForm.control}
-                            name="phoneNumber"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>WhatsApp Phone Number</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="e.g., +2348012345678, +1234567890, +441234567890" {...field} data-testid="login-input-phone" />
-                                </FormControl>
-                                <FormMessage />
-                                <p className="text-xs text-gray-500 mt-1">
-                                  We'll send an OTP to this number via WhatsApp for verification
-                                </p>
-                              </FormItem>
-                            )}
-                          />
-
-                          <Button 
-                            type="submit" 
-                            className="w-full bg-nigerian-green hover:bg-forest-green"
-                            disabled={sendLoginOtpMutation.isPending}
-                            data-testid="send-login-otp"
-                          >
-                            {sendLoginOtpMutation.isPending ? (
-                              "Sending OTP..."
-                            ) : (
-                              <>
-                                <MessageSquare className="h-4 w-4 mr-2" />
-                                Send OTP via WhatsApp
-                              </>
-                            )}
-                          </Button>
-                        </form>
-                      </Form>
+              <Form {...otpForm}>
+                <form onSubmit={otpForm.handleSubmit(onOtpSubmit)} className="space-y-6">
+                  <div className="flex justify-center gap-3" onPaste={handleOtpPaste}>
+                    {[0, 1, 2, 3, 4, 5].map((index) => (
+                      <input
+                        key={index}
+                        ref={(el) => (otpInputRefs.current[index] = el)}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={1}
+                        className="w-12 h-14 text-center text-2xl font-bold border-2 border-gray-200 rounded-xl focus:border-primary focus:outline-none bg-white"
+                        value={otpForm.watch("otp")[index] || ""}
+                        onChange={(e) => handleOtpChange(index, e.target.value)}
+                        onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                        disabled={verifyOtpMutation.isPending}
+                        data-testid={`input-otp-${index}`}
+                      />
+                    ))}
+                  </div>
+                  
+                  <button
+                    type="submit"
+                    disabled={verifyOtpMutation.isPending || otpForm.watch("otp").length < 6}
+                    className="btn-kontrib w-full rounded-xl"
+                    data-testid="button-verify-otp"
+                  >
+                    {verifyOtpMutation.isPending ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        Verify Code
+                        <ArrowRight className="h-5 w-5" />
+                      </>
                     )}
+                  </button>
+                </form>
+              </Form>
 
-                    {loginStep === "otp-verification" && (
-                      <div className="space-y-4">
-                        <div className="text-center mb-6">
-                          <h3 className="text-lg font-semibold text-gray-900">Verify Login</h3>
-                          <p className="text-sm text-gray-600 mt-1">
-                            Enter the 6-digit code sent to {otpData?.phoneNumber}
-                          </p>
-                        </div>
-                        
-                        <Form {...otpForm}>
-                          <form onSubmit={otpForm.handleSubmit(onLoginOtpVerify)} className="space-y-4">
-                            <FormField
-                              control={otpForm.control}
-                              name="otp"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Verification Code</FormLabel>
-                                  <FormControl>
-                                    <Input 
-                                      placeholder="Enter 6-digit code" 
-                                      {...field} 
-                                      maxLength={6}
-                                      className="text-center text-2xl tracking-widest"
-                                      data-testid="login-input-otp"
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-
-                            <Button 
-                              type="submit" 
-                              className="w-full bg-nigerian-green hover:bg-forest-green"
-                              disabled={loginMutation.isPending}
-                              data-testid="verify-login-otp"
-                            >
-                              {loginMutation.isPending ? "Logging in..." : "Verify & Login"}
-                            </Button>
-                            
-                            <div className="flex justify-between items-center text-sm">
-                              <Button 
-                                type="button"
-                                variant="ghost" 
-                                onClick={() => {
-                                  setLoginStep("form");
-                                  otpForm.reset();
-                                }}
-                                data-testid="back-to-login-form"
-                              >
-                                ← Back to Login
-                              </Button>
-                              <Button 
-                                type="button"
-                                variant="link" 
-                                onClick={() => {
-                                  if (otpData?.username && otpData?.phoneNumber) {
-                                    sendLoginOtpMutation.mutate({
-                                      username: otpData.username,
-                                      phoneNumber: otpData.phoneNumber
-                                    });
-                                  }
-                                }}
-                                disabled={sendLoginOtpMutation.isPending}
-                                data-testid="resend-login-otp"
-                              >
-                                Resend Code
-                              </Button>
-                            </div>
-                          </form>
-                        </Form>
-                      </div>
-                    )}
-                  </TabsContent>
-
-                  <TabsContent value="register">
-                    {registrationStep === "form" && (
-                      <div className="space-y-4">
-                        <Form {...registerForm}>
-                          <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-4">
-                            <FormField
-                              control={registerForm.control}
-                              name="fullName"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Full Name</FormLabel>
-                                  <FormControl>
-                                    <Input placeholder="Enter your full name" {...field} data-testid="input-fullname" />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-
-                            <FormField
-                              control={registerForm.control}
-                              name="username"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Username (WhatsApp Nickname)</FormLabel>
-                                  <FormControl>
-                                    <Input placeholder="Your WhatsApp nickname" {...field} data-testid="input-username" />
-                                  </FormControl>
-                                  <FormMessage />
-                                  <p className="text-xs text-gray-500 mt-1">
-                                    Use the same name you have in WhatsApp groups
-                                  </p>
-                                </FormItem>
-                              )}
-                            />
-
-                            <FormField
-                              control={registerForm.control}
-                              name="phoneNumber"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>WhatsApp Phone Number</FormLabel>
-                                  <FormControl>
-                                    <Input placeholder="e.g., +2348012345678, +1234567890, +441234567890" {...field} data-testid="input-phone" />
-                                  </FormControl>
-                                  <FormMessage />
-                                  <p className="text-xs text-gray-500 mt-1">
-                                    We'll send an OTP to this number via WhatsApp for verification
-                                  </p>
-                                </FormItem>
-                              )}
-                            />
-
-                            <FormField
-                              control={registerForm.control}
-                              name="role"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Account Type</FormLabel>
-                                  <Select onValueChange={field.onChange} defaultValue={field.value} data-testid="select-role">
-                                    <FormControl>
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Select your account type" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      <SelectItem value="member">
-                                        <div className="flex items-center space-x-2">
-                                          <Users className="h-4 w-4" />
-                                          <div>
-                                            <p className="font-medium">Group Member</p>
-                                            <p className="text-xs text-gray-500">Join groups and make contributions</p>
-                                          </div>
-                                        </div>
-                                      </SelectItem>
-                                      <SelectItem value="admin">
-                                        <div className="flex items-center space-x-2">
-                                          <Shield className="h-4 w-4" />
-                                          <div>
-                                            <p className="font-medium">Group Admin</p>
-                                            <p className="text-xs text-gray-500">Create and manage contribution groups</p>
-                                          </div>
-                                        </div>
-                                      </SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-
-                            <Button 
-                              type="submit" 
-                              className="w-full bg-nigerian-green hover:bg-forest-green"
-                              disabled={sendOtpMutation.isPending}
-                              data-testid="send-otp"
-                            >
-                              {sendOtpMutation.isPending ? (
-                                "Sending OTP..."
-                              ) : (
-                                <>
-                                  <Phone className="h-4 w-4 mr-2" />
-                                  Send OTP via WhatsApp
-                                </>
-                              )}
-                            </Button>
-                          </form>
-                        </Form>
-                      </div>
-                    )}
-
-                    {registrationStep === "otp-verification" && (
-                      <div className="space-y-4">
-                        <div className="text-center mb-6">
-                          <h3 className="text-lg font-semibold text-gray-900">Verify Your Phone</h3>
-                          <p className="text-sm text-gray-600 mt-1">
-                            Enter the 6-digit code sent to {otpData?.phoneNumber}
-                          </p>
-                        </div>
-                        
-                        <Form {...otpForm}>
-                          <form onSubmit={otpForm.handleSubmit(onOtpVerify)} className="space-y-4">
-                            <FormField
-                              control={otpForm.control}
-                              name="otp"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Verification Code</FormLabel>
-                                  <FormControl>
-                                    <Input 
-                                      placeholder="Enter 6-digit code" 
-                                      {...field} 
-                                      maxLength={6}
-                                      className="text-center text-2xl tracking-widest"
-                                      data-testid="input-otp"
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-
-                            <Button 
-                              type="submit" 
-                              className="w-full bg-nigerian-green hover:bg-forest-green"
-                              disabled={registerMutation.isPending}
-                              data-testid="verify-otp"
-                            >
-                              {registerMutation.isPending ? "Creating Account..." : "Verify & Create Account"}
-                            </Button>
-                            
-                            <div className="flex justify-between items-center text-sm">
-                              <Button 
-                                type="button"
-                                variant="ghost" 
-                                onClick={() => setRegistrationStep("form")}
-                                data-testid="back-to-form"
-                              >
-                                ← Back to Form
-                              </Button>
-                              <Button 
-                                type="button"
-                                variant="link" 
-                                onClick={() => sendOtpMutation.mutate(otpData?.phoneNumber || "")}
-                                disabled={sendOtpMutation.isPending}
-                                data-testid="resend-otp"
-                              >
-                                Resend Code
-                              </Button>
-                            </div>
-                          </form>
-                        </Form>
-                      </div>
-                    )}
-
-                    {registrationStep === "success" && (
-                      <div className="space-y-4">
-                        <div className="text-center mb-6">
-                          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <CheckCircle className="h-8 w-8 text-green-600" />
-                          </div>
-                          <h3 className="text-lg font-semibold text-gray-900">Account Created!</h3>
-                          <p className="text-sm text-gray-600 mt-1">
-                            Your account has been created successfully with OTP verification
-                          </p>
-                        </div>
-
-                        <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                          <div>
-                            <label className="text-xs text-gray-500 uppercase tracking-wide">Full Name</label>
-                            <p className="font-medium">{newUser?.fullName}</p>
-                          </div>
-                          <div>
-                            <label className="text-xs text-gray-500 uppercase tracking-wide">Username</label>
-                            <p className="font-medium">{newUser?.username}</p>
-                          </div>
-                          <div>
-                            <label className="text-xs text-gray-500 uppercase tracking-wide">WhatsApp Number</label>
-                            <p className="font-medium">{newUser?.phoneNumber}</p>
-                          </div>
-                        </div>
-
-                        <Button 
-                          onClick={() => {
-                            setCurrentUser(newUser);
-                            setLocation("/member");
-                          }} 
-                          className="w-full bg-nigerian-green hover:bg-forest-green"
-                          data-testid="go-to-dashboard"
-                        >
-                          Continue to Dashboard
-                        </Button>
-                      </div>
-                    )}
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
+              <div className="text-center">
+                <button
+                  onClick={() => sendOtpMutation.mutate(phoneNumber)}
+                  disabled={sendOtpMutation.isPending}
+                  className="text-primary font-medium hover:underline disabled:opacity-50"
+                  data-testid="button-resend-otp"
+                >
+                  {sendOtpMutation.isPending ? "Sending..." : "Didn't get it? Send again"}
+                </button>
+              </div>
+            </div>
           </div>
+        )}
+
+        {step === "profile" && (
+          <div className="w-full max-w-md pt-12">
+            <button
+              onClick={() => setStep("otp")}
+              className="flex items-center gap-2 text-gray-500 hover:text-primary mb-8 transition-colors"
+              data-testid="button-back-otp"
+            >
+              <ArrowRight className="h-4 w-4 rotate-180" />
+              <span className="text-sm font-medium">Back</span>
+            </button>
+            
+            <div className="space-y-8">
+              <div>
+                <h2 className="text-3xl font-black text-gray-900">
+                  What's your name?
+                </h2>
+                <p className="text-gray-500 mt-3 text-lg">So your group members can recognize you</p>
+              </div>
+
+              <Form {...profileForm}>
+                <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-5">
+                  <FormField
+                    control={profileForm.control}
+                    name="fullName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input 
+                            placeholder="Your full name" 
+                            className="h-14 text-lg rounded-xl border-2 border-gray-200 focus:border-primary px-5 bg-white" 
+                            autoFocus
+                            {...field}
+                            data-testid="input-fullname"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <button
+                    type="submit"
+                    className="btn-kontrib w-full rounded-xl"
+                    data-testid="button-next"
+                  >
+                    Continue
+                    <ArrowRight className="h-5 w-5" />
+                  </button>
+                </form>
+              </Form>
+            </div>
+          </div>
+        )}
+
+        {step === "role" && (
+          <div className="w-full max-w-md pt-12">
+            <button
+              onClick={() => setStep("profile")}
+              disabled={profileMutation.isPending}
+              className="flex items-center gap-2 text-gray-500 hover:text-primary mb-8 transition-colors disabled:opacity-50"
+              data-testid="button-back-profile"
+            >
+              <ArrowRight className="h-4 w-4 rotate-180" />
+              <span className="text-sm font-medium">Back</span>
+            </button>
+            
+            <div className="space-y-8">
+              <div>
+                <h2 className="text-3xl font-black text-gray-900">
+                  What do you want to do?
+                </h2>
+                <p className="text-gray-500 mt-3 text-lg">You can change this later</p>
+              </div>
+
+              <div className="space-y-4">
+                <button
+                  onClick={() => selectRole("member")}
+                  disabled={profileMutation.isPending}
+                  className="w-full bg-white border-2 border-gray-200 hover:border-primary hover:shadow-md rounded-xl p-5 text-left transition-all active:scale-[0.98] disabled:opacity-50"
+                  data-testid="button-role-member"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Users className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-900 text-lg">Join Groups</p>
+                      <p className="text-gray-500 mt-1">Contribute to groups, track your payments</p>
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => selectRole("admin")}
+                  disabled={profileMutation.isPending}
+                  className="w-full bg-white border-2 border-gray-200 hover:border-primary hover:shadow-md rounded-xl p-5 text-left transition-all active:scale-[0.98] disabled:opacity-50"
+                  data-testid="button-role-admin"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Shield className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-900 text-lg">Create Groups</p>
+                      <p className="text-gray-500 mt-1">Manage contributions, approve payments</p>
+                    </div>
+                  </div>
+                </button>
+              </div>
+
+              {profileMutation.isPending && (
+                <div className="flex items-center justify-center gap-3 text-primary py-4">
+                  <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                  <span className="font-medium">Setting up your account...</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </main>
+
+      <footer className="px-6 py-4 border-t border-gray-200 bg-white">
+        <div className="flex items-center justify-between text-sm font-sans">
+          <span className="text-kontrib-green font-semibold">kontrib.app</span>
+          <span className="text-gray-500">2025 Kontrib - VibeCore Labs</span>
         </div>
-      </div>
+      </footer>
     </div>
   );
 }

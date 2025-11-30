@@ -30,29 +30,51 @@ export default function WhatsAppIntegration() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   const { data: groups = [] } = useQuery<Group[]>({
-    queryKey: ["/api/groups", user?.role === "admin" ? "admin" : "user", user?.id],
+    queryKey: [`/api/groups/all/${user?.id}`],
     enabled: !!user,
   });
 
   const { data: projects = [] } = useQuery<Project[]>({
-    queryKey: ["/api/groups", selectedGroup?.id, "projects"],
+    queryKey: [`/api/groups/${selectedGroup?.id}/projects`],
     enabled: !!selectedGroup,
   });
 
   const { data: contributions = [] } = useQuery<ContributionWithDetails[]>({
-    queryKey: ["/api/contributions", user?.role === "admin" ? "admin" : "user", user?.id],
+    queryKey: [`/api/contributions/user/${user?.id}`],
     enabled: !!user,
   });
 
+  const generateProjectSlug = (name: string) => {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '')
+      .slice(0, 50);
+  };
+
+  const generateJoinLink = (group: Group, project?: Project) => {
+    const baseUrl = "kontrib.app";
+    const groupSlug = group.customSlug || group.registrationLink;
+    if (project) {
+      return `${baseUrl}/join/${groupSlug}/${generateProjectSlug(project.name)}`;
+    }
+    return `${baseUrl}/join/${groupSlug}`;
+  };
+
   const generateWhatsAppLink = (group: Group, project?: Project) => {
-    const baseUrl = window.location.origin;
-    const groupUrl = project 
-      ? `${baseUrl}/${group.customSlug}/${project.customSlug?.split('/')[1] || project.name.toLowerCase().replace(/\s+/g, '')}`
-      : `${baseUrl}/register/${group.registrationLink}`;
+    const joinLink = generateJoinLink(group, project);
     
-    const message = project 
-      ? `🎯 *${project.name}* - Kontrib\n\n💰 Target: ${formatNaira(Number(project.targetAmount))}\n📈 Progress: ${project.collectedAmount ? Math.round((Number(project.collectedAmount) / Number(project.targetAmount)) * 100) : 0}%\n📅 Deadline: ${new Date(project.deadline || '').toLocaleDateString()}\n\n👥 Join our contribution group and track progress together!\n\n🔗 ${groupUrl}\n\n#Kontrib #GroupContributions #${group.name.replace(/\s+/g, '')}`
-      : `🎉 Join "${group.name}" on Kontrib!\n\nManage group contributions with transparency and ease.\n\n👉 Register here: ${groupUrl}\n\n#Kontrib #GroupContributions`;
+    let message = `${joinLink}\n\n`;
+    message += `You have been invited to join ${group.name} on Kontrib!\n\n`;
+    
+    if (project) {
+      message += `Login to submit your contributions to ${project.name}\n\n`;
+    } else {
+      message += `Login to submit your contributions\n\n`;
+    }
+    
+    message += `Let's keep it transparent\n\n`;
+    message += `Kontrib.app`;
     
     return `https://wa.me/?text=${encodeURIComponent(message)}`;
   };
@@ -196,43 +218,41 @@ export default function WhatsAppIntegration() {
 
             {/* WhatsApp Preview Card */}
             {selectedGroup && (
-              <Card className="border-2 border-green-200 dark:border-green-800">
+              <Card className="border-2 border-primary/30">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                  <CardTitle className="flex items-center gap-2 text-primary">
                     <MessageCircle className="h-5 w-5" />
-                    WhatsApp Preview
+                    WhatsApp Message Preview
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Preview of the message */}
-                  <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
-                    <div className="space-y-2 text-sm">
+                  {/* Preview of the message - styled like WhatsApp */}
+                  <div className="bg-[#dcf8c6] p-4 rounded-lg border border-green-200 shadow-sm">
+                    <div className="space-y-3 text-sm text-gray-800">
+                      {/* Join Link */}
+                      <p className="text-blue-600 font-medium">
+                        {generateJoinLink(selectedGroup, selectedProject || undefined)}
+                      </p>
+                      
+                      {/* Invitation */}
+                      <p>
+                        You have been invited to join <span className="font-semibold">{selectedGroup.name}</span> on Kontrib!
+                      </p>
+                      
+                      {/* Call to action */}
                       {selectedProject ? (
-                        <>
-                          <div className="font-semibold">🎯 {selectedProject.name} - Kontrib</div>
-                          <div>💰 Target: {formatNaira(Number(selectedProject.targetAmount))}</div>
-                          <div>📈 Progress: {Math.round((Number(selectedProject.collectedAmount) / Number(selectedProject.targetAmount)) * 100)}%</div>
-                          <div>📅 Deadline: {new Date(selectedProject.deadline || '').toLocaleDateString()}</div>
-                          <div className="pt-2">👥 Join our contribution group and track progress together!</div>
-                          <div className="text-blue-600 dark:text-blue-400">
-                            🔗 {window.location.origin}/{selectedGroup.customSlug}/{selectedProject.customSlug?.split('/')[1] || selectedProject.name.toLowerCase().replace(/\s+/g, '')}
-                          </div>
-                          <div className="text-gray-500 text-xs">
-                            #Kontrib #GroupContributions #{selectedGroup.name.replace(/\s+/g, '')}
-                          </div>
-                        </>
+                        <p>
+                          Login to submit your contributions to <span className="font-semibold">{selectedProject.name}</span>
+                        </p>
                       ) : (
-                        <>
-                          <div className="font-semibold">🎉 Join "{selectedGroup.name}" on Kontrib!</div>
-                          <div className="pt-2">Manage group contributions with transparency and ease.</div>
-                          <div className="text-blue-600 dark:text-blue-400">
-                            🔗 {window.location.origin}/register/{selectedGroup.registrationLink}
-                          </div>
-                          <div className="text-gray-500 text-xs">
-                            #Kontrib #GroupContributions
-                          </div>
-                        </>
+                        <p>Login to submit your contributions</p>
                       )}
+                      
+                      {/* Tagline */}
+                      <p className="italic text-gray-600">Let's keep it transparent</p>
+                      
+                      {/* Brand */}
+                      <p className="font-semibold text-gray-700">Kontrib.app</p>
                     </div>
                   </div>
 
@@ -240,7 +260,7 @@ export default function WhatsAppIntegration() {
                   <div className="flex flex-wrap gap-2">
                     <Button
                       onClick={() => openWhatsApp(generateWhatsAppLink(selectedGroup, selectedProject || undefined))}
-                      className="bg-green-600 hover:bg-green-700 text-white"
+                      className="btn-kontrib flex-1"
                       data-testid="share-whatsapp"
                     >
                       <MessageCircle className="h-4 w-4 mr-2" />
@@ -249,28 +269,13 @@ export default function WhatsAppIntegration() {
                     <Button
                       variant="outline"
                       onClick={() => {
-                        const url = selectedProject 
-                          ? `${window.location.origin}/${selectedGroup.customSlug}/${selectedProject.customSlug?.split('/')[1] || selectedProject.name.toLowerCase().replace(/\s+/g, '')}`
-                          : `${window.location.origin}/register/${selectedGroup.registrationLink}`;
-                        copyToClipboard(url);
+                        const joinLink = generateJoinLink(selectedGroup, selectedProject || undefined);
+                        copyToClipboard(`https://${joinLink}`);
                       }}
                       data-testid="copy-link"
                     >
                       <Copy className="h-4 w-4 mr-2" />
                       Copy Link
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        const url = selectedProject 
-                          ? `${window.location.origin}/${selectedGroup.customSlug}/${selectedProject.customSlug?.split('/')[1] || selectedProject.name.toLowerCase().replace(/\s+/g, '')}`
-                          : `${window.location.origin}/register/${selectedGroup.registrationLink}`;
-                        window.open(url, '_blank');
-                      }}
-                      data-testid="open-link"
-                    >
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      Open Link
                     </Button>
                   </div>
                 </CardContent>

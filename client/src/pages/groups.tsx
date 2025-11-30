@@ -1,132 +1,112 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLocation } from "wouter";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Navigation } from "@/components/navigation";
 import { CreateGroupModal } from "@/components/create-group-modal";
-import { CreateProjectModal } from "@/components/create-project-modal";
-import { GroupCard } from "@/components/group-card";
-import { ProjectCard } from "@/components/project-card";
-import { ShareableLinkDisplay, CopyLinkButton } from "@/components/copy-link-button";
 import { 
   Users, 
   Plus, 
   Search,
-  FolderPlus,
-  ChevronDown,
-  ChevronUp,
-  Settings,
-  Target,
-  Calendar,
-  MessageCircle,
-  UserPlus,
-  Eye,
-  UserCheck
+  ChevronRight,
+  FolderKanban,
+  Shield,
+  UserCheck,
+  CreditCard,
+  Bell,
 } from "lucide-react";
-import { getCurrentUser, isAdmin } from "@/lib/auth";
-import { formatNaira } from "@/lib/currency";
-import { useToast } from "@/hooks/use-toast";
-import type { Group, Project } from "@shared/schema";
+import { getCurrentUser } from "@/lib/auth";
+import type { GroupWithRole } from "@shared/schema";
+
+type FilterType = 'all' | 'admin' | 'member';
 
 export default function Groups() {
   const user = getCurrentUser();
-  const userIsAdmin = isAdmin();
-  const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [createGroupModalOpen, setCreateGroupModalOpen] = useState(false);
-  const [createProjectModalOpen, setCreateProjectModalOpen] = useState(false);
-  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState("");
+  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
 
-  // Fetch groups based on user role
-  const { data: groups = [], isLoading } = useQuery<any[]>({
-    queryKey: userIsAdmin ? ["/api/groups", "admin", user?.id] : ["/api/groups", "user", user?.id],
+  const { data: groups = [], isLoading } = useQuery<GroupWithRole[]>({
+    queryKey: ["/api/groups", "all", user?.id],
     enabled: !!user,
   });
 
-  // Extract groups for member data structure
-  const actualGroups = userIsAdmin ? groups : groups.map(membership => membership.group);
-
-  // Filter groups based on search
-  const filteredGroups = actualGroups.filter((group) =>
-    group.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    group.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Hook to fetch projects for a specific group
-  const useGroupProjects = (groupId: string) => {
-    return useQuery<Project[]>({
-      queryKey: ["/api/groups", groupId, "projects"],
-      enabled: !!groupId && expandedGroups.has(groupId),
+  const filteredGroups = groups
+    .filter((group) => group.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    .filter((group) => {
+      if (activeFilter === 'all') return true;
+      if (activeFilter === 'admin') return group.role === 'admin' || group.role === 'both';
+      if (activeFilter === 'member') return group.role === 'member' || group.role === 'both';
+      return true;
     });
-  };
 
-  // Hook to fetch members for a specific group
-  const useGroupMembers = (groupId: string) => {
-    return useQuery<any[]>({
-      queryKey: ["/api/groups", groupId, "members"],
-      enabled: !!groupId && expandedGroups.has(groupId),
-    });
-  };
+  const adminCount = groups.filter(g => g.role === 'admin' || g.role === 'both').length;
+  const memberCount = groups.filter(g => g.role === 'member' || g.role === 'both').length;
 
-  const toggleGroupExpansion = (groupId: string) => {
-    const newExpanded = new Set(expandedGroups);
-    if (newExpanded.has(groupId)) {
-      newExpanded.delete(groupId);
-    } else {
-      newExpanded.add(groupId);
+  const getRoleBadges = (role: 'admin' | 'member' | 'both') => {
+    if (role === 'both') {
+      return (
+        <div className="flex gap-1">
+          <Badge className="bg-green-100 text-green-700 text-xs px-2 py-0.5">
+            <Shield className="h-3 w-3 mr-1" />
+            Admin
+          </Badge>
+          <Badge className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5">
+            <UserCheck className="h-3 w-3 mr-1" />
+            Member
+          </Badge>
+        </div>
+      );
     }
-    setExpandedGroups(newExpanded);
+    if (role === 'admin') {
+      return (
+        <Badge className="bg-green-100 text-green-700 text-xs px-2 py-0.5">
+          <Shield className="h-3 w-3 mr-1" />
+          Admin
+        </Badge>
+      );
+    }
+    return (
+      <Badge className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5">
+        <UserCheck className="h-3 w-3 mr-1" />
+        Member
+      </Badge>
+    );
   };
 
-  const handleCreateProject = (group: Group) => {
-    setSelectedGroup(group);
-    setCreateProjectModalOpen(true);
-  };
-
-  const handleManageGroup = (group: Group) => {
-    // TODO: Implement group management
-    toast({
-      title: "Group Management",
-      description: "Group management features coming soon!",
-    });
-  };
-
-  const handleContributeToProject = (project: Project) => {
-    // Navigate to make payment page with project pre-selected
-    window.location.href = "/make-payment";
-  };
-
-  const handleViewMembers = (group: Group) => {
-    // Toggle group expansion to show members
-    toggleGroupExpansion(group.id);
-  };
-
-  const handleShareGroup = (group: any) => {
-    const shareUrl = `${window.location.origin}/${group.customSlug || group.registrationLink}`;
-    
-    // WhatsApp-specific share (opens WhatsApp directly with pre-filled message)
-    const shareText = `🎯 You're invited to join "${group.name}" on Kontrib!\n\n💰 Manage contributions with transparency and ease.\n\n${shareUrl}`;
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
-    
-    // Open WhatsApp directly instead of using navigator.share
-    // This ensures the URL is in the message where WhatsApp can detect it
-    window.open(whatsappUrl, '_blank');
+  const getActionButton = (group: GroupWithRole) => {
+    if (group.role === 'admin' || group.role === 'both') {
+      if (group.pendingApprovals && group.pendingApprovals > 0) {
+        return (
+          <div className="flex items-center gap-1 text-orange-600 text-sm font-medium">
+            <Bell className="h-4 w-4" />
+            {group.pendingApprovals} pending
+          </div>
+        );
+      }
+      return (
+        <span className="text-sm text-gray-500">Manage</span>
+      );
+    }
+    return (
+      <div className="flex items-center gap-1 text-primary text-sm font-medium">
+        <CreditCard className="h-4 w-4" />
+        Submit a Payment
+      </div>
+    );
   };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="min-h-screen bg-gray-50">
         <Navigation />
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="animate-pulse space-y-6">
-            <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-xl"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="h-48 bg-gray-200 dark:bg-gray-700 rounded-xl"></div>
-              ))}
-            </div>
+        <div className="max-w-lg mx-auto px-4 py-6">
+          <div className="flex items-center justify-center py-12">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-solid border-green-600 border-r-transparent"></div>
           </div>
         </div>
       </div>
@@ -134,416 +114,184 @@ export default function Groups() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20 sm:pb-0">
+    <div className="min-h-screen bg-gray-50 pb-24 sm:pb-8">
       <Navigation />
-      
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-                {userIsAdmin ? "My Groups" : "Groups"}
-              </h1>
-              <p className="text-gray-600 dark:text-gray-300">
-                {userIsAdmin 
-                  ? "Manage your contribution groups and track member progress."
-                  : "View and contribute to your active groups."
-                }
-              </p>
-            </div>
-            {userIsAdmin && (
-              <Button 
-                onClick={() => setCreateGroupModalOpen(true)}
-                className="mt-4 sm:mt-0 bg-nigerian-green hover:bg-forest-green"
-                data-testid="create-group-button"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create Group
-              </Button>
-            )}
+
+      <main className="max-w-lg mx-auto px-4 py-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900" data-testid="text-page-title">
+              My Groups
+            </h1>
+            <p className="text-gray-500">All your groups in one place</p>
           </div>
+          <button
+            onClick={() => setCreateGroupModalOpen(true)}
+            className="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white shadow-lg hover:bg-primary/90 transition-colors"
+            data-testid="button-create-group-fab"
+          >
+            <Plus className="h-6 w-6" />
+          </button>
         </div>
 
-        {/* Search */}
-        <Card className="mb-6">
-          <CardContent className="p-4">
+        {groups.length > 0 && (
+          <>
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              <button
+                onClick={() => setActiveFilter('all')}
+                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                  activeFilter === 'all'
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-white text-gray-600 border border-gray-200'
+                }`}
+                data-testid="filter-all"
+              >
+                All ({groups.length})
+              </button>
+              <button
+                onClick={() => setActiveFilter('admin')}
+                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                  activeFilter === 'admin'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-white text-gray-600 border border-gray-200'
+                }`}
+                data-testid="filter-admin"
+              >
+                <Shield className="h-3 w-3 inline mr-1" />
+                Admin ({adminCount})
+              </button>
+              <button
+                onClick={() => setActiveFilter('member')}
+                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                  activeFilter === 'member'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-600 border border-gray-200'
+                }`}
+                data-testid="filter-member"
+              >
+                <UserCheck className="h-3 w-3 inline mr-1" />
+                Member ({memberCount})
+              </button>
+            </div>
+
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search groups by name or description..."
+                placeholder="Search groups..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-                data-testid="search-groups"
+                className="pl-10 bg-white"
+                data-testid="input-search-groups"
               />
             </div>
-          </CardContent>
-        </Card>
+          </>
+        )}
 
-        {/* Groups Grid */}
         {filteredGroups.length === 0 ? (
-          <Card>
-            <CardContent className="text-center py-12">
-              {actualGroups.length === 0 ? (
+          <Card className="border-2 border-dashed border-gray-300">
+            <CardContent className="py-12 text-center">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Users className="h-8 w-8 text-gray-400" />
+              </div>
+              {groups.length === 0 ? (
                 <>
-                  <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">
-                    {userIsAdmin ? "No Groups Created" : "No Groups Joined"}
+                  <h3 className="text-lg font-bold text-gray-900 mb-2" data-testid="text-empty-state">
+                    No groups yet
                   </h3>
-                  <p className="text-gray-600 dark:text-gray-300 mb-6">
-                    {userIsAdmin 
-                      ? "Create your first group to start collecting contributions from members."
-                      : "You haven't joined any contribution groups yet. Ask a group admin for an invitation link."
-                    }
+                  <p className="text-gray-500 mb-6">
+                    Create a group to manage contributions, or ask someone to invite you to theirs
                   </p>
-                  {userIsAdmin && (
-                    <Button 
-                      onClick={() => setCreateGroupModalOpen(true)}
-                      className="bg-nigerian-green hover:bg-forest-green"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Your First Group
-                    </Button>
-                  )}
+                  <Button
+                    onClick={() => setCreateGroupModalOpen(true)}
+                    className="bg-primary hover:bg-primary/90"
+                    data-testid="button-create-first-group"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create First Group
+                  </Button>
                 </>
               ) : (
                 <>
-                  <Search className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">No Results Found</h3>
-                  <p className="text-gray-600 dark:text-gray-300">
-                    No groups match your search criteria.
-                  </p>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">No results found</h3>
+                  <p className="text-gray-500">No groups match your search</p>
                   <Button
                     variant="outline"
-                    onClick={() => setSearchTerm("")}
+                    onClick={() => {
+                      setSearchTerm("");
+                      setActiveFilter('all');
+                    }}
                     className="mt-4"
+                    data-testid="button-clear-search"
                   >
-                    Clear Search
+                    Clear Filters
                   </Button>
                 </>
               )}
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-6">
-            {filteredGroups.map((group) => {
-              // Handle different data structures for admin vs member groups
-              const userContribution = userIsAdmin ? undefined : 
-                groups.find(membership => membership.group?.id === group.id)?.contributedAmount;
-              const isExpanded = expandedGroups.has(group.id);
-              
-              return (
-                <GroupWithProjects 
-                  key={group.id} 
-                  group={group} 
-                  isExpanded={isExpanded}
-                  userContribution={userContribution}
-                />
-              );
-            })}
+          <div className="space-y-3">
+            {filteredGroups.map((group) => (
+              <Card
+                key={group.id}
+                className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all cursor-pointer active:scale-[0.99]"
+                onClick={() => setLocation(`/group/${group.id}`)}
+                data-testid={`group-card-${group.id}`}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+                        group.role === 'admin' || group.role === 'both'
+                          ? 'bg-green-100'
+                          : 'bg-blue-100'
+                      }`}>
+                        <Users className={`h-6 w-6 ${
+                          group.role === 'admin' || group.role === 'both'
+                            ? 'text-green-600'
+                            : 'text-blue-600'
+                        }`} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-bold text-gray-900 truncate" data-testid={`text-group-name-${group.id}`}>
+                          {group.name}
+                        </h3>
+                        {getRoleBadges(group.role)}
+                      </div>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-gray-300 shrink-0 mt-2" />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4 text-sm text-gray-500">
+                      <span className="flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        {group.memberCount}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <FolderKanban className="h-3 w-3" />
+                        {group.projectCount}
+                      </span>
+                    </div>
+                    {getActionButton(group)}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         )}
 
-        {/* Quick Stats Summary */}
-        {actualGroups.length > 0 && (
-          <div className="mt-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>Summary</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-nigerian-green">
-                      {actualGroups.length}
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {userIsAdmin ? "Groups Created" : "Groups Joined"}
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {actualGroups.reduce((sum, group) => sum + (group.memberCount || 0), 0)}
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Total Members</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {actualGroups.reduce((sum, group) => sum + (group.projectCount || 0), 0)}
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Total Projects</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+        {groups.length > 0 && (
+          <div className="text-center text-sm text-gray-500 pt-4">
+            {filteredGroups.length} of {groups.length} {groups.length === 1 ? "group" : "groups"}
           </div>
         )}
-      </div>
+      </main>
 
-      {/* Create Group Modal */}
       <CreateGroupModal
         open={createGroupModalOpen}
         onOpenChange={setCreateGroupModalOpen}
       />
-
-      {/* Create Project Modal */}
-      {selectedGroup && (
-        <CreateProjectModal
-          open={createProjectModalOpen}
-          onOpenChange={setCreateProjectModalOpen}
-          groupId={selectedGroup.id}
-          groupName={selectedGroup.name}
-        />
-      )}
     </div>
   );
-
-  // Component to display group with its projects
-  function GroupWithProjects({ 
-    group, 
-    isExpanded, 
-    userContribution 
-  }: { 
-    group: Group; 
-    isExpanded: boolean; 
-    userContribution?: string;
-  }) {
-    const { data: projects = [], isLoading: projectsLoading } = useGroupProjects(group.id);
-    const { data: members = [], isLoading: membersLoading } = useGroupMembers(group.id);
-
-    return (
-      <Card className="hover:shadow-lg transition-shadow">
-        <CardContent className="p-6">
-          {/* Group Header */}
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex-1">
-              <GroupCard
-                group={group}
-                isAdmin={userIsAdmin}
-                onManage={handleManageGroup}
-                onShare={handleShareGroup}
-                onMakePayment={!userIsAdmin ? () => {} : undefined}
-                userContribution={userContribution}
-              />
-            </div>
-          </div>
-
-          {/* Shareable Link Display for Admins */}
-          {userIsAdmin && (
-            <div className="mb-6">
-              <ShareableLinkDisplay
-                link={`${window.location.origin}/join/${group.registrationLink}`}
-                title="Share Group Link"
-                description="Share this easy-to-remember link with people you want to invite"
-              />
-            </div>
-          )}
-
-          {/* Group Action Buttons */}
-          <div className="flex flex-wrap gap-2 mb-4">
-            {userIsAdmin && (
-              <Button
-                onClick={() => handleCreateProject(group)}
-                variant="outline"
-                size="sm"
-                className="flex-1 min-w-[120px]"
-                data-testid={`create-project-${group.id}`}
-              >
-                <FolderPlus className="h-4 w-4 mr-1" />
-                Add Project
-              </Button>
-            )}
-            
-            <Button
-              onClick={() => toggleGroupExpansion(group.id)}
-              variant="outline"
-              size="sm"
-              className="flex-1 min-w-[120px]"
-              data-testid={`toggle-projects-${group.id}`}
-            >
-              {isExpanded ? (
-                <>
-                  <ChevronUp className="h-4 w-4 mr-1" />
-                  Hide Projects
-                </>
-              ) : (
-                <>
-                  <ChevronDown className="h-4 w-4 mr-1" />
-                  View Projects ({(group as any).projectCount || 0})
-                </>
-              )}
-            </Button>
-
-            {userIsAdmin && (
-              <Button
-                onClick={() => handleViewMembers(group)}
-                variant="outline"
-                size="sm"
-                className="flex-1 min-w-[120px]"
-                data-testid={`view-members-${group.id}`}
-              >
-                <UserCheck className="h-4 w-4 mr-1" />
-                View Members ({(group as any).memberCount || 0})
-              </Button>
-            )}
-
-            <Button
-              onClick={() => handleShareGroup(group)}
-              variant="outline"
-              size="sm"
-              className="flex-1 min-w-[120px]"
-              data-testid={`share-group-${group.id}`}
-            >
-              <MessageCircle className="h-4 w-4 mr-1" />
-              Share Group
-            </Button>
-          </div>
-
-          {/* Expanded Content - Members and Projects */}
-          {isExpanded && (
-            <div className="border-t pt-4 space-y-6">
-              {/* Members Section */}
-              {userIsAdmin && (
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-semibold text-gray-900 dark:text-white flex items-center">
-                      <Users className="h-5 w-5 mr-2 text-nigerian-green" />
-                      Members in {group.name}
-                    </h4>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
-                        {members.length} member{members.length !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  </div>
-
-                  {membersLoading ? (
-                    <div className="flex items-center justify-center py-4">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-nigerian-green"></div>
-                      <span className="ml-2 text-sm text-gray-600">Loading members...</span>
-                    </div>
-                  ) : members.length === 0 ? (
-                    <div className="text-center py-6 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                      <UserPlus className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-600 dark:text-gray-300">
-                        No members have joined this group yet. Share the group link to invite members.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {members.map((member) => (
-                        <Card key={member.id} className="p-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-nigerian-green rounded-full flex items-center justify-center">
-                              <Users className="h-5 w-5 text-white" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-gray-900 dark:text-white truncate">
-                                {member.user?.fullName || 'Unknown Member'}
-                              </p>
-                              <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
-                                @{member.user?.username || 'unknown'}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                Joined {new Date(member.joinedAt).toLocaleDateString()}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-sm font-medium text-nigerian-green">
-                                {formatNaira(member.contributedAmount || "0")}
-                              </p>
-                              <p className="text-xs text-gray-500">contributed</p>
-                            </div>
-                          </div>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Projects Section */}
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="font-semibold text-gray-900 dark:text-white flex items-center">
-                    <Target className="h-5 w-5 mr-2 text-nigerian-green" />
-                    Projects in {group.name}
-                  </h4>
-                  {userIsAdmin && (
-                    <Button
-                      onClick={() => handleCreateProject(group)}
-                      size="sm"
-                      className="bg-nigerian-green hover:bg-forest-green"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      New Project
-                    </Button>
-                  )}
-                </div>
-
-                {projectsLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-nigerian-green"></div>
-                  <span className="ml-2 text-gray-600">Loading projects...</span>
-                </div>
-              ) : projects.length === 0 ? (
-                <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <FolderPlus className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                  <h5 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                    No projects yet
-                  </h5>
-                  <p className="text-gray-600 dark:text-gray-300 mb-4">
-                    {userIsAdmin 
-                      ? "Create your first project to start collecting contributions for specific goals."
-                      : "No projects have been created in this group yet."
-                    }
-                  </p>
-                  {userIsAdmin && (
-                    <Button
-                      onClick={() => handleCreateProject(group)}
-                      className="bg-nigerian-green hover:bg-forest-green"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create First Project
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {projects.map((project) => (
-                    <div key={project.id} className="relative">
-                      <ProjectCard
-                        project={project}
-                        isAdmin={userIsAdmin}
-                        onContribute={handleContributeToProject}
-                      />
-                      {userIsAdmin && (
-                        <div className="absolute top-2 right-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              // TODO: Implement project management
-                              toast({
-                                title: "Project Management",
-                                description: "Project management features coming soon!",
-                              });
-                            }}
-                          >
-                            <Settings className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    );
-  }
 }

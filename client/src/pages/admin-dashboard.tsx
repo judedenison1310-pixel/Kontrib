@@ -1,33 +1,27 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Navigation } from "@/components/navigation";
-import { GroupCard } from "@/components/group-card";
 import { CreateGroupModal } from "@/components/create-group-modal";
 import { CreateProjectModal } from "@/components/create-project-modal";
 import { ManageAccountabilityPartnersModal } from "@/components/manage-accountability-partners-modal";
 import { ProjectCard } from "@/components/project-card";
 import { PaymentModal } from "@/components/payment-modal";
 import { PaymentApprovalModal } from "@/components/payment-approval-modal";
-import { NotificationsPanel } from "@/components/notifications-panel";
+import { StatusBadge, DashboardSkeleton } from "@/components/ui/kontrib-ui";
+import { SiWhatsapp } from "react-icons/si";
 import {
   Plus,
-  DollarSign,
   Users,
   Clock,
-  TrendingUp,
-  Bell,
-  FileText,
-  MessageCircle,
-  ArrowDown,
-  Settings,
   FolderPlus,
   UserCheck,
   CheckCircle,
   XCircle,
+  ChevronRight,
+  ChevronDown,
+  Eye,
+  Wallet,
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { formatNaira } from "@/lib/currency";
@@ -46,8 +40,7 @@ export default function AdminDashboard() {
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [approvalModalOpen, setApprovalModalOpen] = useState(false);
-  const [selectedContribution, setSelectedContribution] =
-    useState<ContributionWithDetails | null>(null);
+  const [selectedContribution, setSelectedContribution] = useState<ContributionWithDetails | null>(null);
 
   const { data: groups = [], isLoading: groupsLoading } = useQuery<Group[]>({
     queryKey: ["/api/groups", "admin", user?.id],
@@ -59,29 +52,18 @@ export default function AdminDashboard() {
     enabled: !!user,
   });
 
-  const { data: recentContributions = [], isLoading: contributionsLoading } =
-    useQuery<ContributionWithDetails[]>({
-      queryKey: ["/api/contributions/admin", user?.id],
-      enabled: !!user,
-    });
+  const { data: recentContributions = [], isLoading: contributionsLoading } = useQuery<ContributionWithDetails[]>({
+    queryKey: ["/api/contributions/admin", user?.id],
+    enabled: !!user,
+  });
+
+  const pendingContributions = recentContributions.filter(c => c.status === "pending");
 
   const handleShareGroup = (group: Group) => {
-    const shareUrl = `${window.location.origin}/${group.customSlug || group.registrationLink}`;
-
-    // WhatsApp-specific share (opens WhatsApp directly with pre-filled message)
-    const shareText = `You're invited to join "${group.name}" on Kontrib!\n\n${shareUrl}`;
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
-
-    // Open WhatsApp directly instead of using navigator.share
-    // This ensures the URL is in the message where WhatsApp can detect it
-    window.open(whatsappUrl, "_blank");
-  };
-
-  const handleManageGroup = (group: Group) => {
-    toast({
-      title: "Feature Coming Soon",
-      description: "Group management features will be available soon.",
-    });
+    const groupSlug = group.customSlug || group.registrationLink;
+    const joinLink = `kontrib.app/join/${groupSlug}`;
+    const shareText = `${joinLink}\n\nYou have been invited to join ${group.name} on Kontrib!\n\nLogin to submit your contributions\n\nLet's keep it transparent\n\nKontrib.app`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, "_blank");
   };
 
   const handleCreateProject = (group: Group) => {
@@ -103,7 +85,6 @@ export default function AdminDashboard() {
     setPaymentModalOpen(true);
   };
 
-  // Hook to fetch projects for a specific group
   const useGroupProjects = (groupId: string) => {
     return useQuery<Project[]>({
       queryKey: ["/api/groups", groupId, "projects"],
@@ -111,97 +92,101 @@ export default function AdminDashboard() {
     });
   };
 
-  // Component to display group with its projects
-  function GroupWithProjects({ group }: { group: Group }) {
-    const { data: projects = [], isLoading: projectsLoading } =
-      useGroupProjects(group.id);
+  function GroupCard({ group }: { group: Group }) {
+    const { data: projects = [], isLoading: projectsLoading } = useGroupProjects(group.id);
     const isExpanded = expandedGroupId === group.id;
 
     return (
-      <div className="space-y-3">
-        <GroupCard
-          group={group}
-          isAdmin={true}
-          onManage={handleManageGroup}
-          onShare={handleShareGroup}
-        />
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+        {/* Group Header */}
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center shrink-0">
+            <Users className="h-6 w-6 text-gray-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-bold text-gray-900 truncate">{group.name}</h3>
+            <p className="text-sm text-gray-500">{group.description || "No description"}</p>
+          </div>
+          <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+            group.status === "active" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"
+          }`}>
+            {group.status}
+          </span>
+        </div>
 
-        {/* Quick Actions for Group */}
-        <div className="grid grid-cols-2 gap-2">
-          <Button
-            onClick={() => handleCreateProject(group)}
-            variant="outline"
-            size="sm"
+        {/* Quick Actions Grid */}
+        <div className="mt-4 grid grid-cols-4 gap-2">
+          <button
+            onClick={() => handleShareGroup(group)}
+            className="flex flex-col items-center gap-1 p-3 rounded-xl bg-[#25D366] text-white hover:bg-[#20bd5a] transition-colors"
+            data-testid={`share-${group.id}`}
           >
-            <FolderPlus className="h-4 w-4 mr-1" />
-            Add Project
-          </Button>
-          <Button
+            <SiWhatsapp className="h-5 w-5" />
+            <span className="text-xs font-medium">Share</span>
+          </button>
+          <button
             onClick={() => setLocation(`/group/${group.id}`)}
-            variant="outline"
-            size="sm"
+            className="flex flex-col items-center gap-1 p-3 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
             data-testid={`view-members-${group.id}`}
           >
-            <Users className="h-4 w-4 mr-1" />
-            View Members
-          </Button>
-          <Button
-            onClick={() => toggleGroupExpansion(group.id)}
-            variant="outline"
-            size="sm"
+            <Eye className="h-5 w-5" />
+            <span className="text-xs font-medium">Members</span>
+          </button>
+          <button
+            onClick={() => handleCreateProject(group)}
+            className="flex flex-col items-center gap-1 p-3 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+            data-testid={`add-project-${group.id}`}
           >
-            <Settings className="h-4 w-4 mr-1" />
-            {isExpanded ? "Hide" : "View"} Projects ({projects.length})
-          </Button>
-          <Button
+            <FolderPlus className="h-5 w-5" />
+            <span className="text-xs font-medium">Project</span>
+          </button>
+          <button
             onClick={() => handleManagePartners(group)}
-            variant="outline"
-            size="sm"
+            className="flex flex-col items-center gap-1 p-3 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+            data-testid={`manage-partners-${group.id}`}
           >
-            <UserCheck className="h-4 w-4 mr-1" />
-            Partners
-          </Button>
+            <UserCheck className="h-5 w-5" />
+            <span className="text-xs font-medium">Partners</span>
+          </button>
         </div>
+
+        {/* Expandable Projects Section */}
+        <button
+          onClick={() => toggleGroupExpansion(group.id)}
+          className="mt-4 w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+          data-testid={`toggle-projects-${group.id}`}
+        >
+          <span>{projects.length} Project{projects.length !== 1 ? "s" : ""}</span>
+          {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </button>
 
         {/* Projects List */}
         {isExpanded && (
-          <div className="ml-4 pl-4 border-l-2 border-gray-200 space-y-3">
+          <div className="mt-3 space-y-3 border-t border-gray-100 pt-4">
             {projectsLoading ? (
-              <div className="text-center py-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-nigerian-green mx-auto"></div>
-                <p className="text-sm text-gray-600 mt-2">
-                  Loading projects...
-                </p>
+              <div className="flex justify-center py-4">
+                <div className="w-6 h-6 border-2 border-gray-200 border-t-primary rounded-full animate-spin" />
               </div>
             ) : projects.length === 0 ? (
-              <div className="text-center py-6 bg-gray-50 rounded-lg">
-                <FolderPlus className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-sm text-gray-600 mb-3">
-                  No projects yet in this group
-                </p>
-                <Button
+              <div className="text-center py-4">
+                <FolderPlus className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">No projects yet</p>
+                <button
                   onClick={() => handleCreateProject(group)}
-                  size="sm"
-                  className="bg-nigerian-green hover:bg-forest-green"
+                  className="mt-2 text-primary text-sm font-medium hover:underline"
                 >
-                  <Plus className="h-4 w-4 mr-1" />
                   Create First Project
-                </Button>
+                </button>
               </div>
             ) : (
-              <div className="space-y-3">
-                <h4 className="font-medium text-gray-900">
-                  Active Projects ({projects.length})
-                </h4>
-                {projects.map((project) => (
-                  <ProjectCard
-                    key={project.id}
-                    project={project}
-                    isAdmin={true}
-                    onContribute={handleContributeToProject}
-                  />
-                ))}
-              </div>
+              projects.map((project) => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  isAdmin={true}
+                  onContribute={handleContributeToProject}
+                />
+              ))
             )}
           </div>
         )}
@@ -213,306 +198,155 @@ export default function AdminDashboard() {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="animate-pulse space-y-6">
-            <div className="h-32 bg-gray-200 rounded-xl"></div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-24 bg-gray-200 rounded-xl"></div>
-              ))}
-            </div>
-          </div>
-        </div>
+        <DashboardSkeleton />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 sm:pb-0">
+    <div className="min-h-screen bg-gray-50 pb-24 sm:pb-8">
       <Navigation />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Dashboard Header */}
-        <div className="mb-8">
-          <div className="bg-gradient-to-r from-nigerian-green to-forest-green rounded-xl p-6 text-white pt-[0px] pb-[0px]">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="font-bold text-[#0d0d0d] text-[21px]">
-                  Welcome back, {user?.fullName}
-                </p>
-                <p className="text-sm text-[#1f241f]">
-                  Managing {groups.length} active groups
-                </p>
+
+      <main className="max-w-lg mx-auto px-4 py-6 space-y-6">
+        {/* Page Header - Clean Style */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">My Groups</h1>
+            <p className="text-gray-500">Manage your contributions</p>
+          </div>
+          {groups.length > 0 && (
+            <button
+              onClick={() => setCreateGroupModalOpen(true)}
+              className="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white shadow-lg hover:bg-primary/90 transition-colors"
+              data-testid="button-create-group-fab"
+            >
+              <Plus className="h-6 w-6" />
+            </button>
+          )}
+        </div>
+
+        {/* Pending Approvals Alert */}
+        {pendingContributions.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center shrink-0">
+                <Clock className="h-5 w-5 text-amber-600" />
               </div>
+              <div className="flex-1">
+                <p className="font-medium text-amber-900">
+                  {pendingContributions.length} Payment{pendingContributions.length > 1 ? "s" : ""} Awaiting Approval
+                </p>
+                <p className="text-sm text-amber-700">Tap to review payment proofs</p>
+              </div>
+              <ChevronRight className="h-5 w-5 text-amber-400" />
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card>
-            <CardContent className="p-6 pt-[10px] pb-[10px]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">
-                    Total Collections
-                  </p>
-                  <p className="text-2xl font-bold text-nigerian-green">
-                    {adminStats
-                      ? formatNaira(adminStats.totalCollections)
-                      : "₦0"}
-                  </p>
-                  <p className="text-xs text-green-600">All groups combined</p>
-                </div>
-                <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center">
-                  <DollarSign className="text-nigerian-green h-6 w-6" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6 pt-[10px] pb-[10px]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">
-                    Active Members
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {adminStats?.activeMembers || 0}
-                  </p>
-                  <p className="text-xs text-blue-600">Across all groups</p>
-                </div>
-                <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center">
-                  <Users className="text-blue-500 h-6 w-6" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6 pt-[10px] pb-[10px]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">
-                    Pending Payments
-                  </p>
-                  <p className="text-2xl font-bold text-orange-600">
-                    {adminStats?.pendingPayments || 0}
-                  </p>
-                  <p className="text-xs text-orange-600">Need follow-up</p>
-                </div>
-                <div className="w-12 h-12 bg-orange-50 rounded-full flex items-center justify-center">
-                  <Clock className="text-orange-500 h-6 w-6" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Groups Management */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Active Groups */}
-            <Card>
-              <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                  <CardTitle>Active Groups</CardTitle>
-                  <Button
-                    onClick={() => setCreateGroupModalOpen(true)}
-                    className="mt-3 sm:mt-0 bg-nigerian-green hover:bg-forest-green"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Group
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {groups.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">
-                      No groups yet
-                    </h3>
-                    <p className="text-gray-600 mb-4">
-                      Create your first group to start collecting contributions.
-                    </p>
-                    <Button
-                      onClick={() => setCreateGroupModalOpen(true)}
-                      className="bg-nigerian-green hover:bg-forest-green"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Your First Group
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {groups.map((group) => (
-                      <GroupWithProjects key={group.id} group={group} />
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Recent Transactions */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Recent Transactions</CardTitle>
-                  <Button variant="ghost" size="sm">
-                    View All
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {recentContributions.slice(0, 5).map((contribution) => (
-                    <div
-                      key={contribution.id}
-                      className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-gray-50 transition-colors ${
-                        contribution.status === "pending"
-                          ? "border-orange-200 bg-orange-50"
-                          : contribution.status === "confirmed"
-                            ? "border-green-200 bg-green-50"
-                            : "border-red-200 bg-red-50"
-                      }`}
-                      onClick={() => {
-                        setSelectedContribution(contribution);
-                        setApprovalModalOpen(true);
-                      }}
-                      data-testid={`contribution-${contribution.id}`}
-                    >
-                      <div className="flex items-center space-x-4">
-                        <div
-                          className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                            contribution.status === "pending"
-                              ? "bg-orange-100"
-                              : contribution.status === "confirmed"
-                                ? "bg-green-100"
-                                : "bg-red-100"
-                          }`}
-                        >
-                          {contribution.status === "pending" ? (
-                            <Clock className={`h-5 w-5 text-orange-600`} />
-                          ) : contribution.status === "confirmed" ? (
-                            <CheckCircle className={`h-5 w-5 text-green-600`} />
-                          ) : (
-                            <XCircle className={`h-5 w-5 text-red-600`} />
-                          )}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium text-gray-900">
-                              {contribution.userName}
-                            </p>
-                            <Badge
-                              variant="secondary"
-                              className={
-                                contribution.status === "pending"
-                                  ? "bg-orange-100 text-orange-800"
-                                  : contribution.status === "confirmed"
-                                    ? "bg-green-100 text-green-800"
-                                    : "bg-red-100 text-red-800"
-                              }
-                            >
-                              {contribution.status.toUpperCase()}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-gray-600">
-                            {contribution.groupName}
-                            {contribution.projectName && (
-                              <span className="text-gray-500">
-                                {" "}
-                                → {contribution.projectName}
-                              </span>
-                            )}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {new Date(
-                              contribution.createdAt,
-                            ).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-gray-900">
-                          {formatNaira(Number(contribution.amount))}
-                        </p>
-                        <p
-                          className={`text-xs ${
-                            contribution.status === "pending"
-                              ? "text-orange-600"
-                              : contribution.status === "confirmed"
-                                ? "text-green-600"
-                                : "text-red-600"
-                          }`}
-                        >
-                          {contribution.status === "pending"
-                            ? "Awaiting Review"
-                            : contribution.status === "confirmed"
-                              ? "Confirmed"
-                              : "Rejected"}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {recentContributions.length === 0 && (
-                  <div className="text-center py-8">
-                    <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">
-                      No transactions yet
-                    </h3>
-                    <p className="text-gray-600">
-                      Transaction history will appear here once members start
-                      contributing.
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+        {/* Groups List or Empty State */}
+        {groups.length === 0 ? (
+          <div className="border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Users className="h-8 w-8 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">No groups yet</h3>
+            <p className="text-gray-500 mb-6">
+              Start by creating your first group
+            </p>
+            <button
+              onClick={() => setCreateGroupModalOpen(true)}
+              className="bg-primary hover:bg-primary/90 text-white font-semibold px-6 py-3 rounded-full transition-colors"
+              data-testid="button-create-first-group"
+            >
+              Create First Group
+            </button>
           </div>
+        ) : (
+          <div className="space-y-4">
+            {groups.map((group) => (
+              <GroupCard key={group.id} group={group} />
+            ))}
+          </div>
+        )}
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Notifications Panel */}
-            <NotificationsPanel currentUser={user} />
-
-            {/* Pending Actions */}
-            {adminStats && adminStats.pendingPayments > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Pending Actions</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
+        {/* Payment Proofs to Review */}
+        {pendingContributions.length > 0 && (
+          <section>
+            <h2 className="text-lg font-bold text-gray-900 mb-4">Payment Proofs to Review</h2>
+            <div className="space-y-2">
+              {pendingContributions.slice(0, 5).map((contribution) => (
+                <div
+                  key={contribution.id}
+                  className="bg-white rounded-2xl p-4 border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => {
+                    setSelectedContribution(contribution);
+                    setApprovalModalOpen(true);
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+                        <Clock className="h-5 w-5 text-amber-600" />
+                      </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          Payment Reminders
-                        </p>
-                        <p className="text-xs text-gray-600">
-                          {adminStats.pendingPayments} members need follow-up
-                        </p>
+                        <p className="font-medium text-gray-900">{contribution.userName}</p>
+                        <p className="text-sm text-gray-500">{contribution.groupName}</p>
                       </div>
-                      <Button variant="ghost" size="sm">
-                        <Bell className="h-4 w-4" />
-                      </Button>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-gray-900">{formatNaira(Number(contribution.amount))}</p>
+                      <StatusBadge status="pending" size="sm" />
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </div>
-      </div>
-      {/* Create Group Modal */}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Recent Transactions */}
+        {recentContributions.filter(c => c.status !== "pending").length > 0 && (
+          <section>
+            <h2 className="text-lg font-bold text-gray-900 mb-4">Recent Transactions</h2>
+            <div className="space-y-2">
+              {recentContributions.filter(c => c.status !== "pending").slice(0, 5).map((contribution) => (
+                <div key={contribution.id} className="bg-white rounded-2xl p-4 border border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        contribution.status === "confirmed" ? "bg-green-100" : "bg-red-100"
+                      }`}>
+                        {contribution.status === "confirmed" ? (
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                        ) : (
+                          <XCircle className="h-5 w-5 text-red-600" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900 text-sm">{contribution.userName}</p>
+                        <p className="text-xs text-gray-500">{contribution.groupName}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-gray-900">{formatNaira(Number(contribution.amount))}</p>
+                      <StatusBadge 
+                        status={contribution.status as "confirmed" | "rejected"} 
+                        size="sm" 
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </main>
+
+      {/* Modals */}
       <CreateGroupModal
         open={createGroupModalOpen}
         onOpenChange={setCreateGroupModalOpen}
       />
-      {/* Project and Accountability Partner Modals */}
       {selectedGroup && (
         <>
           <CreateProjectModal
@@ -521,7 +355,6 @@ export default function AdminDashboard() {
             groupId={selectedGroup.id}
             groupName={selectedGroup.name}
           />
-
           <ManageAccountabilityPartnersModal
             open={managePartnersModalOpen}
             onOpenChange={setManagePartnersModalOpen}

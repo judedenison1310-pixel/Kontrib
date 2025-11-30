@@ -109,19 +109,7 @@ export function PaymentAccountDetails({ project, selectedPaymentType }: PaymentA
   const paymentTypeInfo = PAYMENT_TYPES.find(type => type.value === selectedPaymentType);
 
   if (accountDetails.length === 0 && selectedPaymentType !== "cash") {
-    return (
-      <Card className="border-red-200 bg-red-50">
-        <CardContent className="pt-6">
-          <div className="flex items-center text-red-800">
-            <AlertTriangle className="h-5 w-5 mr-2" />
-            <span>No account details configured for {getPaymentTypeLabel(selectedPaymentType)}</span>
-          </div>
-          <p className="text-sm text-red-600 mt-2">
-            Please contact the group admin to add account details for this payment method.
-          </p>
-        </CardContent>
-      </Card>
-    );
+    return null;
   }
 
   return (

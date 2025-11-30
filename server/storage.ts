@@ -7,6 +7,7 @@ import {
   type Contribution,
   type Notification,
   type OtpVerification,
+  type DeviceToken,
   type InsertUser, 
   type InsertGroup, 
   type InsertGroupMember, 
@@ -16,6 +17,7 @@ import {
   type InsertNotification,
   type InsertOtpVerification,
   type GroupWithStats,
+  type GroupWithRole,
   type MemberWithContributions,
   type ContributionWithDetails,
   type ProjectWithStats,
@@ -27,6 +29,9 @@ export interface IStorage {
   // User methods
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByPhoneNumber(phoneNumber: string): Promise<User | undefined>;
+  findOrCreateUserByPhone(phoneNumber: string): Promise<User>;
+  updateUserProfile(userId: string, updates: { fullName?: string; role?: string }): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   
   // Group methods
@@ -34,6 +39,7 @@ export interface IStorage {
   getGroupByRegistrationLink(link: string): Promise<Group | undefined>;
   getGroupByCustomSlug(slug: string): Promise<Group | undefined>;
   getGroupsByAdmin(adminId: string): Promise<GroupWithStats[]>;
+  getAllUserGroups(userId: string): Promise<GroupWithRole[]>;
   createGroup(group: InsertGroup, adminId: string): Promise<Group>;
   updateGroup(id: string, updates: Partial<Group>): Promise<Group | undefined>;
   
@@ -42,6 +48,7 @@ export interface IStorage {
   getUserGroups(userId: string): Promise<(GroupMember & { group: Group })[]>;
   addGroupMember(member: InsertGroupMember): Promise<GroupMember>;
   getGroupMember(groupId: string, userId: string): Promise<GroupMember | undefined>;
+  removeGroupMember(memberId: string): Promise<boolean>;
   
   // Project methods
   getProjectsByGroup(groupId: string): Promise<ProjectWithStats[]>;
@@ -86,6 +93,11 @@ export interface IStorage {
   getActiveOtpVerification(phoneNumber: string): Promise<OtpVerification | undefined>;
   verifyOtp(phoneNumber: string, otp: string): Promise<boolean>;
   cleanupExpiredOtps(): Promise<void>;
+  
+  // Device Token methods (for remember device)
+  createDeviceToken(userId: string, deviceInfo?: string): Promise<string>;
+  validateDeviceToken(token: string): Promise<User | null>;
+  removeDeviceToken(token: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -97,6 +109,7 @@ export class MemStorage implements IStorage {
   private contributions: Map<string, Contribution>;
   private notifications: Map<string, Notification>;
   private otpVerifications: Map<string, OtpVerification>;
+  private deviceTokens: Map<string, DeviceToken>;
 
   constructor() {
     this.users = new Map();
@@ -107,6 +120,7 @@ export class MemStorage implements IStorage {
     this.contributions = new Map();
     this.notifications = new Map();
     this.otpVerifications = new Map();
+    this.deviceTokens = new Map();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -115,6 +129,49 @@ export class MemStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     return Array.from(this.users.values()).find(user => user.username === username);
+  }
+
+  async getUserByPhoneNumber(phoneNumber: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(user => user.phoneNumber === phoneNumber);
+  }
+
+  async findOrCreateUserByPhone(phoneNumber: string): Promise<User> {
+    const existingUser = await this.getUserByPhoneNumber(phoneNumber);
+    if (existingUser) {
+      return existingUser;
+    }
+    
+    const id = randomUUID();
+    const user: User = {
+      id,
+      username: null,
+      password: null,
+      fullName: null,
+      phoneNumber,
+      role: "member",
+      profileCompletedAt: null,
+      createdAt: new Date(),
+    };
+    this.users.set(id, user);
+    return user;
+  }
+
+  async updateUserProfile(userId: string, updates: { fullName?: string; role?: string }): Promise<User | undefined> {
+    const user = this.users.get(userId);
+    if (!user) return undefined;
+    
+    // Validate role at storage layer as extra safety
+    const validRoles = ['admin', 'member'];
+    const validatedRole = updates.role && validRoles.includes(updates.role) ? updates.role : user.role;
+    
+    const updatedUser: User = {
+      ...user,
+      fullName: updates.fullName ?? user.fullName,
+      role: validatedRole,
+      profileCompletedAt: updates.fullName ? new Date() : user.profileCompletedAt,
+    };
+    this.users.set(userId, updatedUser);
+    return updatedUser;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
@@ -167,6 +224,72 @@ export class MemStorage implements IStorage {
     });
   }
 
+  async getAllUserGroups(userId: string): Promise<GroupWithRole[]> {
+    const groupMap = new Map<string, GroupWithRole>();
+    
+    // Get groups where user is admin
+    const adminGroups = Array.from(this.groups.values()).filter(group => group.adminId === userId);
+    
+    for (const group of adminGroups) {
+      const members = Array.from(this.groupMembers.values()).filter(m => m.groupId === group.id);
+      const groupProjects = Array.from(this.projects.values()).filter(p => p.groupId === group.id);
+      const totalTarget = groupProjects.reduce((sum, p) => sum + Number(p.targetAmount || 0), 0);
+      const totalCollected = groupProjects.reduce((sum, p) => sum + Number(p.collectedAmount || 0), 0);
+      const completionRate = totalTarget > 0 ? Math.round((totalCollected / totalTarget) * 100) : 0;
+      
+      // Count pending approvals for admin
+      const pendingApprovals = Array.from(this.contributions.values())
+        .filter(c => c.groupId === group.id && c.status === "pending").length;
+      
+      groupMap.set(group.id, {
+        ...group,
+        memberCount: members.length,
+        projectCount: groupProjects.length,
+        completionRate,
+        pendingPayments: 0,
+        role: 'admin',
+        pendingApprovals,
+      });
+    }
+    
+    // Get groups where user is member
+    const memberships = Array.from(this.groupMembers.values()).filter(m => m.userId === userId);
+    
+    for (const membership of memberships) {
+      const group = this.groups.get(membership.groupId);
+      if (!group) continue;
+      
+      const members = Array.from(this.groupMembers.values()).filter(m => m.groupId === group.id);
+      const groupProjects = Array.from(this.projects.values()).filter(p => p.groupId === group.id);
+      const totalTarget = groupProjects.reduce((sum, p) => sum + Number(p.targetAmount || 0), 0);
+      const totalCollected = groupProjects.reduce((sum, p) => sum + Number(p.collectedAmount || 0), 0);
+      const completionRate = totalTarget > 0 ? Math.round((totalCollected / totalTarget) * 100) : 0;
+      
+      // Count my pending payments in this group
+      const myPendingPayments = Array.from(this.contributions.values())
+        .filter(c => c.groupId === group.id && c.userId === userId && c.status === "pending").length;
+      
+      const existing = groupMap.get(group.id);
+      if (existing) {
+        // User is both admin and member
+        existing.role = 'both';
+        existing.myPendingPayments = myPendingPayments;
+      } else {
+        groupMap.set(group.id, {
+          ...group,
+          memberCount: members.length,
+          projectCount: groupProjects.length,
+          completionRate,
+          pendingPayments: 0,
+          role: 'member',
+          myPendingPayments,
+        });
+      }
+    }
+    
+    return Array.from(groupMap.values());
+  }
+
   async createGroup(insertGroup: InsertGroup, adminId: string): Promise<Group> {
     const id = randomUUID();
     
@@ -187,8 +310,8 @@ export class MemStorage implements IStorage {
     // Auto-generate WhatsApp sharing link with new format
     let whatsappLink = insertGroup.whatsappLink;
     if (!whatsappLink) {
-      const customUrl = `kontrib.app/join/${registrationLink}`;
-      const message = `🎉 Join "${insertGroup.name}" on Kontrib!\n\nManage group contributions with transparency and ease.\n\n👉 Register here: ${customUrl}\n\n#Kontrib #GroupContributions`;
+      const joinLink = `kontrib.app/join/${groupSlug}`;
+      const message = `${joinLink}\n\nYou have been invited to join ${insertGroup.name} on Kontrib!\n\nLogin to submit your contributions\n\nLet's keep it transparent\n\nKontrib.app`;
       whatsappLink = `https://wa.me/?text=${encodeURIComponent(message)}`;
     }
     
@@ -203,12 +326,14 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
       whatsappLink,
     };
+    this.groups.set(id, group);
+    
     // Automatically add admin as first group member
     await this.addGroupMember({
       groupId: id,
       userId: adminId,
     });
-    this.groups.set(id, group);
+    
     return group;
   }
 
@@ -278,6 +403,14 @@ export class MemStorage implements IStorage {
   async getGroupMember(groupId: string, userId: string): Promise<GroupMember | undefined> {
     return Array.from(this.groupMembers.values())
       .find(member => member.groupId === groupId && member.userId === userId);
+  }
+
+  async removeGroupMember(memberId: string): Promise<boolean> {
+    if (this.groupMembers.has(memberId)) {
+      this.groupMembers.delete(memberId);
+      return true;
+    }
+    return false;
   }
 
   // Project methods
@@ -847,11 +980,53 @@ export class MemStorage implements IStorage {
     
     expiredKeys.forEach(key => this.otpVerifications.delete(key));
   }
+
+  async createDeviceToken(userId: string, deviceInfo?: string): Promise<string> {
+    const token = randomUUID() + '-' + randomUUID(); // Create a strong random token
+    const id = randomUUID();
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000); // 90 days
+    
+    const deviceToken: DeviceToken = {
+      id,
+      userId,
+      token,
+      deviceInfo: deviceInfo || null,
+      lastUsed: now,
+      expiresAt,
+      createdAt: now,
+    };
+    
+    this.deviceTokens.set(token, deviceToken);
+    return token;
+  }
+
+  async validateDeviceToken(token: string): Promise<User | null> {
+    const deviceToken = this.deviceTokens.get(token);
+    if (!deviceToken) return null;
+    
+    const now = new Date();
+    if (deviceToken.expiresAt < now) {
+      this.deviceTokens.delete(token);
+      return null;
+    }
+    
+    // Update last used
+    deviceToken.lastUsed = now;
+    this.deviceTokens.set(token, deviceToken);
+    
+    const user = await this.getUser(deviceToken.userId);
+    return user || null;
+  }
+
+  async removeDeviceToken(token: string): Promise<boolean> {
+    return this.deviceTokens.delete(token);
+  }
 }
 
 // Database Storage implementation using Drizzle ORM
 import { db } from "./db";
-import { users as usersTable, groups as groupsTable, groupMembers as groupMembersTable, projects as projectsTable, accountabilityPartners as accountabilityPartnersTable, contributions as contributionsTable, notifications as notificationsTable, otpVerifications as otpVerificationsTable } from "@shared/schema";
+import { users as usersTable, groups as groupsTable, groupMembers as groupMembersTable, projects as projectsTable, accountabilityPartners as accountabilityPartnersTable, contributions as contributionsTable, notifications as notificationsTable, otpVerifications as otpVerificationsTable, deviceTokens as deviceTokensTable } from "@shared/schema";
 import { eq, and, gt, lt, sql as drizzleSql, desc, inArray } from "drizzle-orm";
 
 export class DbStorage implements IStorage {
@@ -862,6 +1037,46 @@ export class DbStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     const result = await db.select().from(usersTable).where(eq(usersTable.username, username)).limit(1);
+    return result[0];
+  }
+
+  async getUserByPhoneNumber(phoneNumber: string): Promise<User | undefined> {
+    const result = await db.select().from(usersTable).where(eq(usersTable.phoneNumber, phoneNumber)).limit(1);
+    return result[0];
+  }
+
+  async findOrCreateUserByPhone(phoneNumber: string): Promise<User> {
+    const existingUser = await this.getUserByPhoneNumber(phoneNumber);
+    if (existingUser) {
+      return existingUser;
+    }
+    
+    const result = await db.insert(usersTable).values({
+      phoneNumber,
+      role: "member",
+    }).returning();
+    return result[0];
+  }
+
+  async updateUserProfile(userId: string, updates: { fullName?: string; role?: string }): Promise<User | undefined> {
+    const updateData: Partial<User> = {};
+    if (updates.fullName !== undefined) {
+      updateData.fullName = updates.fullName;
+      updateData.profileCompletedAt = new Date();
+    }
+    if (updates.role !== undefined) {
+      // Validate role at storage layer as extra safety
+      const validRoles = ['admin', 'member'];
+      if (validRoles.includes(updates.role)) {
+        updateData.role = updates.role;
+      }
+    }
+    
+    const result = await db
+      .update(usersTable)
+      .set(updateData)
+      .where(eq(usersTable.id, userId))
+      .returning();
     return result[0];
   }
 
@@ -915,6 +1130,96 @@ export class DbStorage implements IStorage {
     return groupsWithStats;
   }
 
+  async getAllUserGroups(userId: string): Promise<GroupWithRole[]> {
+    const groupMap = new Map<string, GroupWithRole>();
+    
+    // Get groups where user is admin
+    const adminGroups = await db.select().from(groupsTable).where(eq(groupsTable.adminId, userId));
+    
+    for (const group of adminGroups) {
+      const memberCountResult = await db
+        .select({ count: drizzleSql<number>`count(*)::int` })
+        .from(groupMembersTable)
+        .where(eq(groupMembersTable.groupId, group.id));
+      const memberCount = memberCountResult[0]?.count || 0;
+      
+      const groupProjects = await db.select().from(projectsTable).where(eq(projectsTable.groupId, group.id));
+      const totalTarget = groupProjects.reduce((sum, p) => sum + Number(p.targetAmount || 0), 0);
+      const totalCollected = groupProjects.reduce((sum, p) => sum + Number(p.collectedAmount || 0), 0);
+      const completionRate = totalTarget > 0 ? Math.round((totalCollected / totalTarget) * 100) : 0;
+      
+      // Count pending approvals for admin
+      const pendingApprovalsResult = await db
+        .select({ count: drizzleSql<number>`count(*)::int` })
+        .from(contributionsTable)
+        .where(and(eq(contributionsTable.groupId, group.id), eq(contributionsTable.status, "pending")));
+      const pendingApprovals = pendingApprovalsResult[0]?.count || 0;
+      
+      groupMap.set(group.id, {
+        ...group,
+        memberCount,
+        projectCount: groupProjects.length,
+        completionRate,
+        pendingPayments: 0,
+        role: 'admin',
+        pendingApprovals,
+      });
+    }
+    
+    // Get groups where user is member
+    const memberships = await db
+      .select()
+      .from(groupMembersTable)
+      .leftJoin(groupsTable, eq(groupMembersTable.groupId, groupsTable.id))
+      .where(eq(groupMembersTable.userId, userId));
+    
+    for (const row of memberships) {
+      const group = row.groups;
+      if (!group) continue;
+      
+      const memberCountResult = await db
+        .select({ count: drizzleSql<number>`count(*)::int` })
+        .from(groupMembersTable)
+        .where(eq(groupMembersTable.groupId, group.id));
+      const memberCount = memberCountResult[0]?.count || 0;
+      
+      const groupProjects = await db.select().from(projectsTable).where(eq(projectsTable.groupId, group.id));
+      const totalTarget = groupProjects.reduce((sum, p) => sum + Number(p.targetAmount || 0), 0);
+      const totalCollected = groupProjects.reduce((sum, p) => sum + Number(p.collectedAmount || 0), 0);
+      const completionRate = totalTarget > 0 ? Math.round((totalCollected / totalTarget) * 100) : 0;
+      
+      // Count my pending payments in this group
+      const myPendingResult = await db
+        .select({ count: drizzleSql<number>`count(*)::int` })
+        .from(contributionsTable)
+        .where(and(
+          eq(contributionsTable.groupId, group.id),
+          eq(contributionsTable.userId, userId),
+          eq(contributionsTable.status, "pending")
+        ));
+      const myPendingPayments = myPendingResult[0]?.count || 0;
+      
+      const existing = groupMap.get(group.id);
+      if (existing) {
+        // User is both admin and member
+        existing.role = 'both';
+        existing.myPendingPayments = myPendingPayments;
+      } else {
+        groupMap.set(group.id, {
+          ...group,
+          memberCount,
+          projectCount: groupProjects.length,
+          completionRate,
+          pendingPayments: 0,
+          role: 'member',
+          myPendingPayments,
+        });
+      }
+    }
+    
+    return Array.from(groupMap.values());
+  }
+
   async createGroup(insertGroup: InsertGroup, adminId: string): Promise<Group> {
     const baseCode = insertGroup.name
       .toLowerCase()
@@ -928,12 +1233,12 @@ export class DbStorage implements IStorage {
 
     let whatsappLink = insertGroup.whatsappLink;
     if (!whatsappLink) {
-      const customUrl = `kontrib.app/join/${registrationLink}`;
-      const message = `🎉 Join "${insertGroup.name}" on Kontrib!\n\nManage group contributions with transparency and ease.\n\n👉 Register here: ${customUrl}\n\n#Kontrib #GroupContributions`;
+      const joinLink = `kontrib.app/join/${groupSlug}`;
+      const message = `${joinLink}\n\nYou have been invited to join ${insertGroup.name} on Kontrib!\n\nLogin to submit your contributions\n\nLet's keep it transparent\n\nKontrib.app`;
       whatsappLink = `https://wa.me/?text=${encodeURIComponent(message)}`;
     }
 
-     const result = await db.insert(groupsTable).values({
+    const result = await db.insert(groupsTable).values({
       ...insertGroup,
       registrationLink,
       customSlug: groupSlug,
@@ -948,6 +1253,7 @@ export class DbStorage implements IStorage {
       groupId: group.id,
       userId: adminId,
     });
+    
     return group;
   }
 
@@ -996,6 +1302,14 @@ export class DbStorage implements IStorage {
       .where(and(eq(groupMembersTable.groupId, groupId), eq(groupMembersTable.userId, userId)))
       .limit(1);
     return result[0];
+  }
+
+  async removeGroupMember(memberId: string): Promise<boolean> {
+    const result = await db
+      .delete(groupMembersTable)
+      .where(eq(groupMembersTable.id, memberId))
+      .returning();
+    return result.length > 0;
   }
 
   async getProjectsByGroup(groupId: string): Promise<ProjectWithStats[]> {
@@ -1399,6 +1713,52 @@ export class DbStorage implements IStorage {
   async cleanupExpiredOtps(): Promise<void> {
     const now = new Date();
     await db.delete(otpVerificationsTable).where(lt(otpVerificationsTable.expiresAt, now));
+  }
+
+  async createDeviceToken(userId: string, deviceInfo?: string): Promise<string> {
+    const token = crypto.randomUUID() + '-' + crypto.randomUUID();
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000); // 90 days
+    
+    await db.insert(deviceTokensTable).values({
+      userId,
+      token,
+      deviceInfo: deviceInfo || null,
+      lastUsed: now,
+      expiresAt,
+    });
+    
+    return token;
+  }
+
+  async validateDeviceToken(token: string): Promise<User | null> {
+    const now = new Date();
+    const result = await db
+      .select()
+      .from(deviceTokensTable)
+      .where(
+        and(
+          eq(deviceTokensTable.token, token),
+          gt(deviceTokensTable.expiresAt, now)
+        )
+      )
+      .limit(1);
+    
+    if (!result[0]) return null;
+    
+    // Update last used
+    await db
+      .update(deviceTokensTable)
+      .set({ lastUsed: now })
+      .where(eq(deviceTokensTable.token, token));
+    
+    const user = await this.getUser(result[0].userId);
+    return user || null;
+  }
+
+  async removeDeviceToken(token: string): Promise<boolean> {
+    const result = await db.delete(deviceTokensTable).where(eq(deviceTokensTable.token, token));
+    return true;
   }
 }
 
