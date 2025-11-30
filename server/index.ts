@@ -88,7 +88,11 @@ app.use((req, res, next) => {
 
   const DEFAULT_PORT = parseInt(process.env.PORT || "5000", 10);
 
-  const tryHosts = [process.env.HOST || "127.0.0.1", "0.0.0.0", "::"];
+  // In production (Render, etc.), bind to 0.0.0.0 first. In development, try localhost first.
+  const isProduction = process.env.NODE_ENV === "production";
+  const tryHosts = isProduction 
+    ? ["0.0.0.0", "127.0.0.1", "::"]
+    : [process.env.HOST || "127.0.0.1", "0.0.0.0", "::"];
 
   async function attemptListen(
     port: number,
