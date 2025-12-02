@@ -5,14 +5,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
-import { Users, Shield, ArrowRight, Lock } from "lucide-react";
+import { Users, Shield, ArrowRight, Lock, CheckCircle2 } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { type User as UserType } from "@shared/schema";
 import { sendOtp, verifyOtp, updateProfile } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import kontribLogo from "@assets/8_1764455185903.png";
-import heroImage from "@assets/landing page image_1764650881450.jpg";
+import heroImage from "@assets/stock_images/african_people_smili_bbf3eb72.jpg";
 
 const phoneSchema = z.object({
   phoneNumber: z.string().min(10, "Enter your WhatsApp number"),
@@ -189,293 +189,312 @@ export default function Landing() {
   }, [step]);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <header className="px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <img src={kontribLogo} alt="Kontrib" className="w-9 h-9" />
-          <span className="text-xl font-bold text-gray-900">Kontrib</span>
-        </div>
-      </header>
-
-      <main className="flex-1 flex flex-col items-center px-6 pb-6">
-        
-        {step === "phone" && (
-          <div className="w-full max-w-md text-center pt-4 flex-1 flex flex-col">
-            <div className="mb-6">
-              <h1 className="text-3xl sm:text-4xl font-black text-gray-900 leading-tight">
-                Track Group Money Together
-              </h1>
-            </div>
-
-            <div className="rounded-2xl overflow-hidden mb-6 shadow-lg">
-              <img 
-                src={heroImage} 
-                alt="People using Kontrib" 
-                className="w-full h-48 sm:h-56 object-cover"
-                loading="eager"
-              />
-            </div>
-
-            <p className="text-gray-600 text-base mb-6">
-              See every payment. No more "who has paid?"
-            </p>
-
-            <div className="space-y-3">
-              <Form {...phoneForm}>
-                <form onSubmit={phoneForm.handleSubmit(onPhoneSubmit)} className="space-y-3">
-                  <FormField
-                    control={phoneForm.control}
-                    name="phoneNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormControl>
-                          <Input 
-                            placeholder="WhatsApp number e.g. +2349056783314" 
-                            className="h-14 text-base px-5 rounded-xl border-2 border-gray-200 focus:border-primary bg-white text-center font-medium" 
-                            type="tel"
-                            {...field}
-                            data-testid="input-phone"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <button
-                    type="submit"
-                    disabled={sendOtpMutation.isPending}
-                    className="btn-kontrib w-full rounded-xl"
-                    data-testid="button-continue"
-                  >
-                    {sendOtpMutation.isPending ? (
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : (
-                      <>
-                        <SiWhatsapp className="h-5 w-5" />
-                        Continue with WhatsApp
-                      </>
-                    )}
-                  </button>
-                </form>
-              </Form>
-            </div>
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Background with gradient overlay */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: `url(${heroImage})` }}
+      />
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-900/95 via-gray-900/90 to-emerald-900/80" />
+      
+      {/* Decorative elements */}
+      <div className="absolute top-20 right-10 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl" />
+      <div className="absolute bottom-20 left-10 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl" />
+      
+      {/* Content */}
+      <div className="relative z-10 min-h-screen flex flex-col">
+        <header className="px-6 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <img src={kontribLogo} alt="Kontrib" className="w-10 h-10" />
+            <span className="text-xl font-bold text-white">Kontrib</span>
           </div>
-        )}
+        </header>
 
-        {step === "otp" && (
-          <div className="w-full max-w-md pt-8">
-            <button
-              onClick={() => {
-                setStep("phone");
-                otpForm.reset();
-                setDevOtp(null);
-              }}
-              className="flex items-center gap-2 text-gray-500 hover:text-primary mb-6 transition-colors"
-              data-testid="button-back-phone"
-            >
-              <ArrowRight className="h-4 w-4 rotate-180" />
-              <span className="text-sm font-medium">Back</span>
-            </button>
-            
-            <div className="space-y-6">
-              <div className="text-center">
-                <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Lock className="h-7 w-7 text-primary" />
-                </div>
-                <h2 className="text-2xl font-black text-gray-900">
-                  Enter the code
-                </h2>
-                <p className="text-gray-500 mt-2">
-                  Sent to <span className="font-semibold text-gray-700">{phoneNumber}</span>
-                </p>
-              </div>
-
-              {devOtp && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-center">
-                  <p className="text-sm text-yellow-800">
-                    Dev mode: <span className="font-bold tracking-wider">{devOtp}</span>
+        <main className="flex-1 flex flex-col items-center justify-center px-6 pb-8">
+          
+          {step === "phone" && (
+            <div className="w-full max-w-sm">
+              {/* Glass card */}
+              <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl">
+                <div className="text-center mb-8">
+                  <h1 className="text-3xl font-black text-white leading-tight mb-3">
+                    Group Money,<br />Made Simple
+                  </h1>
+                  <p className="text-white/70 text-sm">
+                    Everyone sees every kobo. Instantly.
                   </p>
                 </div>
-              )}
 
-              <Form {...otpForm}>
-                <form onSubmit={otpForm.handleSubmit(onOtpSubmit)} className="space-y-5">
-                  <div className="flex justify-center gap-3" onPaste={handleOtpPaste}>
-                    {[0, 1, 2, 3, 4, 5].map((index) => (
-                      <input
-                        key={index}
-                        ref={(el) => (otpInputRefs.current[index] = el)}
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={1}
-                        className="w-11 h-13 text-center text-xl font-bold border-2 border-gray-200 rounded-xl focus:border-primary focus:outline-none bg-white"
-                        value={otpForm.watch("otp")[index] || ""}
-                        onChange={(e) => handleOtpChange(index, e.target.value)}
-                        onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                        disabled={verifyOtpMutation.isPending}
-                        data-testid={`input-otp-${index}`}
-                      />
-                    ))}
-                  </div>
-                  
-                  <button
-                    type="submit"
-                    disabled={verifyOtpMutation.isPending || otpForm.watch("otp").length < 6}
-                    className="btn-kontrib w-full rounded-xl"
-                    data-testid="button-verify-otp"
-                  >
-                    {verifyOtpMutation.isPending ? (
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : (
-                      <>
-                        Verify Code
-                        <ArrowRight className="h-5 w-5" />
-                      </>
-                    )}
-                  </button>
-                </form>
-              </Form>
+                <Form {...phoneForm}>
+                  <form onSubmit={phoneForm.handleSubmit(onPhoneSubmit)} className="space-y-4">
+                    <FormField
+                      control={phoneForm.control}
+                      name="phoneNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <Input 
+                              placeholder="+234 XXX XXX XXXX" 
+                              className="h-14 text-base px-5 rounded-2xl border-0 bg-white/20 backdrop-blur text-white placeholder:text-white/50 text-center font-medium focus:ring-2 focus:ring-emerald-400" 
+                              type="tel"
+                              {...field}
+                              data-testid="input-phone"
+                            />
+                          </FormControl>
+                          <FormMessage className="text-red-300" />
+                        </FormItem>
+                      )}
+                    />
+                    <button
+                      type="submit"
+                      disabled={sendOtpMutation.isPending}
+                      className="w-full h-14 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/30 active:scale-[0.98]"
+                      data-testid="button-continue"
+                    >
+                      {sendOtpMutation.isPending ? (
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <SiWhatsapp className="h-5 w-5" />
+                          Continue with WhatsApp
+                        </>
+                      )}
+                    </button>
+                  </form>
+                </Form>
 
-              <div className="text-center">
-                <button
-                  onClick={() => sendOtpMutation.mutate(phoneNumber)}
-                  disabled={sendOtpMutation.isPending}
-                  className="text-primary font-medium hover:underline disabled:opacity-50 text-sm"
-                  data-testid="button-resend-otp"
-                >
-                  {sendOtpMutation.isPending ? "Sending..." : "Didn't get it? Send again"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {step === "profile" && (
-          <div className="w-full max-w-md pt-8">
-            <button
-              onClick={() => setStep("otp")}
-              className="flex items-center gap-2 text-gray-500 hover:text-primary mb-6 transition-colors"
-              data-testid="button-back-otp"
-            >
-              <ArrowRight className="h-4 w-4 rotate-180" />
-              <span className="text-sm font-medium">Back</span>
-            </button>
-            
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-2xl font-black text-gray-900">
-                  What's your name?
-                </h2>
-                <p className="text-gray-500 mt-2">So group members can recognize you</p>
-              </div>
-
-              <Form {...profileForm}>
-                <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-4">
-                  <FormField
-                    control={profileForm.control}
-                    name="fullName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormControl>
-                          <Input 
-                            placeholder="Your full name" 
-                            className="h-14 text-lg rounded-xl border-2 border-gray-200 focus:border-primary px-5 bg-white" 
-                            autoFocus
-                            {...field}
-                            data-testid="input-fullname"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <button
-                    type="submit"
-                    className="btn-kontrib w-full rounded-xl"
-                    data-testid="button-next"
-                  >
-                    Continue
-                    <ArrowRight className="h-5 w-5" />
-                  </button>
-                </form>
-              </Form>
-            </div>
-          </div>
-        )}
-
-        {step === "role" && (
-          <div className="w-full max-w-md pt-8">
-            <button
-              onClick={() => setStep("profile")}
-              disabled={profileMutation.isPending}
-              className="flex items-center gap-2 text-gray-500 hover:text-primary mb-6 transition-colors disabled:opacity-50"
-              data-testid="button-back-profile"
-            >
-              <ArrowRight className="h-4 w-4 rotate-180" />
-              <span className="text-sm font-medium">Back</span>
-            </button>
-            
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-2xl font-black text-gray-900">
-                  What do you want to do?
-                </h2>
-                <p className="text-gray-500 mt-2">You can change this later</p>
-              </div>
-
-              <div className="space-y-3">
-                <button
-                  onClick={() => selectRole("member")}
-                  disabled={profileMutation.isPending}
-                  className="w-full bg-white border-2 border-gray-200 hover:border-primary hover:shadow-md rounded-xl p-4 text-left transition-all active:scale-[0.98] disabled:opacity-50"
-                  data-testid="button-role-member"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-11 h-11 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <Users className="h-5 w-5 text-primary" />
+                {/* Trust indicators */}
+                <div className="mt-8 pt-6 border-t border-white/10">
+                  <div className="flex items-center justify-center gap-6 text-white/50 text-xs">
+                    <div className="flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Transparent</span>
                     </div>
-                    <div>
-                      <p className="font-bold text-gray-900">Join Groups</p>
-                      <p className="text-gray-500 text-sm">Contribute and track payments</p>
+                    <div className="flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Secure</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Free</span>
                     </div>
                   </div>
-                </button>
-
-                <button
-                  onClick={() => selectRole("admin")}
-                  disabled={profileMutation.isPending}
-                  className="w-full bg-white border-2 border-gray-200 hover:border-primary hover:shadow-md rounded-xl p-4 text-left transition-all active:scale-[0.98] disabled:opacity-50"
-                  data-testid="button-role-admin"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-11 h-11 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <Shield className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-bold text-gray-900">Create Groups</p>
-                      <p className="text-gray-500 text-sm">Manage and approve payments</p>
-                    </div>
-                  </div>
-                </button>
-              </div>
-
-              {profileMutation.isPending && (
-                <div className="flex items-center justify-center gap-3 text-primary py-3">
-                  <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                  <span className="font-medium text-sm">Setting up your account...</span>
                 </div>
-              )}
+              </div>
             </div>
-          </div>
-        )}
-      </main>
+          )}
 
-      <footer className="px-6 py-3 border-t border-gray-200 bg-white">
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-kontrib-green font-semibold">kontrib.app</span>
-          <span className="text-gray-400">2025 Kontrib</span>
-        </div>
-      </footer>
+          {step === "otp" && (
+            <div className="w-full max-w-sm">
+              <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl">
+                <button
+                  onClick={() => {
+                    setStep("phone");
+                    otpForm.reset();
+                    setDevOtp(null);
+                  }}
+                  className="flex items-center gap-2 text-white/60 hover:text-white mb-6 transition-colors"
+                  data-testid="button-back-phone"
+                >
+                  <ArrowRight className="h-4 w-4 rotate-180" />
+                  <span className="text-sm font-medium">Back</span>
+                </button>
+                
+                <div className="text-center mb-6">
+                  <div className="w-14 h-14 bg-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <Lock className="h-7 w-7 text-emerald-400" />
+                  </div>
+                  <h2 className="text-2xl font-black text-white">
+                    Enter Code
+                  </h2>
+                  <p className="text-white/60 mt-2 text-sm">
+                    Sent to <span className="text-white font-medium">{phoneNumber}</span>
+                  </p>
+                </div>
+
+                {devOtp && (
+                  <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-xl p-3 text-center mb-4">
+                    <p className="text-sm text-yellow-200">
+                      Dev: <span className="font-bold tracking-wider">{devOtp}</span>
+                    </p>
+                  </div>
+                )}
+
+                <Form {...otpForm}>
+                  <form onSubmit={otpForm.handleSubmit(onOtpSubmit)} className="space-y-5">
+                    <div className="flex justify-center gap-2" onPaste={handleOtpPaste}>
+                      {[0, 1, 2, 3, 4, 5].map((index) => (
+                        <input
+                          key={index}
+                          ref={(el) => (otpInputRefs.current[index] = el)}
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={1}
+                          className="w-11 h-13 text-center text-xl font-bold border-0 rounded-xl bg-white/20 text-white focus:ring-2 focus:ring-emerald-400 focus:outline-none"
+                          value={otpForm.watch("otp")[index] || ""}
+                          onChange={(e) => handleOtpChange(index, e.target.value)}
+                          onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                          disabled={verifyOtpMutation.isPending}
+                          data-testid={`input-otp-${index}`}
+                        />
+                      ))}
+                    </div>
+                    
+                    <button
+                      type="submit"
+                      disabled={verifyOtpMutation.isPending || otpForm.watch("otp").length < 6}
+                      className="w-full h-14 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-white font-bold rounded-2xl flex items-center justify-center gap-2 transition-all"
+                      data-testid="button-verify-otp"
+                    >
+                      {verifyOtpMutation.isPending ? (
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        "Verify"
+                      )}
+                    </button>
+                  </form>
+                </Form>
+
+                <div className="text-center mt-4">
+                  <button
+                    onClick={() => sendOtpMutation.mutate(phoneNumber)}
+                    disabled={sendOtpMutation.isPending}
+                    className="text-emerald-400 font-medium hover:underline disabled:opacity-50 text-sm"
+                    data-testid="button-resend-otp"
+                  >
+                    {sendOtpMutation.isPending ? "Sending..." : "Resend code"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {step === "profile" && (
+            <div className="w-full max-w-sm">
+              <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl">
+                <button
+                  onClick={() => setStep("otp")}
+                  className="flex items-center gap-2 text-white/60 hover:text-white mb-6 transition-colors"
+                  data-testid="button-back-otp"
+                >
+                  <ArrowRight className="h-4 w-4 rotate-180" />
+                  <span className="text-sm font-medium">Back</span>
+                </button>
+                
+                <div className="mb-6">
+                  <h2 className="text-2xl font-black text-white">
+                    What's your name?
+                  </h2>
+                  <p className="text-white/60 mt-2 text-sm">So your group knows who you are</p>
+                </div>
+
+                <Form {...profileForm}>
+                  <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-4">
+                    <FormField
+                      control={profileForm.control}
+                      name="fullName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <Input 
+                              placeholder="Your full name" 
+                              className="h-14 text-base px-5 rounded-2xl border-0 bg-white/20 backdrop-blur text-white placeholder:text-white/50 font-medium focus:ring-2 focus:ring-emerald-400" 
+                              autoFocus
+                              {...field}
+                              data-testid="input-fullname"
+                            />
+                          </FormControl>
+                          <FormMessage className="text-red-300" />
+                        </FormItem>
+                      )}
+                    />
+                    <button
+                      type="submit"
+                      className="w-full h-14 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-2xl flex items-center justify-center gap-2 transition-all"
+                      data-testid="button-next"
+                    >
+                      Continue
+                      <ArrowRight className="h-5 w-5" />
+                    </button>
+                  </form>
+                </Form>
+              </div>
+            </div>
+          )}
+
+          {step === "role" && (
+            <div className="w-full max-w-sm">
+              <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl">
+                <button
+                  onClick={() => setStep("profile")}
+                  disabled={profileMutation.isPending}
+                  className="flex items-center gap-2 text-white/60 hover:text-white mb-6 transition-colors disabled:opacity-50"
+                  data-testid="button-back-profile"
+                >
+                  <ArrowRight className="h-4 w-4 rotate-180" />
+                  <span className="text-sm font-medium">Back</span>
+                </button>
+                
+                <div className="mb-6">
+                  <h2 className="text-2xl font-black text-white">
+                    How will you use Kontrib?
+                  </h2>
+                  <p className="text-white/60 mt-2 text-sm">You can always do both later</p>
+                </div>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={() => selectRole("member")}
+                    disabled={profileMutation.isPending}
+                    className="w-full bg-white/10 hover:bg-white/20 border border-white/20 hover:border-emerald-400/50 rounded-2xl p-4 text-left transition-all active:scale-[0.98] disabled:opacity-50"
+                    data-testid="button-role-member"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <Users className="h-6 w-6 text-emerald-400" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-white">Join a Group</p>
+                        <p className="text-white/50 text-sm">Pay and track contributions</p>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => selectRole("admin")}
+                    disabled={profileMutation.isPending}
+                    className="w-full bg-white/10 hover:bg-white/20 border border-white/20 hover:border-emerald-400/50 rounded-2xl p-4 text-left transition-all active:scale-[0.98] disabled:opacity-50"
+                    data-testid="button-role-admin"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <Shield className="h-6 w-6 text-emerald-400" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-white">Create a Group</p>
+                        <p className="text-white/50 text-sm">Manage and approve payments</p>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+
+                {profileMutation.isPending && (
+                  <div className="flex items-center justify-center gap-3 text-emerald-400 py-4 mt-4">
+                    <div className="w-5 h-5 border-2 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />
+                    <span className="font-medium text-sm">Setting up...</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </main>
+
+        <footer className="px-6 py-4">
+          <div className="flex items-center justify-center text-xs text-white/40">
+            <span>kontrib.app &middot; 2025</span>
+          </div>
+        </footer>
+      </div>
     </div>
   );
 }
