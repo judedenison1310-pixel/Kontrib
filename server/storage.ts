@@ -73,6 +73,7 @@ export interface IStorage {
   createNotification(notification: InsertNotification): Promise<Notification>;
   createRejectionNotification(contribution: Contribution, reason?: string): Promise<void>;
   markNotificationRead(notificationId: string): Promise<void>;
+  deleteNotification(notificationId: string): Promise<void>;
   
   getUserContributions(userId: string): Promise<ContributionWithDetails[]>;
   getAdminContributions(adminId: string): Promise<ContributionWithDetails[]>;
@@ -812,6 +813,10 @@ export class MemStorage implements IStorage {
       notification.read = true;
       this.notifications.set(notificationId, notification);
     }
+  }
+
+  async deleteNotification(notificationId: string): Promise<void> {
+    this.notifications.delete(notificationId);
   }
 
   // Helper method to create payment notifications
@@ -1580,6 +1585,10 @@ export class DbStorage implements IStorage {
 
   async markNotificationRead(notificationId: string): Promise<void> {
     await db.update(notificationsTable).set({ read: true }).where(eq(notificationsTable.id, notificationId));
+  }
+
+  async deleteNotification(notificationId: string): Promise<void> {
+    await db.delete(notificationsTable).where(eq(notificationsTable.id, notificationId));
   }
 
   async getUserStats(userId: string): Promise<MemberWithContributions> {

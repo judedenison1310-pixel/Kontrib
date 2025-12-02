@@ -758,6 +758,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/notifications/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteNotification(id);
+      res.json({ message: "Notification dismissed" });
+    } catch (error) {
+      console.error("Delete notification error:", error);
+      res.status(500).json({ message: "Failed to dismiss notification" });
+    }
+  });
+
   // Stats routes
   app.get("/api/stats/user/:userId", async (req, res) => {
     try {

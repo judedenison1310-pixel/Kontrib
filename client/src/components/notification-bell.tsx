@@ -14,7 +14,7 @@ import {
   CheckCircle, 
   XCircle, 
   Clock,
-  User
+  X
 } from "lucide-react";
 import { formatNaira } from "@/lib/currency";
 import { apiRequest } from "@/lib/queryClient";
@@ -48,6 +48,21 @@ export function NotificationBell({ userId, onContributionClick }: NotificationBe
       queryClient.invalidateQueries({ queryKey: ["/api/notifications", userId] });
     },
   });
+
+  const dismissMutation = useMutation({
+    mutationFn: async (notificationId: string) => {
+      const response = await apiRequest("DELETE", `/api/notifications/${notificationId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications", userId] });
+    },
+  });
+
+  const handleDismiss = (e: React.MouseEvent, notificationId: string) => {
+    e.stopPropagation();
+    dismissMutation.mutate(notificationId);
+  };
 
   const unreadNotifications = notifications.filter(n => !n.read);
   const pendingContributions = contributions.filter(c => c.status === 'pending');
@@ -135,16 +150,23 @@ export function NotificationBell({ userId, onContributionClick }: NotificationBe
               </div>
             ) : (
               <div className="space-y-1">
-                {notifications.slice(0, 10).map((notification) => (
+                {notifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`p-3 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                    className={`p-3 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors relative group ${
                       !notification.read ? 'bg-blue-50 border-l-4 border-l-blue-500' : 'bg-white'
                     }`}
                     onClick={() => handleNotificationClick(notification)}
                     data-testid={`notification-${notification.id}`}
                   >
-                    <div className="flex items-start gap-3">
+                    <button
+                      onClick={(e) => handleDismiss(e, notification.id)}
+                      className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-200 opacity-0 group-hover:opacity-100 transition-opacity"
+                      data-testid={`dismiss-notification-${notification.id}`}
+                    >
+                      <X className="h-3 w-3 text-gray-500" />
+                    </button>
+                    <div className="flex items-start gap-3 pr-6">
                       <div className="flex-shrink-0">
                         {getNotificationIcon(notification.type)}
                       </div>
@@ -199,8 +221,8 @@ export function NotificationBell({ userId, onContributionClick }: NotificationBe
                             </p>
                             <p className="text-xs text-gray-600">
                               {contribution.groupName}
-                              {contribution.purseName && (
-                                <span> → {contribution.purseName}</span>
+                              {contribution.projectName && (
+                                <span> → {contribution.projectName}</span>
                               )}
                             </p>
                           </div>
