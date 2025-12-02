@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
-import { Users, Shield, ArrowRight, Lock, CheckCircle2, Zap } from "lucide-react";
+import { Users, Shield, ArrowRight, Lock, CheckCircle2, Zap, Eye } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { type User as UserType } from "@shared/schema";
 import { sendOtp, verifyOtp, updateProfile } from "@/lib/auth";
@@ -258,11 +258,11 @@ export default function Landing() {
             {/* Trust Indicators */}
             <div className="flex items-center justify-center gap-6">
               <div className="flex items-center gap-2 text-gray-500 text-sm">
-                <CheckCircle2 className="w-4 h-4 text-green-600" />
+                <Eye className="w-4 h-4 text-green-600" />
                 <span>Transparent</span>
               </div>
               <div className="flex items-center gap-2 text-gray-500 text-sm">
-                <CheckCircle2 className="w-4 h-4 text-green-600" />
+                <Shield className="w-4 h-4 text-green-600" />
                 <span>Secure</span>
               </div>
               <div className="flex items-center gap-2 text-gray-500 text-sm">
