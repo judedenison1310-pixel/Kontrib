@@ -1411,7 +1411,7 @@ export class DbStorage implements IStorage {
 
     return result.map(row => ({
       ...row.contributions,
-      userName: row.users!.username,
+      userName: row.users!.fullName || row.users!.username,
       groupName: row.groups!.name,
       projectName: row.projects?.name
     }));
@@ -1429,7 +1429,7 @@ export class DbStorage implements IStorage {
 
     return result.map(row => ({
       ...row.contributions,
-      userName: row.users!.username,
+      userName: row.users!.fullName || row.users!.username,
       groupName: row.groups!.name,
       projectName: row.projects?.name
     }));
@@ -1503,7 +1503,7 @@ export class DbStorage implements IStorage {
 
     return result.map(row => ({
       ...row.contributions,
-      userName: row.users!.username,
+      userName: row.users!.fullName || row.users!.username,
       groupName: row.groups!.name,
       projectName: row.projects?.name
     }));
@@ -1526,7 +1526,7 @@ export class DbStorage implements IStorage {
 
     return result.map(row => ({
       ...row.contributions,
-      userName: row.users!.username,
+      userName: row.users!.fullName || row.users!.username,
       groupName: row.groups!.name,
       projectName: row.projects?.name
     }));
