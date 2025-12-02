@@ -12,7 +12,7 @@ import { sendOtp, verifyOtp, updateProfile } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import kontribLogo from "@assets/8_1764455185903.png";
-import heroImage from "@assets/stock_images/african_friends_grou_bf4c5d0b.jpg";
+import heroImage from "@assets/Komntrib (2)_1764653626078.jpg";
 
 const phoneSchema = z.object({
   phoneNumber: z.string().min(10, "Enter your WhatsApp number"),
@@ -189,7 +189,7 @@ export default function Landing() {
   }, [step]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
       <header className="bg-white border-b border-gray-100 px-6 py-4">
         <div className="max-w-lg mx-auto flex items-center gap-3">
@@ -198,22 +198,16 @@ export default function Landing() {
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto px-4 py-6">
+      <main className="flex-1 max-w-lg mx-auto px-4 py-6 w-full">
         {step === "phone" && (
-          <div className="space-y-6">
-            {/* Hero Image */}
-            <div className="relative rounded-2xl overflow-hidden shadow-lg">
+          <div className="space-y-8">
+            {/* Hero Image - text embedded in image */}
+            <div className="rounded-2xl overflow-hidden shadow-lg">
               <img 
                 src={heroImage} 
-                alt="Friends tracking group money together" 
-                className="w-full h-48 object-cover"
+                alt="Track group money with ease" 
+                className="w-full aspect-square object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-              <div className="absolute bottom-4 left-4 right-4">
-                <h1 className="text-2xl font-bold text-white leading-tight">
-                  Track Group Money Together
-                </h1>
-              </div>
             </div>
 
             {/* Login Card */}
@@ -478,8 +472,8 @@ export default function Landing() {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="py-6">
+      {/* Footer - pushed to bottom */}
+      <footer className="py-6 mt-auto">
         <div className="text-center text-sm text-gray-400">
           kontrib.app
         </div>
