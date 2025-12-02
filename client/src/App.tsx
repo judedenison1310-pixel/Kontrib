@@ -4,7 +4,7 @@ import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useEffect, useState } from "react";
-import { initializeAuth, getCurrentUser } from "./lib/auth";
+import { initializeAuth, getCurrentUser, setupAuthSync } from "./lib/auth";
 import type { User } from "@shared/schema";
 
 const REDIRECT_KEY = "kontrib_redirectTo";
@@ -96,11 +96,6 @@ function Router() {
       setUser(event.detail);
     };
 
-    const checkAuth = () => {
-      const currentUser = getCurrentUser();
-      setUser(currentUser);
-    };
-
     // Initialize auth with backend validation
     const init = async () => {
       await initializeAuth();
@@ -110,13 +105,17 @@ function Router() {
     
     init();
     
-    // Listen for custom auth state changes
+    // Listen for same-tab auth state changes
     window.addEventListener('authStateChanged', handleAuthStateChange as EventListener);
-    window.addEventListener('storage', checkAuth);
+    
+    // Setup cross-tab auth synchronization (handles logout from other tabs)
+    const cleanupAuthSync = setupAuthSync((newUser) => {
+      setUser(newUser);
+    });
     
     return () => {
       window.removeEventListener('authStateChanged', handleAuthStateChange as EventListener);
-      window.removeEventListener('storage', checkAuth);
+      cleanupAuthSync();
     };
   }, []);
 

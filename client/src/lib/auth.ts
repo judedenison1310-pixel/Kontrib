@@ -5,6 +5,8 @@ let currentUser: User | null = null;
 let authInitialized = false;
 
 const DEVICE_TOKEN_KEY = "kontrib_device_token";
+const CURRENT_USER_KEY = "currentUser";
+const LOGOUT_EVENT_KEY = "kontrib_logout_event";
 
 export function getCurrentUser(): User | null {
   return currentUser;
@@ -13,9 +15,9 @@ export function getCurrentUser(): User | null {
 export function setCurrentUser(user: User | null): void {
   currentUser = user;
   if (user) {
-    localStorage.setItem('currentUser', JSON.stringify(user));
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
   } else {
-    localStorage.removeItem('currentUser');
+    localStorage.removeItem(CURRENT_USER_KEY);
   }
   
   window.dispatchEvent(new CustomEvent('authStateChanged', { detail: user }));
@@ -31,6 +33,58 @@ export function setDeviceToken(token: string | null): void {
   } else {
     localStorage.removeItem(DEVICE_TOKEN_KEY);
   }
+}
+
+// Setup cross-tab auth synchronization
+export function setupAuthSync(onAuthChange: (user: User | null) => void): () => void {
+  const handleStorageChange = (event: StorageEvent) => {
+    // Handle logout event from another tab
+    if (event.key === LOGOUT_EVENT_KEY) {
+      console.log('[Auth] Logout detected from another tab');
+      currentUser = null;
+      onAuthChange(null);
+      return;
+    }
+    
+    // Handle user change from another tab
+    if (event.key === CURRENT_USER_KEY) {
+      if (event.newValue === null) {
+        console.log('[Auth] User cleared from another tab');
+        currentUser = null;
+        onAuthChange(null);
+      } else {
+        try {
+          const newUser = JSON.parse(event.newValue);
+          console.log('[Auth] User changed from another tab:', newUser?.fullName);
+          currentUser = newUser;
+          onAuthChange(newUser);
+        } catch (e) {
+          console.warn('[Auth] Failed to parse user from storage:', e);
+        }
+      }
+    }
+    
+    // Handle device token removal (logout)
+    if (event.key === DEVICE_TOKEN_KEY && event.newValue === null) {
+      console.log('[Auth] Device token cleared from another tab');
+      currentUser = null;
+      localStorage.removeItem(CURRENT_USER_KEY);
+      onAuthChange(null);
+    }
+  };
+  
+  window.addEventListener('storage', handleStorageChange);
+  
+  return () => {
+    window.removeEventListener('storage', handleStorageChange);
+  };
+}
+
+// Broadcast logout to other tabs
+function broadcastLogout(): void {
+  // Use a timestamp to ensure the storage event fires (same value doesn't trigger event)
+  localStorage.setItem(LOGOUT_EVENT_KEY, Date.now().toString());
+  localStorage.removeItem(LOGOUT_EVENT_KEY);
 }
 
 export function isAuthInitialized(): boolean {
@@ -133,8 +187,12 @@ export async function logout(): Promise<void> {
     }
   }
   
+  // Clear local state
   setDeviceToken(null);
   setCurrentUser(null);
+  
+  // Broadcast logout to other tabs
+  broadcastLogout();
 }
 
 export async function sendOtp(phoneNumber: string): Promise<{ success: boolean; expiresAt?: Date; developmentOtp?: string; message?: string }> {
