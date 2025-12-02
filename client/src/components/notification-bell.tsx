@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import {
   Popover,
   PopoverContent,
@@ -27,6 +28,7 @@ interface NotificationBellProps {
 
 export function NotificationBell({ userId, onContributionClick }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
+  const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
 
   const { data: notifications = [] } = useQuery<Notification[]>({
@@ -207,10 +209,8 @@ export function NotificationBell({ userId, onContributionClick }: NotificationBe
                         key={contribution.id}
                         className="p-2 bg-orange-50 rounded border-l-4 border-l-orange-500 cursor-pointer hover:bg-orange-100 transition-colors"
                         onClick={() => {
-                          if (onContributionClick) {
-                            onContributionClick(contribution);
-                            setOpen(false);
-                          }
+                          setLocation(`/group/${contribution.groupId}/pending`);
+                          setOpen(false);
                         }}
                         data-testid={`pending-contribution-${contribution.id}`}
                       >
