@@ -1,6 +1,6 @@
-import { Switch, Route, Redirect, useLocation } from "wouter";
+import { Switch, Route, Redirect, useLocation, useParams } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useEffect, useState } from "react";
@@ -18,13 +18,73 @@ import Updates from "@/pages/updates";
 import GroupRegistration from "@/pages/group-registration";
 import NotFound from "@/pages/not-found";
 import WhatsAppIntegration from "@/pages/whatsapp-integration";
-import GroupLanding from "@/pages/group-landing";
 import MemberPayment from "@/pages/member-payment";
 import JoinGroup from "@/pages/join-group";
 import GroupDetails from "@/pages/group-details";
 import ProjectDetails from "@/pages/project-details";
 import GroupMembers from "@/pages/group-members";
 import GroupProjects from "@/pages/group-projects";
+
+// Component to handle shared links - redirects logged-in users directly to project/group
+function SharedLinkRedirect({ user }: { user: User | null }) {
+  const params = useParams<{ groupSlug?: string; projectSlug?: string }>();
+  const [, navigate] = useLocation();
+  const [location] = useLocation();
+  
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["/api/groups/join", params.groupSlug, params.projectSlug],
+    queryFn: async () => {
+      const endpoint = params.projectSlug 
+        ? `/api/groups/join/${params.groupSlug}/${params.projectSlug}`
+        : `/api/groups/slug/${params.groupSlug}`;
+      const url = user ? `${endpoint}?userId=${user.id}` : endpoint;
+      const response = await fetch(url, { credentials: "include" });
+      if (!response.ok) throw new Error("Group not found");
+      return response.json();
+    },
+    enabled: !!user && !!params.groupSlug,
+  });
+
+  // Not logged in - save path and show landing
+  if (!user) {
+    localStorage.setItem(REDIRECT_KEY, location);
+    return <Landing />;
+  }
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-green-600 border-r-transparent mb-4"></div>
+          <p className="text-gray-600">Finding your group...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error or not found
+  if (isError || !data) {
+    return <NotFound />;
+  }
+
+  // Redirect to the appropriate page
+  if (data.projects && data.projects.length > 0 && params.projectSlug) {
+    // Find matching project by slug
+    const matchedProject = data.projects.find((p: any) => {
+      const pSlug = p.name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '').slice(0, 50);
+      return pSlug === params.projectSlug;
+    });
+    if (matchedProject) {
+      navigate(`/project/${matchedProject.id}`);
+      return null;
+    }
+  }
+  
+  // Default: redirect to group details
+  navigate(`/group/${data.group.id}`);
+  return null;
+}
 function Router() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -91,8 +151,8 @@ function Router() {
       {/* Public routes */}
       <Route path="/" component={user ? Groups : Landing} />
       <Route path="/register/:link" component={GroupRegistration} />
-      <Route path="/join/:groupSlug/:projectSlug" component={GroupLanding} />
-      <Route path="/join/:groupSlug" component={GroupLanding} />
+      <Route path="/join/:groupSlug/:projectSlug">{() => <SharedLinkRedirect user={user} />}</Route>
+      <Route path="/join/:groupSlug">{() => <SharedLinkRedirect user={user} />}</Route>
       <Route path="/join-group" component={JoinGroup} />
       <Route path="/member-payment" component={MemberPayment} />
       
@@ -119,7 +179,7 @@ function Router() {
           if (knownRoutes.includes(params.groupSlug?.toLowerCase() || '')) {
             return <NotFound />;
           }
-          return <GroupLanding />;
+          return <SharedLinkRedirect user={user} />;
         }}
       </Route>
       <Route path="/:groupSlug">
@@ -128,7 +188,7 @@ function Router() {
           if (knownRoutes.includes(params.groupSlug?.toLowerCase() || '')) {
             return <NotFound />;
           }
-          return <GroupLanding />;
+          return <SharedLinkRedirect user={user} />;
         }}
       </Route>
       
