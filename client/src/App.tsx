@@ -24,6 +24,7 @@ import GroupDetails from "@/pages/group-details";
 import ProjectDetails from "@/pages/project-details";
 import GroupMembers from "@/pages/group-members";
 import GroupProjects from "@/pages/group-projects";
+import PendingApprovals from "@/pages/pending-approvals";
 
 // Component to handle shared links - redirects logged-in users directly to project/group
 function SharedLinkRedirect({ user }: { user: User | null }) {
@@ -167,6 +168,7 @@ function Router() {
       <Route path="/updates">{user ? <Updates /> : <Landing />}</Route>
       <Route path="/group/:groupId/members">{user ? <GroupMembers /> : <Landing />}</Route>
       <Route path="/group/:groupId/projects">{user ? <GroupProjects /> : <Landing />}</Route>
+      <Route path="/group/:groupId/pending">{user ? <PendingApprovals /> : <Landing />}</Route>
       <Route path="/group/:groupId">{user ? <GroupDetails /> : <Landing />}</Route>
       <Route path="/project/:projectId">{user ? <ProjectDetails /> : <Landing />}</Route>
       <Route path="/whatsapp">{user ? <WhatsAppIntegration /> : <Landing />}</Route>

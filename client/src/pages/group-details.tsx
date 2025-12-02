@@ -295,7 +295,7 @@ function AdminContent({
               <Button
                 size="sm"
                 className="bg-orange-600 hover:bg-orange-700"
-                onClick={() => setLocation(`/admin/projects`)}
+                onClick={() => setLocation(`/group/${groupId}/pending`)}
                 data-testid="button-review-payments"
               >
                 Review
