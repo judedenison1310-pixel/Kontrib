@@ -5,13 +5,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
-import { Users, Shield, ArrowRight, Quote, User, Lock } from "lucide-react";
+import { Users, Shield, ArrowRight, Lock } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { type User as UserType } from "@shared/schema";
 import { sendOtp, verifyOtp, updateProfile } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import kontribLogo from "@assets/8_1764455185903.png";
+import heroImage from "@assets/landing page image_1764650881450.jpg";
 
 const phoneSchema = z.object({
   phoneNumber: z.string().min(10, "Enter your WhatsApp number"),
@@ -189,29 +190,39 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <header className="px-6 py-5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <img src={kontribLogo} alt="Kontrib" className="w-10 h-10" />
-          <span className="text-2xl font-bold text-gray-900">Kontrib</span>
+      <header className="px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <img src={kontribLogo} alt="Kontrib" className="w-9 h-9" />
+          <span className="text-xl font-bold text-gray-900">Kontrib</span>
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center px-6 pb-8">
+      <main className="flex-1 flex flex-col items-center px-6 pb-6">
         
         {step === "phone" && (
-          <div className="w-full max-w-lg text-center pt-8 sm:pt-12 flex-1 flex flex-col">
-            <div className="space-y-6 mb-10">
-              <h1 className="text-4xl sm:text-5xl font-black text-gray-900 leading-tight font-circular">
-                Track Group Money With Ease
+          <div className="w-full max-w-md text-center pt-4 flex-1 flex flex-col">
+            <div className="mb-6">
+              <h1 className="text-3xl sm:text-4xl font-black text-gray-900 leading-tight">
+                Track Group Money Together
               </h1>
-              <p className="text-gray-600 text-base sm:text-lg max-w-md mx-auto leading-relaxed font-sans">
-                No more "who has paid?" Everyone sees every kobo instantly. Payment proofs, updates, and history – all in one place.
-              </p>
             </div>
 
-            <div className="space-y-4 mb-10">
+            <div className="rounded-2xl overflow-hidden mb-6 shadow-lg">
+              <img 
+                src={heroImage} 
+                alt="People using Kontrib" 
+                className="w-full h-48 sm:h-56 object-cover"
+                loading="eager"
+              />
+            </div>
+
+            <p className="text-gray-600 text-base mb-6">
+              See every payment. No more "who has paid?"
+            </p>
+
+            <div className="space-y-3">
               <Form {...phoneForm}>
-                <form onSubmit={phoneForm.handleSubmit(onPhoneSubmit)} className="space-y-4">
+                <form onSubmit={phoneForm.handleSubmit(onPhoneSubmit)} className="space-y-3">
                   <FormField
                     control={phoneForm.control}
                     name="phoneNumber"
@@ -219,7 +230,7 @@ export default function Landing() {
                       <FormItem>
                         <FormControl>
                           <Input 
-                            placeholder="Type in Whatsapp number eg. +2349056783314" 
+                            placeholder="WhatsApp number e.g. +2349056783314" 
                             className="h-14 text-base px-5 rounded-xl border-2 border-gray-200 focus:border-primary bg-white text-center font-medium" 
                             type="tel"
                             {...field}
@@ -233,7 +244,7 @@ export default function Landing() {
                   <button
                     type="submit"
                     disabled={sendOtpMutation.isPending}
-                    className="btn-kontrib w-full rounded-xl px-2"
+                    className="btn-kontrib w-full rounded-xl"
                     data-testid="button-continue"
                   >
                     {sendOtpMutation.isPending ? (
@@ -248,78 +259,47 @@ export default function Landing() {
                 </form>
               </Form>
             </div>
-
-            <div className="pt-6 pb-4">
-              <p className="text-gray-500 text-base italic font-sans">"Let's keep it transparent"</p>
-            </div>
-
-            <div className="flex-1 -mx-6 px-6 mt-2">
-              <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide" style={{ scrollSnapType: 'x mandatory' }}>
-                <div className="bg-white rounded-xl p-5 text-left border-2 border-gray-200 relative shadow-sm flex-shrink-0 w-72" style={{ borderLeftColor: 'var(--kontrib-green)', borderLeftWidth: '4px', scrollSnapAlign: 'start' }}>
-                  <div className="absolute top-4 left-4 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                    <User className="h-4 w-4 text-gray-600" />
-                  </div>
-                  <Quote className="h-6 w-6 text-primary/20 absolute top-4 right-4" />
-                  <p className="text-gray-800 text-base font-medium italic leading-relaxed pr-8 pl-10 font-sans">
-                    "Everything just dey flow. No more stress for admin"
-                  </p>
-                  <p className="text-gray-900 text-sm mt-3 font-semibold pl-10 font-sans">Ada, Ajo treasurer</p>
-                </div>
-                
-                <div className="bg-white rounded-xl p-5 text-left border-2 border-gray-200 relative shadow-sm flex-shrink-0 w-72" style={{ borderLeftColor: 'var(--kontrib-green)', borderLeftWidth: '4px', scrollSnapAlign: 'start' }}>
-                  <div className="absolute top-4 left-4 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                    <User className="h-4 w-4 text-gray-600" />
-                  </div>
-                  <Quote className="h-6 w-6 text-primary/20 absolute top-4 right-4" />
-                  <p className="text-gray-800 text-base font-medium italic leading-relaxed pr-8 pl-10 font-sans">
-                    "This tracker is brilliant! My Whatsapp group loves it"
-                  </p>
-                  <p className="text-gray-900 text-sm mt-3 font-semibold pl-10 font-sans">Ayo, Delta FC Admin</p>
-                </div>
-              </div>
-            </div>
           </div>
         )}
 
         {step === "otp" && (
-          <div className="w-full max-w-md pt-12">
+          <div className="w-full max-w-md pt-8">
             <button
               onClick={() => {
                 setStep("phone");
                 otpForm.reset();
                 setDevOtp(null);
               }}
-              className="flex items-center gap-2 text-gray-500 hover:text-primary mb-8 transition-colors"
+              className="flex items-center gap-2 text-gray-500 hover:text-primary mb-6 transition-colors"
               data-testid="button-back-phone"
             >
               <ArrowRight className="h-4 w-4 rotate-180" />
               <span className="text-sm font-medium">Back</span>
             </button>
             
-            <div className="space-y-8">
+            <div className="space-y-6">
               <div className="text-center">
-                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Lock className="h-8 w-8 text-primary" />
+                <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Lock className="h-7 w-7 text-primary" />
                 </div>
-                <h2 className="text-3xl font-black text-gray-900">
+                <h2 className="text-2xl font-black text-gray-900">
                   Enter the code
                 </h2>
-                <p className="text-gray-500 mt-3 text-lg">
-                  We sent a 6-digit code to<br />
-                  <span className="font-semibold text-gray-700">{phoneNumber}</span>
+                <p className="text-gray-500 mt-2">
+                  Sent to <span className="font-semibold text-gray-700">{phoneNumber}</span>
                 </p>
               </div>
 
               {devOtp && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-center">
+                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-center">
                   <p className="text-sm text-yellow-800">
-                    Development mode: <span className="font-bold tracking-wider">{devOtp}</span>
+                    Dev mode: <span className="font-bold tracking-wider">{devOtp}</span>
                   </p>
                 </div>
               )}
 
               <Form {...otpForm}>
-                <form onSubmit={otpForm.handleSubmit(onOtpSubmit)} className="space-y-6">
+                <form onSubmit={otpForm.handleSubmit(onOtpSubmit)} className="space-y-5">
                   <div className="flex justify-center gap-3" onPaste={handleOtpPaste}>
                     {[0, 1, 2, 3, 4, 5].map((index) => (
                       <input
@@ -328,7 +308,7 @@ export default function Landing() {
                         type="text"
                         inputMode="numeric"
                         maxLength={1}
-                        className="w-12 h-14 text-center text-2xl font-bold border-2 border-gray-200 rounded-xl focus:border-primary focus:outline-none bg-white"
+                        className="w-11 h-13 text-center text-xl font-bold border-2 border-gray-200 rounded-xl focus:border-primary focus:outline-none bg-white"
                         value={otpForm.watch("otp")[index] || ""}
                         onChange={(e) => handleOtpChange(index, e.target.value)}
                         onKeyDown={(e) => handleOtpKeyDown(index, e)}
@@ -360,7 +340,7 @@ export default function Landing() {
                 <button
                   onClick={() => sendOtpMutation.mutate(phoneNumber)}
                   disabled={sendOtpMutation.isPending}
-                  className="text-primary font-medium hover:underline disabled:opacity-50"
+                  className="text-primary font-medium hover:underline disabled:opacity-50 text-sm"
                   data-testid="button-resend-otp"
                 >
                   {sendOtpMutation.isPending ? "Sending..." : "Didn't get it? Send again"}
@@ -371,26 +351,26 @@ export default function Landing() {
         )}
 
         {step === "profile" && (
-          <div className="w-full max-w-md pt-12">
+          <div className="w-full max-w-md pt-8">
             <button
               onClick={() => setStep("otp")}
-              className="flex items-center gap-2 text-gray-500 hover:text-primary mb-8 transition-colors"
+              className="flex items-center gap-2 text-gray-500 hover:text-primary mb-6 transition-colors"
               data-testid="button-back-otp"
             >
               <ArrowRight className="h-4 w-4 rotate-180" />
               <span className="text-sm font-medium">Back</span>
             </button>
             
-            <div className="space-y-8">
+            <div className="space-y-6">
               <div>
-                <h2 className="text-3xl font-black text-gray-900">
+                <h2 className="text-2xl font-black text-gray-900">
                   What's your name?
                 </h2>
-                <p className="text-gray-500 mt-3 text-lg">So your group members can recognize you</p>
+                <p className="text-gray-500 mt-2">So group members can recognize you</p>
               </div>
 
               <Form {...profileForm}>
-                <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-5">
+                <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-4">
                   <FormField
                     control={profileForm.control}
                     name="fullName"
@@ -424,39 +404,39 @@ export default function Landing() {
         )}
 
         {step === "role" && (
-          <div className="w-full max-w-md pt-12">
+          <div className="w-full max-w-md pt-8">
             <button
               onClick={() => setStep("profile")}
               disabled={profileMutation.isPending}
-              className="flex items-center gap-2 text-gray-500 hover:text-primary mb-8 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 text-gray-500 hover:text-primary mb-6 transition-colors disabled:opacity-50"
               data-testid="button-back-profile"
             >
               <ArrowRight className="h-4 w-4 rotate-180" />
               <span className="text-sm font-medium">Back</span>
             </button>
             
-            <div className="space-y-8">
+            <div className="space-y-6">
               <div>
-                <h2 className="text-3xl font-black text-gray-900">
+                <h2 className="text-2xl font-black text-gray-900">
                   What do you want to do?
                 </h2>
-                <p className="text-gray-500 mt-3 text-lg">You can change this later</p>
+                <p className="text-gray-500 mt-2">You can change this later</p>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <button
                   onClick={() => selectRole("member")}
                   disabled={profileMutation.isPending}
-                  className="w-full bg-white border-2 border-gray-200 hover:border-primary hover:shadow-md rounded-xl p-5 text-left transition-all active:scale-[0.98] disabled:opacity-50"
+                  className="w-full bg-white border-2 border-gray-200 hover:border-primary hover:shadow-md rounded-xl p-4 text-left transition-all active:scale-[0.98] disabled:opacity-50"
                   data-testid="button-role-member"
                 >
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <Users className="h-6 w-6 text-primary" />
+                  <div className="flex items-center gap-4">
+                    <div className="w-11 h-11 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Users className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <p className="font-bold text-gray-900 text-lg">Join Groups</p>
-                      <p className="text-gray-500 mt-1">Contribute to groups, track your payments</p>
+                      <p className="font-bold text-gray-900">Join Groups</p>
+                      <p className="text-gray-500 text-sm">Contribute and track payments</p>
                     </div>
                   </div>
                 </button>
@@ -464,25 +444,25 @@ export default function Landing() {
                 <button
                   onClick={() => selectRole("admin")}
                   disabled={profileMutation.isPending}
-                  className="w-full bg-white border-2 border-gray-200 hover:border-primary hover:shadow-md rounded-xl p-5 text-left transition-all active:scale-[0.98] disabled:opacity-50"
+                  className="w-full bg-white border-2 border-gray-200 hover:border-primary hover:shadow-md rounded-xl p-4 text-left transition-all active:scale-[0.98] disabled:opacity-50"
                   data-testid="button-role-admin"
                 >
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <Shield className="h-6 w-6 text-primary" />
+                  <div className="flex items-center gap-4">
+                    <div className="w-11 h-11 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Shield className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <p className="font-bold text-gray-900 text-lg">Create Groups</p>
-                      <p className="text-gray-500 mt-1">Manage contributions, approve payments</p>
+                      <p className="font-bold text-gray-900">Create Groups</p>
+                      <p className="text-gray-500 text-sm">Manage and approve payments</p>
                     </div>
                   </div>
                 </button>
               </div>
 
               {profileMutation.isPending && (
-                <div className="flex items-center justify-center gap-3 text-primary py-4">
+                <div className="flex items-center justify-center gap-3 text-primary py-3">
                   <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                  <span className="font-medium">Setting up your account...</span>
+                  <span className="font-medium text-sm">Setting up your account...</span>
                 </div>
               )}
             </div>
@@ -490,10 +470,10 @@ export default function Landing() {
         )}
       </main>
 
-      <footer className="px-6 py-4 border-t border-gray-200 bg-white">
-        <div className="flex items-center justify-between text-sm font-sans">
+      <footer className="px-6 py-3 border-t border-gray-200 bg-white">
+        <div className="flex items-center justify-between text-xs">
           <span className="text-kontrib-green font-semibold">kontrib.app</span>
-          <span className="text-gray-500">2025 Kontrib - VibeCore Labs</span>
+          <span className="text-gray-400">2025 Kontrib</span>
         </div>
       </footer>
     </div>
