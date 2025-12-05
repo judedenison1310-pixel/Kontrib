@@ -294,6 +294,22 @@ export default function ProjectDetails() {
           </Card>
         )}
 
+        {/* Primary CTA - Submit Payment Proof */}
+        <div className="bg-primary rounded-2xl p-5 text-center">
+          <h3 className="text-white font-bold text-lg mb-2">Ready to Contribute?</h3>
+          <p className="text-green-100 text-sm mb-4">
+            Make your payment using the account details below, then submit your proof
+          </p>
+          <button
+            onClick={() => setPaymentOpen(true)}
+            className="w-full bg-white hover:bg-gray-100 text-primary font-bold text-lg py-4 rounded-full shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+            data-testid="button-submit-proof-primary"
+          >
+            <CreditCard className="h-5 w-5" />
+            Submit Payment Proof
+          </button>
+        </div>
+
         {/* Payment Details */}
         {hasPaymentDetails && (
           <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 space-y-3">
