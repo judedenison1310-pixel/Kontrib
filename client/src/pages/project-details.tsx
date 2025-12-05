@@ -215,6 +215,18 @@ export default function ProjectDetails() {
 
         {/* Project Header */}
         <div className="bg-primary rounded-2xl p-5 text-white">
+          {/* Group Name */}
+          {group && (
+            <button
+              onClick={() => setLocation(`/group/${group.id}`)}
+              className="flex items-center gap-1 text-green-200 text-sm mb-2 hover:text-white transition-colors"
+              data-testid="link-group"
+            >
+              <Building2 className="h-4 w-4" />
+              <span>{group.name}</span>
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          )}
           <div className="flex items-center gap-2 mb-2">
             <Badge className="bg-white/20 text-white border-0 text-xs">
               {getProjectTypeLabel(project.projectType)}

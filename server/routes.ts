@@ -286,11 +286,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get member count
       const members = await storage.getGroupMembers(group.id);
       
-      // Check if current user is already a member
+      // Check if current user is already a member, and auto-add them if not
       let isMember = false;
       if (userId && typeof userId === 'string') {
         const membership = await storage.getGroupMember(group.id, userId);
         isMember = !!membership;
+        
+        // Auto-add user to group if they followed a shared link and aren't already a member
+        if (!isMember) {
+          try {
+            await storage.addGroupMember({
+              groupId: group.id,
+              userId: userId,
+            });
+            isMember = true;
+            console.log(`Auto-added user ${userId} to group ${group.id} via shared link`);
+          } catch (addError) {
+            console.error("Failed to auto-add user to group:", addError);
+            // Don't mask the failure - isMember stays false
+          }
+        }
       }
       
       // Calculate totals - if project found, use its data; otherwise use group totals
