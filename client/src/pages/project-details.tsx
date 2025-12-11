@@ -23,12 +23,32 @@ import {
   Eye,
   Trash2,
   Pencil,
+  MessageCircle,
+  Send,
+  UserX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { formatNaira } from "@/lib/currency";
 import { getCurrentUser } from "@/lib/auth";
+import { 
+  generateIndividualReminderMessage, 
+  generateBulkReminderMessage, 
+  generateWhatsAppLink,
+  generateWhatsAppShareLink 
+} from "@/lib/reminders";
 import type { Project, ContributionWithDetails, Group } from "@shared/schema";
+
+interface GroupMemberWithUser {
+  id: string;
+  userId: string;
+  user: {
+    id: string;
+    fullName: string;
+    phoneNumber?: string;
+    phone_number?: string;
+  };
+}
 
 export default function ProjectDetails() {
   const { projectId } = useParams();
@@ -57,12 +77,79 @@ export default function ProjectDetails() {
       enabled: !!projectId,
     });
 
+  const { data: groupMembers = [] } = useQuery<GroupMemberWithUser[]>({
+    queryKey: ["/api/groups", project?.groupId, "members"],
+    enabled: !!project?.groupId,
+  });
+
   const isLoading = projectLoading || contributionsLoading;
   const isAdmin = user?.id === group?.adminId;
 
   const confirmedContributions = contributions.filter(
     (c) => c.status === "confirmed",
   );
+
+  const paidUserIds = new Set(
+    confirmedContributions.map((c) => c.userId)
+  );
+
+  const unpaidMembers = groupMembers.filter(
+    (member) => !paidUserIds.has(member.userId)
+  );
+
+  const unpaidMembersWithPhone = unpaidMembers.filter(
+    (member) => member.user.phoneNumber || member.user.phone_number
+  );
+
+  const hasPhoneNumber = (member: GroupMemberWithUser) => {
+    return !!(member.user.phoneNumber || member.user.phone_number);
+  };
+
+  const sendIndividualReminder = (member: GroupMemberWithUser) => {
+    if (!project || !group) return;
+    
+    const phoneNumber = member.user.phoneNumber || member.user.phone_number || "";
+    if (!phoneNumber) {
+      toast({
+        title: "No phone number",
+        description: `${member.user.fullName} doesn't have a phone number on file.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const message = generateIndividualReminderMessage(
+      { fullName: member.user.fullName, phoneNumber },
+      { name: project.name, targetAmount: project.targetAmount, deadline: project.deadline },
+      { name: group.name, customSlug: group.customSlug, registrationLink: group.registrationLink }
+    );
+
+    window.open(generateWhatsAppLink(phoneNumber, message), "_blank");
+  };
+
+  const sendBulkReminder = () => {
+    if (!project || !group || unpaidMembersWithPhone.length === 0) {
+      toast({
+        title: "No reachable members",
+        description: "None of the unpaid members have phone numbers on file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const membersWithPhone = unpaidMembersWithPhone.map((m) => ({
+      fullName: m.user.fullName,
+      phoneNumber: m.user.phoneNumber || m.user.phone_number || "",
+    }));
+
+    const message = generateBulkReminderMessage(
+      membersWithPhone,
+      { name: project.name, targetAmount: project.targetAmount, deadline: project.deadline },
+      { name: group.name, customSlug: group.customSlug, registrationLink: group.registrationLink }
+    );
+
+    window.open(generateWhatsAppShareLink(message), "_blank");
+  };
   const totalContributed = confirmedContributions.reduce(
     (sum, contribution) => sum + parseFloat(contribution.amount || "0"),
     0,
@@ -517,6 +604,81 @@ export default function ProjectDetails() {
                     ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Unpaid Members Section - Admin Only */}
+        {isAdmin && unpaidMembers.length > 0 && (
+          <Card className="rounded-2xl border-0 shadow-sm border-l-4 border-l-orange-400">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <UserX className="w-5 h-5 text-orange-600" />
+                  Unpaid Members
+                </CardTitle>
+                <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700">
+                  {unpaidMembers.length}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button
+                onClick={sendBulkReminder}
+                disabled={unpaidMembersWithPhone.length === 0}
+                className={`w-full ${
+                  unpaidMembersWithPhone.length > 0 
+                    ? "bg-green-600 hover:bg-green-700 text-white" 
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                }`}
+                data-testid="button-remind-all"
+              >
+                <MessageCircle className="w-4 h-4 mr-2" />
+                Remind All via WhatsApp ({unpaidMembersWithPhone.length} reachable)
+              </Button>
+              
+              <div className="space-y-2">
+                {unpaidMembers.map((member) => {
+                  const memberHasPhone = hasPhoneNumber(member);
+                  return (
+                    <div
+                      key={member.id}
+                      className="flex items-center justify-between py-3 px-3 bg-gray-50 rounded-xl"
+                      data-testid={`unpaid-member-${member.id}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                          <span className="font-semibold text-orange-600">
+                            {member.user.fullName?.charAt(0)?.toUpperCase() || "?"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-900">
+                            {member.user.fullName}
+                          </span>
+                          {!memberHasPhone && (
+                            <p className="text-xs text-gray-400">No phone number</p>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => sendIndividualReminder(member)}
+                        disabled={!memberHasPhone}
+                        className={memberHasPhone 
+                          ? "text-green-600 border-green-200 hover:bg-green-50" 
+                          : "text-gray-400 border-gray-200 cursor-not-allowed"
+                        }
+                        data-testid={`button-remind-${member.id}`}
+                      >
+                        <Send className="w-4 h-4 mr-1" />
+                        Remind
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
             </CardContent>
           </Card>
         )}
