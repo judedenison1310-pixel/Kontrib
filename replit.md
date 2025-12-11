@@ -29,6 +29,7 @@ The frontend uses React 18 with TypeScript and Vite, leveraging Shadcn/UI (based
 - **Simplified Navigation**: Three main navigation links: My Groups, Pay, History. Logo links directly to /groups. Old dashboard routes (/dashboard, /admin) redirect to /groups.
 - **Project Contribution Transparency**: Members can view detailed contributor lists for any project, showing all confirmed contributions sorted by amount, total contributions, and remaining balance.
 - **Unified Groups Page**: Single "My Groups" page with filter pills (All, Admin, Member) to filter groups by role. Each group card shows role badges and context-aware action buttons.
+- **Payment Reminders**: Admins can nudge unpaid members via WhatsApp. Project page shows "Unpaid Members" section with individual "Remind" buttons (opens direct WhatsApp message) and "Remind All via WhatsApp" for bulk reminders. Button states reflect phone number availability - disabled for members without phone numbers.
 
 ### System Design Choices
 - **Database**: PostgreSQL with Drizzle ORM for a relational schema (Users, Groups, Members, Contributions, OTPs).
