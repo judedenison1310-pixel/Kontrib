@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { formatNaira } from "@/lib/currency";
+import { formatCurrency, CurrencyCode } from "@/lib/currency";
 import { getCurrentUser } from "@/lib/auth";
 import { 
   generateIndividualReminderMessage, 
@@ -287,6 +287,7 @@ export default function ProjectDetails() {
   }
 
   const hasPaymentDetails = project.accountNumber || project.bankName || project.paymentInstructions;
+  const projectCurrency = (project.currency as CurrencyCode) || "NGN";
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -353,12 +354,12 @@ export default function ProjectDetails() {
                   <Target className="h-3 w-3" />
                   Target
                 </p>
-                <p className="font-bold text-lg">{formatNaira(project.targetAmount!)}</p>
+                <p className="font-bold text-lg">{formatCurrency(project.targetAmount!, projectCurrency)}</p>
               </div>
             )}
             <div className={`bg-white/10 rounded-xl p-3 ${!hasTarget ? 'col-span-2' : ''}`}>
               <p className="text-green-200 text-xs">Collected</p>
-              <p className="font-bold text-lg">{formatNaira(project.collectedAmount)}</p>
+              <p className="font-bold text-lg">{formatCurrency(project.collectedAmount, projectCurrency)}</p>
             </div>
           </div>
 
@@ -384,10 +385,11 @@ export default function ProjectDetails() {
               </div>
               <Progress value={progress} className="h-3 mb-3" />
               <div className="flex justify-between text-sm text-gray-500">
-                <span>Collected: {formatNaira(project.collectedAmount)}</span>
+                <span>Collected: {formatCurrency(project.collectedAmount, projectCurrency)}</span>
                 <span>
-                  Remaining: {formatNaira(
-                    Math.max(0, parseFloat(project.targetAmount!) - parseFloat(project.collectedAmount))
+                  Remaining: {formatCurrency(
+                    Math.max(0, parseFloat(project.targetAmount!) - parseFloat(project.collectedAmount)),
+                    projectCurrency
                   )}
                 </span>
               </div>
@@ -597,7 +599,7 @@ export default function ProjectDetails() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-gray-900">{formatNaira(contribution.amount)}</span>
+                          <span className="font-bold text-gray-900">{formatCurrency(contribution.amount, projectCurrency)}</span>
                           <Eye className="w-4 h-4 text-gray-400" />
                         </div>
                       </div>
@@ -676,7 +678,7 @@ export default function ProjectDetails() {
                       </span>
                     </div>
                     <span className="font-bold text-gray-900">
-                      {formatNaira(contribution.amount)}
+                      {formatCurrency(contribution.amount, projectCurrency)}
                     </span>
                   </div>
                 ))}

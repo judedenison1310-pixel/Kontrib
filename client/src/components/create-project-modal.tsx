@@ -11,6 +11,7 @@ import { insertProjectSchema } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { getDefaultPaymentTypes } from "@/lib/payment-types";
+import { CURRENCIES, getCurrencySymbol, CurrencyCode } from "@/lib/currency";
 import { z } from "zod";
 import { ArrowLeft, Calendar, Building2, ChevronDown, ChevronUp } from "lucide-react";
 
@@ -43,6 +44,7 @@ export function CreateProjectModal({ open, onOpenChange, groupId, groupName }: C
       deadline: undefined,
       groupId,
       projectType: "target",
+      currency: "NGN",
       accountName: "",
       accountNumber: "",
       bankName: "",
@@ -59,6 +61,7 @@ export function CreateProjectModal({ open, onOpenChange, groupId, groupName }: C
   });
 
   const projectType = form.watch("projectType");
+  const selectedCurrency = form.watch("currency") as CurrencyCode || "NGN";
   const requiresTarget = projectType === "target" || projectType === "event" || projectType === "emergency";
 
   const createProjectMutation = useMutation({
@@ -178,13 +181,38 @@ export function CreateProjectModal({ open, onOpenChange, groupId, groupName }: C
                     )}
                   />
 
+                  <FormField
+                    control={form.control}
+                    name="currency"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-gray-700 font-medium">Currency</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="h-14 text-lg rounded-2xl border-2 border-gray-200" data-testid="select-currency">
+                              <SelectValue placeholder="Select currency" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {CURRENCIES.map((curr) => (
+                              <SelectItem key={curr.code} value={curr.code}>
+                                {curr.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
                   {requiresTarget && (
                     <FormField
                       control={form.control}
                       name="targetAmount"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-gray-700 font-medium">Target Amount (₦)</FormLabel>
+                          <FormLabel className="text-gray-700 font-medium">Target Amount ({getCurrencySymbol(selectedCurrency)})</FormLabel>
                           <FormControl>
                             <Input 
                               type="number" 

@@ -41,6 +41,7 @@ export const projects = pgTable("projects", {
   name: text("name").notNull(),
   description: text("description"),
   projectType: text("project_type").notNull().default("target"), // "target", "monthly", "yearly", "event", "emergency"
+  currency: text("currency").notNull().default("NGN"), // "NGN", "USD", "EUR"
   targetAmount: decimal("target_amount", { precision: 15, scale: 2 }), // Optional for monthly/yearly types
   collectedAmount: decimal("collected_amount", { precision: 15, scale: 2 }).notNull().default("0"),
   customSlug: text("custom_slug").unique(), // For kontrib.app/groupname/pursename URLs
@@ -148,6 +149,7 @@ export const insertProjectSchema = createInsertSchema(projects).omit({
   createdAt: true,
 }).extend({
   projectType: z.enum(["target", "monthly", "yearly", "event", "emergency"]).default("target"),
+  currency: z.enum(["NGN", "USD", "EUR"]).default("NGN"),
   targetAmount: z.string().optional().nullable(), // Optional for monthly/yearly types
   deadline: z.string().optional().or(z.date().optional()),
   allowedPaymentTypes: z.string().optional(), // JSON string of payment types

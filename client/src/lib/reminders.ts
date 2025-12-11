@@ -1,4 +1,4 @@
-import { formatNaira } from "./currency";
+import { formatCurrency, CurrencyCode } from "./currency";
 
 interface ReminderMember {
   fullName: string;
@@ -9,6 +9,7 @@ interface ReminderProject {
   name: string;
   targetAmount?: string | null;
   deadline?: string | Date | null;
+  currency?: string | null;
 }
 
 interface ReminderGroup {
@@ -31,7 +32,8 @@ export function generateIndividualReminderMessage(
   message += `This is a friendly reminder to submit your contribution for *${project.name}* in ${group.name}.\n\n`;
   
   if (project.targetAmount && parseFloat(project.targetAmount) > 0) {
-    message += `Target: ${formatNaira(project.targetAmount)}\n`;
+    const currency = (project.currency as CurrencyCode) || "NGN";
+    message += `Target: ${formatCurrency(project.targetAmount, currency)}\n`;
   }
   
   if (deadline) {
@@ -59,7 +61,8 @@ export function generateBulkReminderMessage(
   message += `This is a friendly reminder to submit your contributions for *${project.name}* in ${group.name}.\n\n`;
   
   if (project.targetAmount && parseFloat(project.targetAmount) > 0) {
-    message += `Target: ${formatNaira(project.targetAmount)}\n`;
+    const currency = (project.currency as CurrencyCode) || "NGN";
+    message += `Target: ${formatCurrency(project.targetAmount, currency)}\n`;
   }
   
   if (deadline) {
