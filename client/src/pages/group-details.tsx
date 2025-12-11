@@ -4,21 +4,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Navigation } from "@/components/navigation";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import {
   ArrowLeft,
-  Users,
-  FolderKanban,
-  ChevronRight,
-  ChevronDown,
   Shield,
   UserCheck,
   CreditCard,
+  ChevronRight,
   Bell,
   Plus,
   Pencil,
@@ -217,53 +208,47 @@ export default function GroupDetails() {
           </div>
         </div>
 
-        {isBoth ? (
-          <Tabs defaultValue="admin" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="admin" className="flex items-center gap-2" data-testid="tab-admin">
-                <Shield className="h-4 w-4" />
-                Admin View
-                {pendingApprovals > 0 && (
-                  <span className="bg-orange-500 text-white text-xs px-1.5 rounded-full">{pendingApprovals}</span>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="member" className="flex items-center gap-2" data-testid="tab-member">
-                <UserCheck className="h-4 w-4" />
-                My Contributions
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="admin" className="space-y-4 mt-4">
-              <AdminContent 
-                groupId={groupId!}
-                projects={projects}
-                members={members}
-                pendingApprovals={pendingApprovals}
-                setLocation={setLocation}
-                onCreateProject={() => setCreateProjectModalOpen(true)}
-              />
-            </TabsContent>
-            
-            <TabsContent value="member" className="space-y-4 mt-4">
-              <MemberContent
-                groupId={groupId!}
-                projects={projects}
-                myContributions={myContributions}
-                myPendingPayments={myPendingPayments}
-                setLocation={setLocation}
-              />
-            </TabsContent>
-          </Tabs>
-        ) : isAdmin ? (
-          <AdminContent 
-            groupId={groupId!}
-            projects={projects}
-            members={members}
-            pendingApprovals={pendingApprovals}
-            setLocation={setLocation}
-            onCreateProject={() => setCreateProjectModalOpen(true)}
-          />
-        ) : (
+        {/* Show pending approvals banner for admins */}
+        {isAdmin && pendingApprovals > 0 && (
+          <Card className="bg-orange-50 border-orange-200 rounded-2xl">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                    <Bell className="h-5 w-5 text-orange-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-orange-900">{pendingApprovals} Pending Approval{pendingApprovals > 1 ? 's' : ''}</h3>
+                    <p className="text-sm text-orange-700">Payment proofs waiting for review</p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  className="bg-orange-600 hover:bg-orange-700"
+                  onClick={() => setLocation(`/group/${groupId}/pending`)}
+                  data-testid="button-review-payments"
+                >
+                  Review
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Show admin project creation option */}
+        {isAdmin && (
+          <Button
+            onClick={() => setCreateProjectModalOpen(true)}
+            className="w-full"
+            data-testid="button-create-project"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create New Project
+          </Button>
+        )}
+
+        {/* Show member content for members (including dual-role users) */}
+        {isMember && (
           <MemberContent
             groupId={groupId!}
             projects={projects}
@@ -293,84 +278,6 @@ export default function GroupDetails() {
         />
       )}
     </div>
-  );
-}
-
-function AdminContent({
-  groupId,
-  projects,
-  members,
-  pendingApprovals,
-  setLocation,
-  onCreateProject,
-}: {
-  groupId: string;
-  projects: Project[];
-  members: GroupMemberWithUser[];
-  pendingApprovals: number;
-  setLocation: (path: string) => void;
-  onCreateProject: () => void;
-}) {
-  return (
-    <>
-      {pendingApprovals > 0 && (
-        <Card className="bg-orange-50 border-orange-200 rounded-2xl">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
-                  <Bell className="h-5 w-5 text-orange-600" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-orange-900">{pendingApprovals} Pending Approval{pendingApprovals > 1 ? 's' : ''}</h3>
-                  <p className="text-sm text-orange-700">Payment proofs waiting for review</p>
-                </div>
-              </div>
-              <Button
-                size="sm"
-                className="bg-orange-600 hover:bg-orange-700"
-                onClick={() => setLocation(`/group/${groupId}/pending`)}
-                data-testid="button-review-payments"
-              >
-                Review
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="space-y-3">
-        <ProjectsDropdown 
-          groupId={groupId} 
-          projects={projects} 
-          setLocation={setLocation}
-          onCreateProject={onCreateProject}
-        />
-
-        <Card
-          className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all cursor-pointer active:scale-[0.99]"
-          onClick={() => setLocation(`/group/${groupId}/members`)}
-          data-testid="nav-card-members"
-        >
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                  <Users className="h-6 w-6 text-green-600" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-900">Members</h3>
-                  <p className="text-sm text-gray-500">
-                    {members.length} {members.length === 1 ? "member" : "members"}
-                  </p>
-                </div>
-              </div>
-              <ChevronRight className="h-5 w-5 text-gray-300" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </>
   );
 }
 
@@ -439,139 +346,7 @@ function MemberContent({
         </CardContent>
       </Card>
 
-      {myContributions.length > 0 && (
-        <Card className="bg-white rounded-2xl">
-          <CardContent className="p-5">
-            <h3 className="font-bold text-gray-900 mb-3">Recent Payments</h3>
-            <div className="space-y-3">
-              {myContributions.slice(0, 5).map((contribution) => (
-                <div key={contribution.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                  <div>
-                    <p className="font-medium text-gray-900">{contribution.projectName || "General"}</p>
-                    <p className="text-xs text-gray-500">
-                      {new Date(contribution.createdAt).toLocaleDateString("en-NG", { 
-                        day: "numeric", month: "short", year: "numeric" 
-                      })}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-gray-900">{formatNaira(contribution.amount)}</p>
-                    <Badge className={
-                      contribution.status === "confirmed" 
-                        ? "bg-green-100 text-green-700" 
-                        : "bg-yellow-100 text-yellow-700"
-                    }>
-                      {contribution.status}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </>
   );
 }
 
-function ProjectsDropdown({
-  groupId,
-  projects,
-  setLocation,
-  onCreateProject,
-}: {
-  groupId: string;
-  projects: Project[];
-  setLocation: (path: string) => void;
-  onCreateProject: () => void;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "completed": return "bg-green-100 text-green-700";
-      case "active": return "bg-blue-100 text-blue-700";
-      case "paused": return "bg-orange-100 text-orange-700";
-      default: return "bg-gray-100 text-gray-700";
-    }
-  };
-
-  return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <Card className="bg-white rounded-2xl border border-gray-100 shadow-sm">
-        <CollapsibleTrigger asChild>
-          <CardContent className="p-4 cursor-pointer hover:bg-gray-50 transition-colors" data-testid="dropdown-projects">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                  <FolderKanban className="h-6 w-6 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-900">Projects</h3>
-                  <p className="text-sm text-gray-500">
-                    {projects.length} {projects.length === 1 ? "project" : "projects"}
-                  </p>
-                </div>
-              </div>
-              <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-            </div>
-          </CardContent>
-        </CollapsibleTrigger>
-        
-        <CollapsibleContent>
-          <div className="px-4 pb-4 space-y-2">
-            {projects.length === 0 ? (
-              <div className="text-center py-4">
-                <p className="text-sm text-gray-500 mb-3">No projects yet</p>
-                <Button
-                  size="sm"
-                  onClick={onCreateProject}
-                  data-testid="button-create-project"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Create Project
-                </Button>
-              </div>
-            ) : (
-              <>
-                {projects.map((project) => (
-                  <div
-                    key={project.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors"
-                    onClick={() => setLocation(`/project/${project.id}`)}
-                    data-testid={`project-item-${project.id}`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 truncate">{project.name}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge className={`text-xs ${getStatusColor(project.status)}`}>
-                          {project.status}
-                        </Badge>
-                        {project.targetAmount && parseFloat(project.targetAmount) > 0 && (
-                          <span className="text-xs text-gray-500">
-                            {formatNaira(project.collectedAmount || "0")} / {formatNaira(project.targetAmount)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                  </div>
-                ))}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full mt-2"
-                  onClick={onCreateProject}
-                  data-testid="button-add-project"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add New Project
-                </Button>
-              </>
-            )}
-          </div>
-        </CollapsibleContent>
-      </Card>
-    </Collapsible>
-  );
-}
