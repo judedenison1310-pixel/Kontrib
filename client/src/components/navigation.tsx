@@ -7,16 +7,19 @@ import {
   History,
   LogOut,
   ShieldCheck,
+  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { NotificationBell } from "@/components/notification-bell";
+import { EditNameModal } from "@/components/edit-name-modal";
 import { getCurrentUser, logout } from "@/lib/auth";
 import kontribLogo from "@assets/8_1764455185903.png";
 
 export function Navigation() {
   const [location, setLocation] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [editProfileNameModalOpen, setEditProfileNameModalOpen] = useState(false);
   const user = getCurrentUser();
 
   const handleLogout = () => {
@@ -58,14 +61,19 @@ export function Navigation() {
             <div className="hidden sm:flex items-center gap-3">
               <NotificationBell userId={user.id} />
               
-              <div className="flex items-center gap-2 bg-gray-100 rounded-full px-3 py-1.5">
+              <button
+                onClick={() => setEditProfileNameModalOpen(true)}
+                className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 rounded-full px-3 py-1.5 transition-colors"
+                data-testid="button-edit-profile-name-desktop"
+              >
                 <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-sm font-medium text-white">
                   {user.fullName?.charAt(0)?.toUpperCase() || "U"}
                 </div>
                 <span className="text-sm font-medium text-gray-700 max-w-[100px] truncate">
                   {user.fullName?.split(" ")[0] || "User"}
                 </span>
-              </div>
+                <Pencil className="h-3 w-3 text-gray-400" />
+              </button>
               
               <Button
                 variant="ghost"
@@ -101,8 +109,20 @@ export function Navigation() {
                         <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-xl font-bold">
                           {user.fullName?.charAt(0)?.toUpperCase() || "U"}
                         </div>
-                        <div>
-                          <p className="font-semibold text-lg">{user.fullName}</p>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-lg">{user.fullName}</p>
+                            <button
+                              onClick={() => {
+                                setMobileMenuOpen(false);
+                                setEditProfileNameModalOpen(true);
+                              }}
+                              className="p-1 hover:bg-white/20 rounded-lg transition-colors"
+                              data-testid="button-edit-profile-name-mobile"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                          </div>
                           <p className="text-white/70 text-sm capitalize">{user.role}</p>
                         </div>
                       </div>
@@ -199,6 +219,15 @@ export function Navigation() {
           </div>
         </div>
       </div>
+
+      {user && (
+        <EditNameModal
+          open={editProfileNameModalOpen}
+          onOpenChange={setEditProfileNameModalOpen}
+          type="profile"
+          currentName={user.fullName || ""}
+        />
+      )}
     </>
   );
 }

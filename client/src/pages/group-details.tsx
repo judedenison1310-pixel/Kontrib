@@ -21,12 +21,14 @@ import {
   CreditCard,
   Bell,
   Plus,
+  Pencil,
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { formatNaira } from "@/lib/currency";
 import { Group, Project, User as UserType, ContributionWithDetails } from "@shared/schema";
 import { useState } from "react";
 import { CreateProjectModal } from "@/components/create-project-modal";
+import { EditNameModal } from "@/components/edit-name-modal";
 
 interface GroupMemberWithUser {
   id: string;
@@ -43,6 +45,7 @@ export default function GroupDetails() {
   const [, setLocation] = useLocation();
   const user = getCurrentUser();
   const [createProjectModalOpen, setCreateProjectModalOpen] = useState(false);
+  const [editGroupNameModalOpen, setEditGroupNameModalOpen] = useState(false);
 
   const { data: group, isLoading: groupLoading } = useQuery<Group>({
     queryKey: ["/api/groups", groupId],
@@ -171,6 +174,15 @@ export default function GroupDetails() {
             <h1 className="text-2xl font-bold" data-testid="text-group-name">
               {group.name}
             </h1>
+            {isAdmin && (
+              <button
+                onClick={() => setEditGroupNameModalOpen(true)}
+                className="p-1 hover:bg-white/20 rounded-lg transition-colors"
+                data-testid="button-edit-group-name"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+            )}
             <Badge className={getStatusColor(group.status)}>
               {group.status}
             </Badge>
@@ -188,7 +200,13 @@ export default function GroupDetails() {
           
           <div className="flex items-center gap-3">
             {getRoleBadge()}
-            <span className="text-white/70 text-sm">{members.length} members</span>
+            <button
+              onClick={() => setLocation(`/group/${groupId}/members`)}
+              className="text-white/70 text-sm hover:text-white hover:underline transition-colors"
+              data-testid="button-view-members"
+            >
+              {members.length} members
+            </button>
             <span className="text-white/70 text-sm">{projects.length} projects</span>
           </div>
         </div>
@@ -256,6 +274,16 @@ export default function GroupDetails() {
           onOpenChange={setCreateProjectModalOpen}
           groupId={groupId!}
           groupName={group.name}
+        />
+      )}
+
+      {group && (
+        <EditNameModal
+          open={editGroupNameModalOpen}
+          onOpenChange={setEditGroupNameModalOpen}
+          type="group"
+          currentName={group.name}
+          entityId={group.id}
         />
       )}
     </div>

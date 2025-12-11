@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Navigation } from "@/components/navigation";
 import { PaymentModal } from "@/components/payment-modal";
+import { EditNameModal } from "@/components/edit-name-modal";
 import {
   ArrowLeft,
   Target,
@@ -21,6 +22,7 @@ import {
   ChevronRight,
   Eye,
   Trash2,
+  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -35,6 +37,7 @@ export default function ProjectDetails() {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [selectedProof, setSelectedProof] = useState<string | null>(null);
+  const [editProjectNameModalOpen, setEditProjectNameModalOpen] = useState(false);
   const { toast } = useToast();
   const user = getCurrentUser();
 
@@ -235,9 +238,20 @@ export default function ProjectDetails() {
               {project.status}
             </Badge>
           </div>
-          <h1 className="text-2xl font-bold mb-2" data-testid="text-project-name">
-            {project.name}
-          </h1>
+          <div className="flex items-center gap-2 mb-2">
+            <h1 className="text-2xl font-bold" data-testid="text-project-name">
+              {project.name}
+            </h1>
+            {isAdmin && (
+              <button
+                onClick={() => setEditProjectNameModalOpen(true)}
+                className="p-1 hover:bg-white/20 rounded-lg transition-colors"
+                data-testid="button-edit-project-name"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+            )}
+          </div>
           {project.description && (
             <p className="text-green-100 text-sm mb-4">
               {project.description}
@@ -602,6 +616,17 @@ export default function ProjectDetails() {
         onOpenChange={setPaymentOpen}
         project={project}
       />
+
+      {project && (
+        <EditNameModal
+          open={editProjectNameModalOpen}
+          onOpenChange={setEditProjectNameModalOpen}
+          type="project"
+          currentName={project.name}
+          entityId={project.id}
+          groupId={project.groupId}
+        />
+      )}
     </div>
   );
 }

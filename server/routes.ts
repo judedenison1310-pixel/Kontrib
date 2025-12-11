@@ -420,6 +420,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update group
+  app.patch("/api/groups/:groupId", async (req, res) => {
+    try {
+      const { groupId } = req.params;
+      const { name, description, adminId } = req.body;
+      
+      // Verify the requester is the admin
+      const group = await storage.getGroup(groupId);
+      if (!group) {
+        return res.status(404).json({ message: "Group not found" });
+      }
+      
+      if (group.adminId !== adminId) {
+        return res.status(403).json({ message: "Only the group admin can update this group" });
+      }
+      
+      const updates: Partial<typeof group> = {};
+      if (name) updates.name = name;
+      if (description !== undefined) updates.description = description;
+      
+      const updatedGroup = await storage.updateGroup(groupId, updates);
+      res.json(updatedGroup);
+    } catch (error) {
+      console.error("Update group error:", error);
+      res.status(500).json({ message: "Failed to update group" });
+    }
+  });
+
   app.get("/api/groups/:groupId/members", async (req, res) => {
     try {
       const { groupId } = req.params;
