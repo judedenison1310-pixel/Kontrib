@@ -66,11 +66,7 @@ export function generateBulkReminderMessage(
     message += `Deadline: ${deadline}\n`;
   }
   
-  message += `\n*Outstanding members (${unpaidMembers.length}):*\n`;
-  unpaidMembers.forEach((member, index) => {
-    const firstName = member.fullName?.split(" ")[0] || "Member";
-    message += `${index + 1}. ${firstName}\n`;
-  });
+  message += `\n*${unpaidMembers.length} member${unpaidMembers.length > 1 ? 's' : ''} outstanding.*\n`;
   
   message += `\nPlease submit your payment proof on Kontrib.app when done.\n\n`;
   message += `Thank you for your cooperation!\n\n`;

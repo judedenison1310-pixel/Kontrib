@@ -608,81 +608,6 @@ export default function ProjectDetails() {
           </Card>
         )}
 
-        {/* Unpaid Members Section - Admin Only */}
-        {isAdmin && unpaidMembers.length > 0 && (
-          <Card className="rounded-2xl border-0 shadow-sm border-l-4 border-l-orange-400">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <UserX className="w-5 h-5 text-orange-600" />
-                  Unpaid Members
-                </CardTitle>
-                <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700">
-                  {unpaidMembers.length}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button
-                onClick={sendBulkReminder}
-                disabled={unpaidMembersWithPhone.length === 0}
-                className={`w-full ${
-                  unpaidMembersWithPhone.length > 0 
-                    ? "bg-green-600 hover:bg-green-700 text-white" 
-                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                }`}
-                data-testid="button-remind-all"
-              >
-                <MessageCircle className="w-4 h-4 mr-2" />
-                Remind All via WhatsApp ({unpaidMembersWithPhone.length} reachable)
-              </Button>
-              
-              <div className="space-y-2">
-                {unpaidMembers.map((member) => {
-                  const memberHasPhone = hasPhoneNumber(member);
-                  return (
-                    <div
-                      key={member.id}
-                      className="flex items-center justify-between py-3 px-3 bg-gray-50 rounded-xl"
-                      data-testid={`unpaid-member-${member.id}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
-                          <span className="font-semibold text-orange-600">
-                            {member.user.fullName?.charAt(0)?.toUpperCase() || "?"}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-900">
-                            {member.user.fullName}
-                          </span>
-                          {!memberHasPhone && (
-                            <p className="text-xs text-gray-400">No phone number</p>
-                          )}
-                        </div>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => sendIndividualReminder(member)}
-                        disabled={!memberHasPhone}
-                        className={memberHasPhone 
-                          ? "text-green-600 border-green-200 hover:bg-green-50" 
-                          : "text-gray-400 border-gray-200 cursor-not-allowed"
-                        }
-                        data-testid={`button-remind-${member.id}`}
-                      >
-                        <Send className="w-4 h-4 mr-1" />
-                        Remind
-                      </Button>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Payment Proof Viewer Modal */}
         {selectedProof && (
           <div 
@@ -759,6 +684,81 @@ export default function ProjectDetails() {
             )}
           </CardContent>
         </Card>
+
+        {/* Unpaid Members Section - Admin Only */}
+        {isAdmin && unpaidMembers.length > 0 && (
+          <Card className="rounded-2xl border-0 shadow-sm border-l-4 border-l-orange-400">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <UserX className="w-5 h-5 text-orange-600" />
+                  Unpaid Members
+                </CardTitle>
+                <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700">
+                  {unpaidMembers.length}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button
+                onClick={sendBulkReminder}
+                disabled={unpaidMembersWithPhone.length === 0}
+                className={`w-full ${
+                  unpaidMembersWithPhone.length > 0 
+                    ? "bg-green-600 hover:bg-green-700 text-white" 
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                }`}
+                data-testid="button-remind-all"
+              >
+                <MessageCircle className="w-4 h-4 mr-2" />
+                Remind All via WhatsApp ({unpaidMembersWithPhone.length} reachable)
+              </Button>
+              
+              <div className="space-y-2">
+                {unpaidMembers.map((member) => {
+                  const memberHasPhone = hasPhoneNumber(member);
+                  return (
+                    <div
+                      key={member.id}
+                      className="flex items-center justify-between py-3 px-3 bg-gray-50 rounded-xl"
+                      data-testid={`unpaid-member-${member.id}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                          <span className="font-semibold text-orange-600">
+                            {member.user.fullName?.charAt(0)?.toUpperCase() || "?"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-900">
+                            {member.user.fullName}
+                          </span>
+                          {!memberHasPhone && (
+                            <p className="text-xs text-gray-400">No phone number</p>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => sendIndividualReminder(member)}
+                        disabled={!memberHasPhone}
+                        className={memberHasPhone 
+                          ? "text-green-600 border-green-200 hover:bg-green-50" 
+                          : "text-gray-400 border-gray-200 cursor-not-allowed"
+                        }
+                        data-testid={`button-remind-${member.id}`}
+                      >
+                        <Send className="w-4 h-4 mr-1" />
+                        Remind
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Submit Proof Button */}
         <div className="fixed bottom-6 left-4 right-4 max-w-lg mx-auto">
