@@ -207,7 +207,13 @@ export default function GroupDetails() {
             >
               {members.length} members
             </button>
-            <span className="text-white/70 text-sm">{projects.length} projects</span>
+            <button
+              onClick={() => setLocation(`/group/${groupId}/projects`)}
+              className="text-white/70 text-sm hover:text-white hover:underline transition-colors"
+              data-testid="button-view-projects"
+            >
+              {projects.length} projects
+            </button>
           </div>
         </div>
 
