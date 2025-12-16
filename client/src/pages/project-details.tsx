@@ -569,25 +569,27 @@ export default function ProjectDetails() {
               </button>
             )}
 
-            {/* Contributors */}
-            <button
-              onClick={() => setLocation(`/project/${projectId}/contributors`)}
-              className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
-              data-testid="link-contributors"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                  <Users className="w-5 h-5 text-primary" />
+            {/* Contributors - Hidden for non-admins in private groups */}
+            {(group?.privacyMode !== "private" || isAdmin) && (
+              <button
+                onClick={() => setLocation(`/project/${projectId}/contributors`)}
+                className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                data-testid="link-contributors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                    <Users className="w-5 h-5 text-primary" />
+                  </div>
+                  <span className="font-medium text-gray-900">Contributors</span>
                 </div>
-                <span className="font-medium text-gray-900">Contributors</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="text-xs">
-                  {sortedContributors.length}
-                </Badge>
-                <ChevronRight className="w-5 h-5 text-gray-400" />
-              </div>
-            </button>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">
+                    {sortedContributors.length}
+                  </Badge>
+                  <ChevronRight className="w-5 h-5 text-gray-400" />
+                </div>
+              </button>
+            )}
 
             {/* Unpaid Members - Admin Only */}
             {isAdmin && unpaidMembers.length > 0 && (
