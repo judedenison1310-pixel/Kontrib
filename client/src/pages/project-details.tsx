@@ -211,8 +211,24 @@ export default function ProjectDetails() {
     });
   };
 
-  const sortedContributions = [...confirmedContributions].sort(
-    (a, b) => parseFloat(b.amount) - parseFloat(a.amount),
+  // Aggregate contributions by user (show each contributor once with total)
+  const aggregatedContributors = confirmedContributions.reduce((acc, contribution) => {
+    const userId = contribution.userId;
+    if (!acc[userId]) {
+      acc[userId] = {
+        userId,
+        userName: contribution.userName,
+        totalAmount: 0,
+        paymentCount: 0,
+      };
+    }
+    acc[userId].totalAmount += parseFloat(contribution.amount);
+    acc[userId].paymentCount += 1;
+    return acc;
+  }, {} as Record<string, { userId: string; userName: string; totalAmount: number; paymentCount: number }>);
+
+  const sortedContributors = Object.values(aggregatedContributors).sort(
+    (a, b) => b.totalAmount - a.totalAmount,
   );
 
   const generateProjectSlug = (name: string) => {
@@ -646,12 +662,12 @@ export default function ProjectDetails() {
                   Contributors
                 </CardTitle>
                 <Badge variant="secondary" className="text-xs">
-                  {confirmedContributions.length}
+                  {sortedContributors.length}
                 </Badge>
               </div>
             </CardHeader>
             <CardContent>
-              {sortedContributions.length === 0 ? (
+              {sortedContributors.length === 0 ? (
                 <div className="text-center py-8">
                   <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
                     <Users className="w-7 h-7 text-gray-400" />
@@ -663,24 +679,31 @@ export default function ProjectDetails() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {sortedContributions.map((contribution, index) => (
+                  {sortedContributors.map((contributor, index) => (
                     <div
-                      key={contribution.id}
+                      key={contributor.userId}
                       className="flex items-center justify-between py-3 px-3 bg-gray-50 rounded-xl"
                       data-testid={`contributor-row-${index}`}
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
                           <span className="font-semibold text-primary">
-                            {contribution.userName?.charAt(0)?.toUpperCase() || "?"}
+                            {contributor.userName?.charAt(0)?.toUpperCase() || "?"}
                           </span>
                         </div>
-                        <span className="font-medium text-gray-900">
-                          {contribution.userName}
-                        </span>
+                        <div>
+                          <span className="font-medium text-gray-900">
+                            {contributor.userName}
+                          </span>
+                          {contributor.paymentCount > 1 && (
+                            <p className="text-xs text-gray-500">
+                              {contributor.paymentCount} payments
+                            </p>
+                          )}
+                        </div>
                       </div>
                       <span className="font-bold text-gray-900">
-                        {formatCurrency(contribution.amount, projectCurrency)}
+                        {formatCurrency(contributor.totalAmount.toString(), projectCurrency)}
                       </span>
                     </div>
                   ))}
