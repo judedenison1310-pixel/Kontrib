@@ -57,7 +57,6 @@ export default function ProjectDetails() {
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
-  const [selectedProof, setSelectedProof] = useState<string | null>(null);
   const [editProjectNameModalOpen, setEditProjectNameModalOpen] = useState(false);
   const { toast } = useToast();
   const user = getCurrentUser();
@@ -545,265 +544,74 @@ export default function ProjectDetails() {
           </CardContent>
         </Card>
 
-        {/* Payment Proofs - Admin Only */}
-        {isAdmin && (
-          <Card className="rounded-2xl border-0 shadow-sm">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <FileImage className="w-5 h-5 text-orange-600" />
-                  Payment Proofs
-                </CardTitle>
-                <Badge variant="secondary" className="text-xs">
-                  {contributions.filter(c => c.proofOfPayment).length}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {contributions.filter(c => c.proofOfPayment).length === 0 ? (
-                <div className="text-center py-6">
-                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <FileImage className="w-6 h-6 text-gray-400" />
-                  </div>
-                  <p className="text-sm text-gray-500">No payment proofs uploaded yet</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {contributions
-                    .filter(c => c.proofOfPayment)
-                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                    .map((contribution) => (
-                      <div
-                        key={contribution.id}
-                        className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 cursor-pointer transition-colors"
-                        onClick={() => setSelectedProof(contribution.proofOfPayment!)}
-                        data-testid={`payment-proof-${contribution.id}`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                            contribution.status === 'confirmed' 
-                              ? 'bg-green-100' 
-                              : contribution.status === 'pending'
-                              ? 'bg-yellow-100'
-                              : 'bg-red-100'
-                          }`}>
-                            <FileImage className={`w-5 h-5 ${
-                              contribution.status === 'confirmed' 
-                                ? 'text-green-600' 
-                                : contribution.status === 'pending'
-                                ? 'text-yellow-600'
-                                : 'text-red-600'
-                            }`} />
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900">{contribution.userName}</p>
-                            <div className="flex items-center gap-2">
-                              <p className="text-xs text-gray-500">
-                                {new Date(contribution.createdAt).toLocaleDateString("en-NG", { 
-                                  day: "numeric", month: "short" 
-                                })}
-                              </p>
-                              <Badge className={`text-xs ${
-                                contribution.status === 'confirmed' 
-                                  ? 'bg-green-100 text-green-700' 
-                                  : contribution.status === 'pending'
-                                  ? 'bg-yellow-100 text-yellow-700'
-                                  : 'bg-red-100 text-red-700'
-                              }`}>
-                                {contribution.status}
-                              </Badge>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-gray-900">{formatCurrency(contribution.amount, projectCurrency)}</span>
-                          <Eye className="w-4 h-4 text-gray-400" />
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Payment Proof Viewer Modal */}
-        {selectedProof && (
-          <div 
-            className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
-            onClick={() => setSelectedProof(null)}
-          >
-            <div className="relative max-w-lg w-full max-h-[80vh] overflow-auto bg-white rounded-2xl p-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute top-2 right-2 z-10"
-                onClick={() => setSelectedProof(null)}
+        {/* Quick Links */}
+        <Card className="rounded-2xl border-0 shadow-sm">
+          <CardContent className="p-4 space-y-2">
+            {/* Payment Proofs - Admin Only */}
+            {isAdmin && (
+              <button
+                onClick={() => setLocation(`/project/${projectId}/proofs`)}
+                className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                data-testid="link-payment-proofs"
               >
-                ✕
-              </Button>
-              <img 
-                src={selectedProof} 
-                alt="Payment proof" 
-                className="w-full h-auto rounded-xl"
-                onClick={(e) => e.stopPropagation()}
-              />
-            </div>
-          </div>
-        )}
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                    <FileImage className="w-5 h-5 text-orange-600" />
+                  </div>
+                  <span className="font-medium text-gray-900">Payment Proofs</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">
+                    {contributions.filter(c => c.proofOfPayment).length}
+                  </Badge>
+                  <ChevronRight className="w-5 h-5 text-gray-400" />
+                </div>
+              </button>
+            )}
 
-        {/* Contributors Section - Hidden for non-admins in private groups */}
-        {(group?.privacyMode !== "private" || isAdmin) ? (
-          <Card className="rounded-2xl border-0 shadow-sm">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-lg">
+            {/* Contributors */}
+            <button
+              onClick={() => setLocation(`/project/${projectId}/contributors`)}
+              className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+              data-testid="link-contributors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
                   <Users className="w-5 h-5 text-primary" />
-                  Contributors
-                </CardTitle>
+                </div>
+                <span className="font-medium text-gray-900">Contributors</span>
+              </div>
+              <div className="flex items-center gap-2">
                 <Badge variant="secondary" className="text-xs">
                   {sortedContributors.length}
                 </Badge>
+                <ChevronRight className="w-5 h-5 text-gray-400" />
               </div>
-            </CardHeader>
-            <CardContent>
-              {sortedContributors.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <Users className="w-7 h-7 text-gray-400" />
-                  </div>
-                  <p className="font-medium text-gray-900 mb-1">No Contributors Yet</p>
-                  <p className="text-sm text-gray-500">
-                    Be the first to contribute!
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {sortedContributors.map((contributor, index) => (
-                    <div
-                      key={contributor.userId}
-                      className="flex items-center justify-between py-3 px-3 bg-gray-50 rounded-xl"
-                      data-testid={`contributor-row-${index}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                          <span className="font-semibold text-primary">
-                            {contributor.userName?.charAt(0)?.toUpperCase() || "?"}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-900">
-                            {contributor.userName}
-                          </span>
-                          {contributor.paymentCount > 1 && (
-                            <p className="text-xs text-gray-500">
-                              {contributor.paymentCount} payments
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <span className="font-bold text-gray-900">
-                        {formatCurrency(contributor.totalAmount.toString(), projectCurrency)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="rounded-2xl border-0 shadow-sm bg-gray-50">
-            <CardContent className="py-8">
-              <div className="text-center">
-                <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Lock className="w-7 h-7 text-amber-600" />
-                </div>
-                <p className="font-medium text-gray-900 mb-1">Private Group</p>
-                <p className="text-sm text-gray-500">
-                  Contributor details are only visible to the admin.
-                </p>
-                <p className="text-sm text-gray-500 mt-2">
-                  <span className="font-medium">{confirmedContributions.length}</span> contribution{confirmedContributions.length !== 1 ? 's' : ''} received
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+            </button>
 
-        {/* Unpaid Members Section - Admin Only */}
-        {isAdmin && unpaidMembers.length > 0 && (
-          <Card className="rounded-2xl border-0 shadow-sm border-l-4 border-l-orange-400">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <UserX className="w-5 h-5 text-orange-600" />
-                  Unpaid Members
-                </CardTitle>
-                <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700">
-                  {unpaidMembers.length}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button
-                onClick={sendBulkReminder}
-                disabled={unpaidMembersWithPhone.length === 0}
-                className={`w-full ${
-                  unpaidMembersWithPhone.length > 0 
-                    ? "bg-green-600 hover:bg-green-700 text-white" 
-                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                }`}
-                data-testid="button-remind-all"
+            {/* Unpaid Members - Admin Only */}
+            {isAdmin && unpaidMembers.length > 0 && (
+              <button
+                onClick={() => setLocation(`/project/${projectId}/unpaid`)}
+                className="w-full flex items-center justify-between p-3 bg-orange-50 rounded-xl hover:bg-orange-100 transition-colors"
+                data-testid="link-unpaid-members"
               >
-                <MessageCircle className="w-4 h-4 mr-2" />
-                Remind All via WhatsApp ({unpaidMembersWithPhone.length} reachable)
-              </Button>
-              
-              <div className="space-y-2">
-                {unpaidMembers.map((member) => {
-                  const memberHasPhone = hasPhoneNumber(member);
-                  return (
-                    <div
-                      key={member.id}
-                      className="flex items-center justify-between py-3 px-3 bg-gray-50 rounded-xl"
-                      data-testid={`unpaid-member-${member.id}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
-                          <span className="font-semibold text-orange-600">
-                            {member.user.fullName?.charAt(0)?.toUpperCase() || "?"}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-900">
-                            {member.user.fullName}
-                          </span>
-                          {!memberHasPhone && (
-                            <p className="text-xs text-gray-400">No phone number</p>
-                          )}
-                        </div>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => sendIndividualReminder(member)}
-                        disabled={!memberHasPhone}
-                        className={memberHasPhone 
-                          ? "text-green-600 border-green-200 hover:bg-green-50" 
-                          : "text-gray-400 border-gray-200 cursor-not-allowed"
-                        }
-                        data-testid={`button-remind-${member.id}`}
-                      >
-                        <Send className="w-4 h-4 mr-1" />
-                        Remind
-                      </Button>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                    <UserX className="w-5 h-5 text-orange-600" />
+                  </div>
+                  <span className="font-medium text-gray-900">Unpaid Members</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700">
+                    {unpaidMembers.length}
+                  </Badge>
+                  <ChevronRight className="w-5 h-5 text-gray-400" />
+                </div>
+              </button>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Submit Proof Button */}
         <div className="fixed bottom-6 left-4 right-4 max-w-lg mx-auto">

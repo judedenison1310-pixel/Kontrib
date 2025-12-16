@@ -19,7 +19,7 @@ export default function ProjectContributors() {
     enabled: !!projectId,
   });
 
-  const { data: group } = useQuery<Group>({
+  const { data: group, isLoading: groupLoading } = useQuery<Group>({
     queryKey: [`/api/groups/${project?.groupId}`],
     enabled: !!project?.groupId,
   });
@@ -30,7 +30,7 @@ export default function ProjectContributors() {
       enabled: !!projectId,
     });
 
-  const isLoading = projectLoading || contributionsLoading;
+  const isLoading = projectLoading || contributionsLoading || groupLoading;
   const isAdmin = user?.id === group?.adminId;
   const projectCurrency = (project?.currency as CurrencyCode) || "NGN";
   const isPrivate = group?.privacyMode === "private";

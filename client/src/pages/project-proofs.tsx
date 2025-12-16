@@ -21,7 +21,7 @@ export default function ProjectProofs() {
     enabled: !!projectId,
   });
 
-  const { data: group } = useQuery<Group>({
+  const { data: group, isLoading: groupLoading } = useQuery<Group>({
     queryKey: [`/api/groups/${project?.groupId}`],
     enabled: !!project?.groupId,
   });
@@ -32,13 +32,24 @@ export default function ProjectProofs() {
       enabled: !!projectId,
     });
 
-  const isLoading = projectLoading || contributionsLoading;
+  const isLoading = projectLoading || contributionsLoading || groupLoading;
   const isAdmin = user?.id === group?.adminId;
   const projectCurrency = (project?.currency as CurrencyCode) || "NGN";
 
   const proofsWithPayment = contributions
     .filter((c) => c.proofOfPayment)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <div className="max-w-lg mx-auto px-4 py-12 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </div>
+    );
+  }
 
   if (!isAdmin) {
     return (
@@ -54,17 +65,6 @@ export default function ProjectProofs() {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Project
           </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Navigation />
-        <div className="max-w-lg mx-auto px-4 py-12 flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       </div>
     );

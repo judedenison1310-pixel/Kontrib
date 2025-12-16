@@ -37,7 +37,7 @@ export default function ProjectUnpaid() {
     enabled: !!projectId,
   });
 
-  const { data: group } = useQuery<Group>({
+  const { data: group, isLoading: groupLoading } = useQuery<Group>({
     queryKey: [`/api/groups/${project?.groupId}`],
     enabled: !!project?.groupId,
   });
@@ -48,12 +48,12 @@ export default function ProjectUnpaid() {
       enabled: !!projectId,
     });
 
-  const { data: groupMembers = [] } = useQuery<GroupMemberWithUser[]>({
+  const { data: groupMembers = [], isLoading: membersLoading } = useQuery<GroupMemberWithUser[]>({
     queryKey: ["/api/groups", project?.groupId, "members"],
     enabled: !!project?.groupId,
   });
 
-  const isLoading = projectLoading || contributionsLoading;
+  const isLoading = projectLoading || contributionsLoading || groupLoading || membersLoading;
   const isAdmin = user?.id === group?.adminId;
 
   const confirmedContributions = contributions.filter((c) => c.status === "confirmed");
@@ -106,6 +106,17 @@ export default function ProjectUnpaid() {
     window.open(whatsappUrl, "_blank");
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <div className="max-w-lg mx-auto px-4 py-12 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </div>
+    );
+  }
+
   if (!isAdmin) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -120,17 +131,6 @@ export default function ProjectUnpaid() {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Project
           </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Navigation />
-        <div className="max-w-lg mx-auto px-4 py-12 flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       </div>
     );
