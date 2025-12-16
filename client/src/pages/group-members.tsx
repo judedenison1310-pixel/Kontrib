@@ -2,7 +2,8 @@ import { useLocation, useRoute } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Users, Trash2, Lock } from "lucide-react";
+import { ArrowLeft, Users, Trash2, Lock, Eye } from "lucide-react";
+import { MemberContributionsModal } from "@/components/member-contributions-modal";
 import { Navigation } from "@/components/navigation";
 import { useState } from "react";
 import {
@@ -46,6 +47,7 @@ export default function GroupMembers() {
   const groupId = params?.groupId;
   const { toast } = useToast();
   const [memberToDelete, setMemberToDelete] = useState<MemberWithUser | null>(null);
+  const [selectedMember, setSelectedMember] = useState<MemberWithUser | null>(null);
   const currentUser = getCurrentUser();
 
   const { data: group, isLoading: groupLoading } = useQuery<Group>({
@@ -219,16 +221,29 @@ export default function GroupMembers() {
                     </div>
                   </div>
 
-                  {isAdmin && !isGroupAdmin && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50 flex-shrink-0"
-                      onClick={() => setMemberToDelete(member)}
-                      data-testid={`button-delete-member-${member.id}`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                  {isAdmin && (
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-primary hover:text-primary hover:bg-primary/10"
+                        onClick={() => setSelectedMember(member)}
+                        data-testid={`button-view-payments-${member.id}`}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      {!isGroupAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => setMemberToDelete(member)}
+                          data-testid={`button-delete-member-${member.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
                   )}
                 </div>
               );
@@ -264,6 +279,16 @@ export default function GroupMembers() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {groupId && selectedMember && (
+        <MemberContributionsModal
+          open={!!selectedMember}
+          onOpenChange={(open) => !open && setSelectedMember(null)}
+          userId={selectedMember.userId}
+          groupId={groupId}
+          memberName={selectedMember.user?.fullName || "Member"}
+        />
+      )}
     </div>
   );
 }
