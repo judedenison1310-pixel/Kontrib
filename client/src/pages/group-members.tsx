@@ -2,7 +2,7 @@ import { useLocation, useRoute } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Users, Trash2 } from "lucide-react";
+import { ArrowLeft, Users, Trash2, Lock } from "lucide-react";
 import { Navigation } from "@/components/navigation";
 import { useState } from "react";
 import {
@@ -37,6 +37,7 @@ interface Group {
   id: string;
   name: string;
   adminId: string;
+  privacyMode?: string;
 }
 
 export default function GroupMembers() {
@@ -112,6 +113,40 @@ export default function GroupMembers() {
               Back to Dashboard
             </Button>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Private groups: Only admins can view members
+  if (group.privacyMode === "private" && !isAdmin) {
+    return (
+      <div className="min-h-screen bg-gray-50 pb-20 sm:pb-0">
+        <Navigation />
+        <div className="max-w-2xl mx-auto px-4 py-6">
+          <Button
+            variant="ghost"
+            onClick={() => setLocation(`/group/${groupId}`)}
+            className="mb-6"
+            data-testid="button-back"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Group
+          </Button>
+
+          <Card>
+            <CardContent className="py-12">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Lock className="h-8 w-8 text-amber-600" />
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">Private Group</h2>
+                <p className="text-gray-600">
+                  Member details are only visible to the group admin.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );

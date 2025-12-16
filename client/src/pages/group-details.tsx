@@ -191,13 +191,16 @@ export default function GroupDetails() {
           
           <div className="flex items-center gap-3">
             {getRoleBadge()}
-            <button
-              onClick={() => setLocation(`/group/${groupId}/members`)}
-              className="text-white/70 text-sm hover:text-white hover:underline transition-colors"
-              data-testid="button-view-members"
-            >
-              {members.length} members
-            </button>
+            {/* In private groups, only admins can see member count/list */}
+            {(group.privacyMode !== "private" || isAdmin) && (
+              <button
+                onClick={() => setLocation(`/group/${groupId}/members`)}
+                className="text-white/70 text-sm hover:text-white hover:underline transition-colors"
+                data-testid="button-view-members"
+              >
+                {members.length} members
+              </button>
+            )}
             <button
               onClick={() => setLocation(`/group/${groupId}/projects`)}
               className="text-white/70 text-sm hover:text-white hover:underline transition-colors"

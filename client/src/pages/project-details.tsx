@@ -26,6 +26,7 @@ import {
   MessageCircle,
   Send,
   UserX,
+  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -635,57 +636,76 @@ export default function ProjectDetails() {
           </div>
         )}
 
-        {/* Contributors Section */}
-        <Card className="rounded-2xl border-0 shadow-sm">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Users className="w-5 h-5 text-primary" />
-                Contributors
-              </CardTitle>
-              <Badge variant="secondary" className="text-xs">
-                {confirmedContributions.length}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {sortedContributions.length === 0 ? (
-              <div className="text-center py-8">
-                <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Users className="w-7 h-7 text-gray-400" />
-                </div>
-                <p className="font-medium text-gray-900 mb-1">No Contributors Yet</p>
-                <p className="text-sm text-gray-500">
-                  Be the first to contribute!
-                </p>
+        {/* Contributors Section - Hidden for non-admins in private groups */}
+        {(group?.privacyMode !== "private" || isAdmin) ? (
+          <Card className="rounded-2xl border-0 shadow-sm">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Users className="w-5 h-5 text-primary" />
+                  Contributors
+                </CardTitle>
+                <Badge variant="secondary" className="text-xs">
+                  {confirmedContributions.length}
+                </Badge>
               </div>
-            ) : (
-              <div className="space-y-2">
-                {sortedContributions.map((contribution, index) => (
-                  <div
-                    key={contribution.id}
-                    className="flex items-center justify-between py-3 px-3 bg-gray-50 rounded-xl"
-                    data-testid={`contributor-row-${index}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                        <span className="font-semibold text-primary">
-                          {contribution.userName?.charAt(0)?.toUpperCase() || "?"}
+            </CardHeader>
+            <CardContent>
+              {sortedContributions.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Users className="w-7 h-7 text-gray-400" />
+                  </div>
+                  <p className="font-medium text-gray-900 mb-1">No Contributors Yet</p>
+                  <p className="text-sm text-gray-500">
+                    Be the first to contribute!
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {sortedContributions.map((contribution, index) => (
+                    <div
+                      key={contribution.id}
+                      className="flex items-center justify-between py-3 px-3 bg-gray-50 rounded-xl"
+                      data-testid={`contributor-row-${index}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                          <span className="font-semibold text-primary">
+                            {contribution.userName?.charAt(0)?.toUpperCase() || "?"}
+                          </span>
+                        </div>
+                        <span className="font-medium text-gray-900">
+                          {contribution.userName}
                         </span>
                       </div>
-                      <span className="font-medium text-gray-900">
-                        {contribution.userName}
+                      <span className="font-bold text-gray-900">
+                        {formatCurrency(contribution.amount, projectCurrency)}
                       </span>
                     </div>
-                    <span className="font-bold text-gray-900">
-                      {formatCurrency(contribution.amount, projectCurrency)}
-                    </span>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="rounded-2xl border-0 shadow-sm bg-gray-50">
+            <CardContent className="py-8">
+              <div className="text-center">
+                <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Lock className="w-7 h-7 text-amber-600" />
+                </div>
+                <p className="font-medium text-gray-900 mb-1">Private Group</p>
+                <p className="text-sm text-gray-500">
+                  Contributor details are only visible to the admin.
+                </p>
+                <p className="text-sm text-gray-500 mt-2">
+                  <span className="font-medium">{confirmedContributions.length}</span> contribution{confirmedContributions.length !== 1 ? 's' : ''} received
+                </p>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Unpaid Members Section - Admin Only */}
         {isAdmin && unpaidMembers.length > 0 && (
