@@ -1195,6 +1195,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get member contributions for a specific group (for admin view)
+  app.get("/api/contributions/member/:userId/group/:groupId", async (req, res) => {
+    try {
+      const { userId, groupId } = req.params;
+      
+      // Get the group to verify it exists
+      const group = await storage.getGroup(groupId);
+      if (!group) {
+        return res.status(404).json({ message: "Group not found" });
+      }
+      
+      // Get all contributions from this user for this group
+      const allContributions = await storage.getGroupContributions(groupId);
+      const memberContributions = allContributions.filter(c => c.userId === userId);
+      
+      // Calculate totals
+      const confirmedContributions = memberContributions.filter(c => c.status === "confirmed");
+      const totalConfirmed = confirmedContributions.reduce((sum, c) => sum + Number(c.amount), 0);
+      const pendingContributions = memberContributions.filter(c => c.status === "pending");
+      const totalPending = pendingContributions.reduce((sum, c) => sum + Number(c.amount), 0);
+      
+      // Get user details
+      const user = await storage.getUser(userId);
+      
+      // Get project details for each contribution
+      const contributionsWithProjects = await Promise.all(
+        memberContributions.map(async (c) => {
+          const project = c.projectId ? await storage.getProject(c.projectId) : null;
+          return {
+            ...c,
+            projectName: project?.name || "General",
+            projectCurrency: project?.currency || "NGN"
+          };
+        })
+      );
+      
+      res.json({
+        user: {
+          id: user?.id,
+          fullName: user?.fullName,
+          phoneNumber: user?.phoneNumber
+        },
+        totalConfirmed: totalConfirmed.toString(),
+        totalPending: totalPending.toString(),
+        contributionCount: confirmedContributions.length,
+        contributions: contributionsWithProjects.sort((a, b) => 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )
+      });
+    } catch (error) {
+      console.error("Get member group contributions error:", error);
+      res.status(500).json({ message: "Failed to fetch member contributions" });
+    }
+  });
+
   // Member projects endpoint for payment selection
   app.get("/api/contributions/member/:userId/projects", async (req, res) => {
     try {
