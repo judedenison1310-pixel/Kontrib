@@ -1199,11 +1199,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/contributions/member/:userId/group/:groupId", async (req, res) => {
     try {
       const { userId, groupId } = req.params;
+      const viewerId = req.query.viewerId as string;
       
       // Get the group to verify it exists
       const group = await storage.getGroup(groupId);
       if (!group) {
         return res.status(404).json({ message: "Group not found" });
+      }
+      
+      // Privacy enforcement: Only admin can view member contributions in private groups
+      // (unless viewing their own contributions)
+      if (group.privacyMode === "private") {
+        if (!viewerId || (viewerId !== group.adminId && viewerId !== userId)) {
+          return res.status(403).json({ message: "Access denied: Private group" });
+        }
       }
       
       // Get all contributions from this user for this group
