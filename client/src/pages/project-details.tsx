@@ -415,10 +415,7 @@ export default function ProjectDetails() {
 
         {/* Primary CTA - Submit Payment Proof */}
         <div className="bg-white rounded-2xl p-5 text-center shadow-sm">
-          <h3 className="text-gray-900 font-bold text-lg mb-2">Ready to Contribute?</h3>
-          <p className="text-gray-600 text-sm mb-4">
-            Make your payment using the account details below, then submit your proof
-          </p>
+          <h3 className="text-gray-900 font-bold text-lg mb-4">Ready to Contribute?</h3>
           <button
             onClick={() => setPaymentOpen(true)}
             className="w-full bg-primary hover:bg-primary/90 text-white font-bold text-lg py-4 rounded-full shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
@@ -506,13 +503,7 @@ export default function ProjectDetails() {
         {/* Share Project */}
         <Card className="rounded-2xl border-0 shadow-sm bg-green-50 border-green-100">
           <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Share2 className="h-5 w-5 text-green-700" />
-              <h3 className="font-bold text-green-900">Share This Project</h3>
-            </div>
-            <p className="text-sm text-green-700 mb-4">
-              Invite group members to contribute by sharing the project details on WhatsApp
-            </p>
+            <p className="text-sm font-medium text-green-800 mb-3">Share with members</p>
             <div className="flex gap-3">
               <Button
                 variant="outline"
