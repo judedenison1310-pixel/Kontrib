@@ -13,7 +13,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { getDefaultPaymentTypes } from "@/lib/payment-types";
 import { z } from "zod";
-import { ArrowLeft, Calendar, Building2, ChevronDown, ChevronUp, CheckCircle } from "lucide-react";
+import { ArrowLeft, Calendar, Building2, ChevronDown, ChevronUp, CheckCircle, Lock, Users } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 const createGroupFormSchema = insertGroupSchema;
 type CreateGroupFormData = z.infer<typeof createGroupFormSchema>;
@@ -43,6 +44,7 @@ export function CreateGroupModal({ open, onOpenChange }: CreateGroupModalProps) 
     defaultValues: {
       name: "",
       description: "",
+      privacyMode: "standard",
     },
   });
 
@@ -226,6 +228,41 @@ export function CreateGroupModal({ open, onOpenChange }: CreateGroupModalProps) 
                             />
                           </FormControl>
                           <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={groupForm.control}
+                      name="privacyMode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-200">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${field.value === "private" ? "bg-amber-100" : "bg-gray-200"}`}>
+                                {field.value === "private" ? (
+                                  <Lock className="h-5 w-5 text-amber-600" />
+                                ) : (
+                                  <Users className="h-5 w-5 text-gray-500" />
+                                )}
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-900">Private Group (Ajo)</p>
+                                <p className="text-sm text-gray-500">
+                                  {field.value === "private" 
+                                    ? "Only admin sees members & payments" 
+                                    : "Everyone sees who contributed"}
+                                </p>
+                              </div>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value === "private"}
+                                onCheckedChange={(checked) => field.onChange(checked ? "private" : "standard")}
+                                data-testid="switch-privacy-mode"
+                              />
+                            </FormControl>
+                          </div>
                         </FormItem>
                       )}
                     />

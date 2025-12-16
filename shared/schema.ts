@@ -22,6 +22,7 @@ export const groups = pgTable("groups", {
   registrationLink: text("registration_link").notNull().unique(),
   customSlug: text("custom_slug").unique(), // For kontrib.app/customslug URLs
   status: text("status").notNull().default("active"), // "active", "completed", "paused"
+  privacyMode: text("privacy_mode").notNull().default("standard"), // "standard" or "private" (Ajo mode)
   adminId: varchar("admin_id").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
