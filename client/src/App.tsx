@@ -25,6 +25,9 @@ import ProjectDetails from "@/pages/project-details";
 import GroupMembers from "@/pages/group-members";
 import GroupProjects from "@/pages/group-projects";
 import PendingApprovals from "@/pages/pending-approvals";
+import ProjectProofs from "@/pages/project-proofs";
+import ProjectContributors from "@/pages/project-contributors";
+import ProjectUnpaid from "@/pages/project-unpaid";
 
 // Component to handle shared links - redirects logged-in users directly to project/group
 function SharedLinkRedirect({ user }: { user: User | null }) {
@@ -171,6 +174,9 @@ function Router() {
       <Route path="/group/:groupId/pending">{user ? <PendingApprovals /> : <Landing />}</Route>
       <Route path="/group/:groupId">{user ? <GroupDetails /> : <Landing />}</Route>
       <Route path="/project/:projectId">{user ? <ProjectDetails /> : <Landing />}</Route>
+      <Route path="/project/:projectId/proofs">{user ? <ProjectProofs /> : <Landing />}</Route>
+      <Route path="/project/:projectId/contributors">{user ? <ProjectContributors /> : <Landing />}</Route>
+      <Route path="/project/:projectId/unpaid">{user ? <ProjectUnpaid /> : <Landing />}</Route>
       <Route path="/whatsapp">{user ? <WhatsAppIntegration /> : <Landing />}</Route>
       
       {/* Short URL patterns - catches custom slugs like /groupname or /groupname/projectname */}
