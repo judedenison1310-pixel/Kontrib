@@ -51,7 +51,17 @@ export function MemberContributionsModal({
   const currentUser = getCurrentUser();
   
   const { data, isLoading, isError, error } = useQuery<MemberContributionsData>({
-    queryKey: ["/api/contributions/member", userId, "group", groupId, { viewerId: currentUser?.id }],
+    queryKey: ["/api/contributions/member", userId, "group", groupId, currentUser?.id],
+    queryFn: async () => {
+      const response = await fetch(
+        `/api/contributions/member/${userId}/group/${groupId}?viewerId=${currentUser?.id}`,
+        { credentials: "include" }
+      );
+      if (!response.ok) {
+        throw new Error(`${response.status}: ${response.statusText}`);
+      }
+      return response.json();
+    },
     enabled: open && !!userId && !!groupId && !!currentUser?.id,
   });
 
