@@ -381,13 +381,14 @@ export function PaymentModal({ open, onOpenChange, project }: PaymentModalProps)
                             />
                             <label
                               htmlFor="proof-upload"
-                              className="cursor-pointer text-primary font-medium hover:underline"
+                              className="inline-flex items-center gap-2 cursor-pointer bg-primary text-white font-semibold px-6 py-3 rounded-full hover:bg-primary/90 transition-all active:scale-[0.98]"
                             >
-                              Tap to upload receipt
+                              <Upload className="h-4 w-4" />
+                              Upload Receipt
                             </label>
                           </div>
-                          <p className="text-xs text-gray-400">
-                            Screenshot of bank transfer or payment receipt (Max 5MB)
+                          <p className="text-xs text-gray-400 mt-2">
+                            Screenshot or photo of your payment (Max 5MB)
                           </p>
                         </div>
                       )}
