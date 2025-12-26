@@ -157,9 +157,9 @@ export function CreateGroupModal({ open, onOpenChange }: CreateGroupModalProps) 
   };
 
   const projectTypes = [
+    { value: "monthly", label: "Monthly Contributions/Savings", description: "e.g. Ajo, Esusu" },
     { value: "target", label: "Target Goal", description: "e.g. Wedding Gift, House Project" },
-    { value: "monthly", label: "Monthly Dues", description: "e.g. Ajo, Monthly Levy" },
-    { value: "yearly", label: "Yearly Dues", description: "e.g. Annual Dues, Yearly Contribution" },
+    { value: "yearly", label: "Dues and Levies", description: "e.g. Annual Dues, Fees" },
     { value: "event", label: "One-time Event", description: "e.g. Birthday Party, Burial" },
     { value: "emergency", label: "Emergency Fund", description: "e.g. Medical, Urgent Needs" },
   ];

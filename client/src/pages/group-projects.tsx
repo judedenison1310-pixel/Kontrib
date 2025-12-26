@@ -64,8 +64,8 @@ export default function GroupProjects() {
 
   const getProjectTypeLabel = (type: string | undefined) => {
     switch (type) {
-      case "monthly": return "Monthly Dues";
-      case "yearly": return "Yearly Dues";
+      case "monthly": return "Monthly Contributions/Savings";
+      case "yearly": return "Dues and Levies";
       case "event": return "Event";
       case "emergency": return "Emergency";
       default: return "Target Goal";

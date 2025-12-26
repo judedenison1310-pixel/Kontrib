@@ -135,8 +135,8 @@ export function PaymentModal({ open, onOpenChange, project }: PaymentModalProps)
 
   const hasPaymentDetails = project.accountNumber || project.bankName || project.paymentInstructions;
   const hasTarget = project.targetAmount && parseFloat(project.targetAmount) > 0;
-  const projectTypeLabel = project.projectType === "monthly" ? "Monthly Dues" 
-    : project.projectType === "yearly" ? "Yearly Dues" 
+  const projectTypeLabel = project.projectType === "monthly" ? "Monthly Contributions/Savings" 
+    : project.projectType === "yearly" ? "Dues and Levies" 
     : project.projectType === "event" ? "Event Collection"
     : project.projectType === "emergency" ? "Emergency Fund"
     : "Target Goal";
