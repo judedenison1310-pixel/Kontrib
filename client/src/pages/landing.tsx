@@ -237,7 +237,7 @@ export default function Landing() {
             {/* Login Card */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
               <p className="text-gray-600 text-center mb-6">
-                Everyone sees every kobo. Instantly.
+                Contribute with peace of mind.
               </p>
 
               <Form {...phoneForm}>
