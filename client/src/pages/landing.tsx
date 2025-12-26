@@ -281,8 +281,8 @@ export default function Landing() {
                           {/* Phone Number Input */}
                           <FormControl>
                             <Input 
-                              placeholder="••• ••• ••••" 
-                              className="flex-1 h-14 text-base px-4 rounded-xl border-gray-200 font-medium focus:border-green-500 focus:ring-green-500" 
+                              placeholder="⬤⬤⬤ ⬤⬤⬤ ⬤⬤⬤⬤" 
+                              className="flex-1 h-14 text-base px-4 rounded-xl border-gray-200 font-medium focus:border-green-500 focus:ring-green-500 placeholder:text-gray-300 placeholder:tracking-wider" 
                               type="tel"
                               inputMode="numeric"
                               {...field}
