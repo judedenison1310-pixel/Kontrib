@@ -5,7 +5,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
-import { Users, Shield, ArrowRight, Lock, CheckCircle2, Zap, Eye } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Users, Shield, ArrowRight, Lock, CheckCircle2, Zap, Eye, ChevronDown } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { type User as UserType } from "@shared/schema";
 import { sendOtp, verifyOtp, updateProfile } from "@/lib/auth";
@@ -14,8 +15,25 @@ import { z } from "zod";
 import kontribLogo from "@assets/8_1764455185903.png";
 import heroImage from "@assets/Komntrib (2)_1764653626078.jpg";
 
+const COUNTRY_CODES = [
+  { code: "+234", country: "NG", flag: "🇳🇬", name: "Nigeria" },
+  { code: "+1", country: "US", flag: "🇺🇸", name: "United States" },
+  { code: "+44", country: "GB", flag: "🇬🇧", name: "United Kingdom" },
+  { code: "+49", country: "DE", flag: "🇩🇪", name: "Germany" },
+  { code: "+33", country: "FR", flag: "🇫🇷", name: "France" },
+  { code: "+39", country: "IT", flag: "🇮🇹", name: "Italy" },
+  { code: "+34", country: "ES", flag: "🇪🇸", name: "Spain" },
+  { code: "+31", country: "NL", flag: "🇳🇱", name: "Netherlands" },
+  { code: "+32", country: "BE", flag: "🇧🇪", name: "Belgium" },
+  { code: "+41", country: "CH", flag: "🇨🇭", name: "Switzerland" },
+  { code: "+353", country: "IE", flag: "🇮🇪", name: "Ireland" },
+  { code: "+27", country: "ZA", flag: "🇿🇦", name: "South Africa" },
+  { code: "+233", country: "GH", flag: "🇬🇭", name: "Ghana" },
+  { code: "+254", country: "KE", flag: "🇰🇪", name: "Kenya" },
+];
+
 const phoneSchema = z.object({
-  phoneNumber: z.string().min(10, "Enter your WhatsApp number"),
+  phoneNumber: z.string().min(6, "Enter your WhatsApp number"),
 });
 
 const otpSchema = z.object({
@@ -37,9 +55,12 @@ export default function Landing() {
   const { toast } = useToast();
   const [step, setStep] = useState<"phone" | "otp" | "profile" | "role">("phone");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [countryCode, setCountryCode] = useState("+234");
   const [newUser, setNewUser] = useState<UserType | null>(null);
   const [devOtp, setDevOtp] = useState<string | null>(null);
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  
+  const selectedCountry = COUNTRY_CODES.find(c => c.code === countryCode) || COUNTRY_CODES[0];
 
   const getRedirectPath = () => {
     const storedPath = localStorage.getItem(REDIRECT_KEY);
@@ -132,8 +153,11 @@ export default function Landing() {
   });
 
   const onPhoneSubmit = (data: PhoneFormData) => {
-    setPhoneNumber(data.phoneNumber);
-    sendOtpMutation.mutate(data.phoneNumber);
+    // Clean the phone number - remove spaces and leading zeros
+    const cleanNumber = data.phoneNumber.replace(/\s/g, '').replace(/^0+/, '');
+    const fullNumber = `${countryCode}${cleanNumber}`;
+    setPhoneNumber(fullNumber);
+    sendOtpMutation.mutate(fullNumber);
   };
 
   const onOtpSubmit = (data: OtpFormData) => {
@@ -223,15 +247,49 @@ export default function Landing() {
                     name="phoneNumber"
                     render={({ field }) => (
                       <FormItem>
-                        <FormControl>
-                          <Input 
-                            placeholder="+234 XXX XXX XXXX" 
-                            className="h-14 text-base px-4 rounded-xl border-gray-200 text-center font-medium focus:border-green-500 focus:ring-green-500" 
-                            type="tel"
-                            {...field}
-                            data-testid="input-phone"
-                          />
-                        </FormControl>
+                        <div className="flex gap-2">
+                          {/* Country Code Dropdown */}
+                          <Select value={countryCode} onValueChange={setCountryCode}>
+                            <SelectTrigger 
+                              className="w-[100px] h-14 rounded-xl border-gray-200 focus:border-green-500 focus:ring-green-500"
+                              data-testid="select-country-code"
+                            >
+                              <SelectValue>
+                                <span className="flex items-center gap-1">
+                                  <span className="text-lg">{selectedCountry.flag}</span>
+                                  <span className="text-sm font-medium">{selectedCountry.code}</span>
+                                </span>
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent className="max-h-[300px]">
+                              {COUNTRY_CODES.map((country) => (
+                                <SelectItem 
+                                  key={country.code} 
+                                  value={country.code}
+                                  data-testid={`country-${country.country}`}
+                                >
+                                  <span className="flex items-center gap-2">
+                                    <span className="text-lg">{country.flag}</span>
+                                    <span className="font-medium">{country.code}</span>
+                                    <span className="text-gray-500 text-sm">{country.name}</span>
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          
+                          {/* Phone Number Input */}
+                          <FormControl>
+                            <Input 
+                              placeholder="XXX XXX XXXX" 
+                              className="flex-1 h-14 text-base px-4 rounded-xl border-gray-200 font-medium focus:border-green-500 focus:ring-green-500" 
+                              type="tel"
+                              inputMode="numeric"
+                              {...field}
+                              data-testid="input-phone"
+                            />
+                          </FormControl>
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}
