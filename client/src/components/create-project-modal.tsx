@@ -18,7 +18,7 @@ import { ArrowLeft, Calendar, Building2, ChevronDown, ChevronUp } from "lucide-r
 const createProjectFormSchema = insertProjectSchema.extend({
   targetAmount: z.string().optional(),
   selectedPaymentTypes: z.array(z.string()).min(1, "Please select at least one payment method"),
-  projectType: z.enum(["target", "monthly", "yearly", "event", "emergency"]).default("target"),
+  projectType: z.enum(["target", "monthly", "yearly", "event", "emergency"]),
 });
 
 type CreateProjectFormData = z.infer<typeof createProjectFormSchema>;
@@ -43,7 +43,7 @@ export function CreateProjectModal({ open, onOpenChange, groupId, groupName }: C
       targetAmount: "",
       deadline: undefined,
       groupId,
-      projectType: "target",
+      projectType: undefined as any,
       currency: "NGN",
       accountName: "",
       accountNumber: "",

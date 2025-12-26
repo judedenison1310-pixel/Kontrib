@@ -1,9 +1,10 @@
-export type CurrencyCode = "NGN" | "USD" | "EUR";
+export type CurrencyCode = "NGN" | "USD" | "EUR" | "GBP";
 
 export const CURRENCIES: { code: CurrencyCode; label: string; symbol: string }[] = [
   { code: "NGN", label: "Nigerian Naira (₦)", symbol: "₦" },
   { code: "USD", label: "US Dollar ($)", symbol: "$" },
   { code: "EUR", label: "Euro (€)", symbol: "€" },
+  { code: "GBP", label: "British Pound (£)", symbol: "£" },
 ];
 
 export function formatCurrency(amount: string | number | null | undefined, currency: CurrencyCode = "NGN"): string {
@@ -15,6 +16,7 @@ export function formatCurrency(amount: string | number | null | undefined, curre
     NGN: 'en-NG',
     USD: 'en-US',
     EUR: 'de-DE',
+    GBP: 'en-GB',
   };
   
   return new Intl.NumberFormat(localeMap[currency], {
@@ -30,6 +32,7 @@ export function getCurrencySymbol(currency: CurrencyCode = "NGN"): string {
     NGN: "₦",
     USD: "$",
     EUR: "€",
+    GBP: "£",
   };
   return symbols[currency] || "₦";
 }

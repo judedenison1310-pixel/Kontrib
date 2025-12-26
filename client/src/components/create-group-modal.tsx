@@ -22,7 +22,7 @@ type CreateGroupFormData = z.infer<typeof createGroupFormSchema>;
 const createProjectFormSchema = insertProjectSchema.extend({
   targetAmount: z.string().optional(),
   selectedPaymentTypes: z.array(z.string()).min(1, "Please select at least one payment method"),
-  projectType: z.enum(["target", "monthly", "yearly", "event", "emergency"]).default("target"),
+  projectType: z.enum(["target", "monthly", "yearly", "event", "emergency"]),
 });
 type CreateProjectFormData = z.infer<typeof createProjectFormSchema>;
 
@@ -56,7 +56,7 @@ export function CreateGroupModal({ open, onOpenChange }: CreateGroupModalProps) 
       targetAmount: "",
       deadline: undefined,
       groupId: "",
-      projectType: "target",
+      projectType: undefined as any,
       accountName: "",
       accountNumber: "",
       bankName: "",
