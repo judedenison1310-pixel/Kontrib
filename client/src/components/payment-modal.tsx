@@ -304,7 +304,7 @@ export function PaymentModal({ open, onOpenChange, project }: PaymentModalProps)
                     name="transactionRef"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-gray-700 font-medium">Transaction Reference</FormLabel>
+                        <FormLabel className="text-gray-700 font-medium">Transaction Reference (Optional)</FormLabel>
                         <FormControl>
                           <Input 
                             placeholder="Bank reference or receipt number" 
