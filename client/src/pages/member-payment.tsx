@@ -19,7 +19,8 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle,
-  Camera
+  Camera,
+  X
 } from "lucide-react";
 import { formatNaira } from "@/lib/currency";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -403,47 +404,66 @@ export default function MemberPayment() {
                 </p>
               </div>
 
-              <div>
-                <Label>Upload Proof of Payment *</Label>
-                <div className="mt-2">
-                  {!proofFile ? (
-                    <label className="border-2 border-dashed border-gray-300 rounded-lg p-6 block cursor-pointer hover:border-nigerian-green transition-colors">
-                      <div className="text-center">
-                        <Camera className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                        <p className="text-sm font-medium text-gray-900">Click to upload payment proof</p>
-                        <p className="text-xs text-gray-500">PNG, JPG up to 10MB</p>
-                      </div>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileSelect}
-                        className="hidden"
-                        data-testid="proof-upload-input"
-                      />
-                    </label>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="relative border rounded-lg overflow-hidden">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">
+                  Proof of Payment <span className="text-red-500">*</span>
+                </Label>
+                <div className={`border-2 border-dashed rounded-2xl p-6 text-center ${!proofFile && submitContributionMutation.isError ? 'border-red-300 bg-red-50' : 'border-gray-300'}`}>
+                  {proofPreview ? (
+                    <div className="space-y-3">
+                      <div className="relative inline-block">
                         <img 
                           src={proofPreview} 
                           alt="Payment proof" 
-                          className="w-full h-48 object-contain bg-gray-50"
+                          className="max-w-full h-40 object-contain mx-auto rounded-xl"
                         />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProofFile(null);
+                            setProofPreview("");
+                          }}
+                          className="absolute -top-2 -right-2 w-8 h-8 bg-red-100 hover:bg-red-200 rounded-full flex items-center justify-center transition-colors"
+                          data-testid="button-remove-proof"
+                        >
+                          <X className="h-4 w-4 text-red-600" />
+                        </button>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setProofFile(null);
-                          setProofPreview("");
-                        }}
-                        data-testid="change-image-button"
-                      >
-                        Change Image
-                      </Button>
+                      <p className="text-xs text-gray-500">{proofFile?.name}</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
+                        <Upload className="h-6 w-6 text-gray-400" />
+                      </div>
+                      <div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileSelect}
+                          className="hidden"
+                          id="proof-upload-member"
+                          data-testid="proof-upload-input"
+                        />
+                        <label
+                          htmlFor="proof-upload-member"
+                          className="inline-flex items-center gap-2 cursor-pointer text-nigerian-green border-2 border-nigerian-green/30 hover:border-nigerian-green hover:bg-nigerian-green/5 font-semibold px-6 py-3 rounded-full transition-all active:scale-[0.98]"
+                        >
+                          <Upload className="h-4 w-4" />
+                          Upload Receipt
+                        </label>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-2">
+                        Screenshot or photo of your payment (Max 10MB)
+                      </p>
                     </div>
                   )}
                 </div>
+                {!proofFile && submitContributionMutation.isError && (
+                  <p className="text-sm text-red-500 mt-1">
+                    Payment proof is required
+                  </p>
+                )}
               </div>
 
               <div>

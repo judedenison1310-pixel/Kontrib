@@ -251,15 +251,13 @@ export default function Landing() {
                           {/* Country Code Dropdown */}
                           <Select value={countryCode} onValueChange={setCountryCode}>
                             <SelectTrigger 
-                              className="w-[100px] h-14 rounded-xl border-gray-200 focus:border-green-500 focus:ring-green-500"
+                              className="w-[100px] h-14 rounded-xl border-gray-200 focus:border-green-500 focus:ring-green-500 [&>span:last-child]:hidden"
                               data-testid="select-country-code"
                             >
-                              <SelectValue>
-                                <span className="flex items-center gap-1">
-                                  <span className="text-lg">{selectedCountry.flag}</span>
-                                  <span className="text-sm font-medium">{selectedCountry.code}</span>
-                                </span>
-                              </SelectValue>
+                              <span className="flex items-center gap-1">
+                                <span className="text-lg">{selectedCountry.flag}</span>
+                                <span className="text-sm font-medium">{selectedCountry.code}</span>
+                              </span>
                             </SelectTrigger>
                             <SelectContent className="max-h-[300px]">
                               {COUNTRY_CODES.map((country) => (
@@ -281,8 +279,8 @@ export default function Landing() {
                           {/* Phone Number Input */}
                           <FormControl>
                             <Input 
-                              placeholder="⬤⬤⬤ ⬤⬤⬤ ⬤⬤⬤⬤" 
-                              className="flex-1 h-14 text-base px-4 rounded-xl border-gray-200 font-medium focus:border-green-500 focus:ring-green-500 placeholder:text-gray-300 placeholder:tracking-wider" 
+                              placeholder="●●● ●●● ●●●●" 
+                              className="flex-1 h-14 text-base px-4 rounded-xl border-gray-200 font-medium focus:border-green-500 focus:ring-green-500 placeholder:text-gray-300 placeholder:text-xs placeholder:tracking-[0.3em]" 
                               type="tel"
                               inputMode="numeric"
                               {...field}
