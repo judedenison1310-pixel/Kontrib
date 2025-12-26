@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { whatsappService } from "./whatsapp-service";
 import { 
@@ -8,6 +9,21 @@ import {
   insertNotificationSchema, insertOtpVerificationSchema
 } from "@shared/schema";
 import { z } from "zod";
+
+// Track connected WebSocket clients by userId
+const wsClients = new Map<string, Set<WebSocket>>();
+
+export function broadcastNotification(userId: string, notification: any) {
+  const clients = wsClients.get(userId);
+  if (clients) {
+    const message = JSON.stringify({ type: 'notification', payload: notification });
+    clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(message);
+      }
+    });
+  }
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -388,12 +404,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (group && user) {
         // Create notification for group admin about new member
-        await storage.createNotification({
+        const notification = await storage.createNotification({
           userId: group.adminId,
           type: "member_joined",
           title: "New Member Joined",
           message: `${user.fullName} (@${user.username}) has joined your group "${group.name}"`
         });
+        broadcastNotification(group.adminId, notification);
       }
       
       res.json(membership);
@@ -501,12 +518,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Send notification to the removed member
-      await storage.createNotification({
+      const notification = await storage.createNotification({
         userId: memberToRemove.userId,
         type: "member_removed",
         title: "Removed from Group",
         message: `You have been removed from the group "${group.name}"`
       });
+      broadcastNotification(memberToRemove.userId, notification);
       
       res.json({ success: true, message: "Member removed successfully" });
     } catch (error) {
@@ -1340,5 +1358,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
+  
+  // Set up WebSocket server for real-time notifications
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  
+  wss.on('connection', (ws) => {
+    let userId: string = '';
+    
+    ws.on('message', (message) => {
+      try {
+        const data = JSON.parse(message.toString());
+        if (data.type === 'subscribe' && data.userId) {
+          userId = data.userId;
+          if (!wsClients.has(userId)) {
+            wsClients.set(userId, new Set());
+          }
+          wsClients.get(userId)!.add(ws);
+        }
+      } catch (e) {
+        console.error('WebSocket message error:', e);
+      }
+    });
+    
+    ws.on('close', () => {
+      if (userId) {
+        const clients = wsClients.get(userId);
+        if (clients) {
+          clients.delete(ws);
+          if (clients.size === 0) {
+            wsClients.delete(userId);
+          }
+        }
+      }
+    });
+  });
+  
   return httpServer;
 }

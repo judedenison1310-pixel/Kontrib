@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { formatNaira } from "@/lib/currency";
 import { apiRequest } from "@/lib/queryClient";
+import { useNotificationsWebSocket } from "@/hooks/use-notifications-ws";
 import type { Notification, ContributionWithDetails } from "@shared/schema";
 
 interface NotificationBellProps {
@@ -30,11 +31,18 @@ export function NotificationBell({ userId, onContributionClick }: NotificationBe
   const [open, setOpen] = useState(false);
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const { hasNewNotification, clearNewNotification } = useNotificationsWebSocket(userId);
 
   const { data: notifications = [] } = useQuery<Notification[]>({
     queryKey: ["/api/notifications", userId],
     enabled: !!userId,
   });
+
+  useEffect(() => {
+    if (open && hasNewNotification) {
+      clearNewNotification();
+    }
+  }, [open, hasNewNotification, clearNewNotification]);
 
   const { data: contributions = [] } = useQuery<ContributionWithDetails[]>({
     queryKey: ["/api/contributions/admin", userId],
@@ -124,13 +132,13 @@ export function NotificationBell({ userId, onContributionClick }: NotificationBe
           className="relative"
           data-testid="notification-bell"
         >
-          <Bell className="h-5 w-5 text-gray-600" />
-          {totalUnreadCount > 0 && (
+          <Bell className={`h-5 w-5 text-gray-600 ${hasNewNotification ? 'animate-bounce' : ''}`} />
+          {(totalUnreadCount > 0 || hasNewNotification) && (
             <Badge 
               variant="destructive" 
-              className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs"
+              className={`absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs ${hasNewNotification ? 'animate-pulse ring-2 ring-red-300' : ''}`}
             >
-              {totalUnreadCount > 9 ? '9+' : totalUnreadCount}
+              {totalUnreadCount > 9 ? '9+' : totalUnreadCount || '!'}
             </Badge>
           )}
         </Button>
