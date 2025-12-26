@@ -317,9 +317,11 @@ export default function MakePayment() {
                   name="proofOfPayment"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-gray-700 font-medium">Proof of Payment</FormLabel>
-                      <div className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${
-                        field.value ? "border-green-400 bg-green-50" : "border-gray-300 hover:border-gray-400"
+                      <FormLabel className="text-gray-700 font-medium">
+                        Proof of Payment <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <div className={`border-2 border-dashed rounded-2xl p-6 text-center transition-colors ${
+                        field.value ? "border-green-400 bg-green-50" : form.formState.errors.proofOfPayment ? "border-red-300 bg-red-50" : "border-gray-300"
                       }`}>
                         <input
                           type="file"
@@ -331,27 +333,35 @@ export default function MakePayment() {
                         />
                         {field.value ? (
                           <div className="space-y-3">
-                            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                            <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto">
                               <CheckCircle className="h-6 w-6 text-green-600" />
                             </div>
                             <p className="font-medium text-green-700">Receipt Uploaded!</p>
                             <label 
                               htmlFor="proof-upload" 
-                              className="text-sm text-primary underline cursor-pointer"
+                              className="inline-flex items-center gap-2 cursor-pointer text-primary border-2 border-primary/30 hover:border-primary hover:bg-primary/5 font-semibold px-4 py-2 rounded-full transition-all text-sm"
                             >
                               Change Image
                             </label>
                           </div>
                         ) : (
-                          <label htmlFor="proof-upload" className="cursor-pointer block">
-                            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                          <div className="space-y-3">
+                            <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
                               <Camera className="h-6 w-6 text-gray-400" />
                             </div>
-                            <p className="font-medium text-gray-700 mb-1">
-                              {uploading ? "Uploading..." : "Upload Receipt"}
+                            <div>
+                              <label 
+                                htmlFor="proof-upload" 
+                                className="inline-flex items-center gap-2 cursor-pointer text-primary border-2 border-primary/30 hover:border-primary hover:bg-primary/5 font-semibold px-6 py-3 rounded-full transition-all active:scale-[0.98]"
+                              >
+                                <Upload className="h-4 w-4" />
+                                {uploading ? "Uploading..." : "Upload Receipt"}
+                              </label>
+                            </div>
+                            <p className="text-xs text-gray-400 mt-2">
+                              Screenshot or photo of your payment (Max 5MB)
                             </p>
-                            <p className="text-sm text-gray-500">Tap to take photo or choose file</p>
-                          </label>
+                          </div>
                         )}
                       </div>
                       <FormMessage />
