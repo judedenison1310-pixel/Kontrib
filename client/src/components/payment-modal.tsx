@@ -381,7 +381,7 @@ export function PaymentModal({ open, onOpenChange, project }: PaymentModalProps)
                             />
                             <label
                               htmlFor="proof-upload"
-                              className="inline-flex items-center gap-2 cursor-pointer bg-primary text-white font-semibold px-6 py-3 rounded-full hover:bg-primary/90 transition-all active:scale-[0.98]"
+                              className="inline-flex items-center gap-2 cursor-pointer text-primary border-2 border-primary/30 hover:border-primary hover:bg-primary/5 font-semibold px-6 py-3 rounded-full transition-all active:scale-[0.98]"
                             >
                               <Upload className="h-4 w-4" />
                               Upload Receipt
