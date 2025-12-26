@@ -332,7 +332,7 @@ export function CreateGroupModal({ open, onOpenChange }: CreateGroupModalProps) 
                           <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
                               <SelectTrigger className="h-14 text-lg rounded-2xl border-2 border-gray-200" data-testid="select-project-type">
-                                <SelectValue placeholder="Select project type" />
+                                <SelectValue placeholder="Choose Contribution Type" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
