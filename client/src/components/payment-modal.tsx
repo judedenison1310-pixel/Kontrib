@@ -16,6 +16,7 @@ import { z } from "zod";
 
 const paymentFormSchema = insertContributionSchema.extend({
   amount: z.string().min(1, "Amount is required"),
+  proofOfPayment: z.string().min(1, "Payment proof is required"),
 }).omit({
   groupId: true,
   projectId: true,
@@ -341,8 +342,10 @@ export function PaymentModal({ open, onOpenChange, project }: PaymentModalProps)
 
                   {/* Proof of Payment Upload */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Proof of Payment</label>
-                    <div className="border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center">
+                    <label className="text-sm font-medium text-gray-700">
+                      Proof of Payment <span className="text-red-500">*</span>
+                    </label>
+                    <div className={`border-2 border-dashed rounded-2xl p-6 text-center ${form.formState.errors.proofOfPayment ? 'border-red-300 bg-red-50' : 'border-gray-300'}`}>
                       {proofPreview ? (
                         <div className="space-y-3">
                           <div className="relative inline-block">
@@ -389,6 +392,11 @@ export function PaymentModal({ open, onOpenChange, project }: PaymentModalProps)
                         </div>
                       )}
                     </div>
+                    {form.formState.errors.proofOfPayment && (
+                      <p className="text-sm text-red-500 mt-1">
+                        {form.formState.errors.proofOfPayment.message}
+                      </p>
+                    )}
                   </div>
 
                   <button
