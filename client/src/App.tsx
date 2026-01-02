@@ -5,6 +5,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useEffect, useState } from "react";
 import { initializeAuth, getCurrentUser, setupAuthSync } from "./lib/auth";
+import { initGA } from "./lib/analytics";
+import { useAnalytics } from "./hooks/use-analytics";
 import type { User } from "@shared/schema";
 
 const REDIRECT_KEY = "kontrib_redirectTo";
@@ -93,6 +95,8 @@ function Router() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [location] = useLocation();
+  
+  useAnalytics();
 
   // Initialize auth on mount
   useEffect(() => {
@@ -206,6 +210,12 @@ function Router() {
 }
 
 function App() {
+  useEffect(() => {
+    if (import.meta.env.VITE_GA_MEASUREMENT_ID) {
+      initGA();
+    }
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
