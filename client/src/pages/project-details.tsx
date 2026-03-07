@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Navigation } from "@/components/navigation";
 import { PaymentModal } from "@/components/payment-modal";
-import { EditNameModal } from "@/components/edit-name-modal";
+import { EditProjectModal } from "@/components/edit-project-modal";
 import {
   ArrowLeft,
   Target,
@@ -57,7 +57,7 @@ export default function ProjectDetails() {
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
-  const [editProjectNameModalOpen, setEditProjectNameModalOpen] = useState(false);
+  const [editProjectModalOpen, setEditProjectModalOpen] = useState(false);
   const { toast } = useToast();
   const user = getCurrentUser();
 
@@ -348,9 +348,10 @@ export default function ProjectDetails() {
             </h1>
             {isAdmin && (
               <button
-                onClick={() => setEditProjectNameModalOpen(true)}
+                onClick={() => setEditProjectModalOpen(true)}
                 className="p-1 hover:bg-white/20 rounded-lg transition-colors"
-                data-testid="button-edit-project-name"
+                title="Edit project"
+                data-testid="button-edit-project"
               >
                 <Pencil className="h-4 w-4" />
               </button>
@@ -626,13 +627,10 @@ export default function ProjectDetails() {
       />
 
       {project && (
-        <EditNameModal
-          open={editProjectNameModalOpen}
-          onOpenChange={setEditProjectNameModalOpen}
-          type="project"
-          currentName={project.name}
-          entityId={project.id}
-          groupId={project.groupId}
+        <EditProjectModal
+          open={editProjectModalOpen}
+          onOpenChange={setEditProjectModalOpen}
+          project={project}
         />
       )}
     </div>

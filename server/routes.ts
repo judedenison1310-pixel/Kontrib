@@ -796,6 +796,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/contributions/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const contribution = await storage.getContribution(id);
+      if (!contribution) {
+        return res.status(404).json({ message: "Contribution not found" });
+      }
+      // If confirmed, reverse the collected amount on the project
+      if (contribution.status === "confirmed" && contribution.projectId) {
+        const project = await storage.getProject(contribution.projectId);
+        if (project) {
+          const newCollected = Math.max(0, parseFloat(project.collectedAmount) - parseFloat(contribution.amount));
+          await storage.updateProject(contribution.projectId, { collectedAmount: String(newCollected) });
+        }
+      }
+      await storage.deleteContribution(id);
+      res.json({ message: "Contribution deleted" });
+    } catch (error) {
+      console.error("Delete contribution error:", error);
+      res.status(500).json({ message: "Failed to delete contribution" });
+    }
+  });
+
   // Notification routes
   app.get("/api/notifications/:userId", async (req, res) => {
     try {

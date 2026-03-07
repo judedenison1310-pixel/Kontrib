@@ -75,9 +75,11 @@ export interface IStorage {
   markNotificationRead(notificationId: string): Promise<void>;
   deleteNotification(notificationId: string): Promise<void>;
   
+  getContribution(id: string): Promise<Contribution | undefined>;
   getUserContributions(userId: string): Promise<ContributionWithDetails[]>;
   getAdminContributions(adminId: string): Promise<ContributionWithDetails[]>;
   updateContribution(id: string, updates: Partial<Contribution>): Promise<Contribution | undefined>;
+  deleteContribution(id: string): Promise<void>;
   
   // Stats methods
   getUserStats(userId: string): Promise<MemberWithContributions>;
@@ -625,6 +627,10 @@ export class MemStorage implements IStorage {
     });
   }
 
+  async getContribution(id: string): Promise<Contribution | undefined> {
+    return this.contributions.get(id);
+  }
+
   async createContribution(insertContribution: InsertContribution): Promise<Contribution> {
     const id = randomUUID();
     const contribution: Contribution = {
@@ -712,6 +718,10 @@ export class MemStorage implements IStorage {
     const updatedContribution = { ...contribution, ...updates };
     this.contributions.set(id, updatedContribution);
     return updatedContribution;
+  }
+
+  async deleteContribution(id: string): Promise<void> {
+    this.contributions.delete(id);
   }
 
   async getUserStats(userId: string): Promise<MemberWithContributions> {
@@ -1435,6 +1445,11 @@ export class DbStorage implements IStorage {
     }));
   }
 
+  async getContribution(id: string): Promise<Contribution | undefined> {
+    const result = await db.select().from(contributionsTable).where(eq(contributionsTable.id, id)).limit(1);
+    return result[0];
+  }
+
   async createContribution(contribution: InsertContribution): Promise<Contribution> {
     const result = await db.insert(contributionsTable).values(contribution).returning();
     return result[0];
@@ -1535,6 +1550,10 @@ export class DbStorage implements IStorage {
   async updateContribution(id: string, updates: Partial<Contribution>): Promise<Contribution | undefined> {
     const result = await db.update(contributionsTable).set(updates).where(eq(contributionsTable.id, id)).returning();
     return result[0];
+  }
+
+  async deleteContribution(id: string): Promise<void> {
+    await db.delete(contributionsTable).where(eq(contributionsTable.id, id));
   }
 
   async getUserNotifications(userId: string): Promise<Notification[]> {

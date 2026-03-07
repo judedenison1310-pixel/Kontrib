@@ -1,19 +1,33 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Navigation } from "@/components/navigation";
-import { ArrowLeft, FileImage, Loader2, Eye } from "lucide-react";
+import { ArrowLeft, FileImage, Loader2, Eye, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { formatCurrency, CurrencyCode } from "@/lib/currency";
 import { getCurrentUser } from "@/lib/auth";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { Project, ContributionWithDetails, Group } from "@shared/schema";
 
 export default function ProjectProofs() {
   const { projectId } = useParams();
   const [, setLocation] = useLocation();
   const [selectedProof, setSelectedProof] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const { toast } = useToast();
   const user = getCurrentUser();
 
   const { data: project, isLoading: projectLoading } = useQuery<Project>({
@@ -31,6 +45,20 @@ export default function ProjectProofs() {
       queryKey: [`/api/contributions/project/${projectId}`],
       enabled: !!projectId,
     });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => apiRequest("DELETE", `/api/contributions/${id}`),
+    onSuccess: () => {
+      toast({ title: "Upload removed", description: "The payment upload has been deleted." });
+      queryClient.invalidateQueries({ queryKey: [`/api/contributions/project/${projectId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}`] });
+      setDeleteId(null);
+    },
+    onError: () => {
+      toast({ title: "Failed to delete", description: "Please try again.", variant: "destructive" });
+      setDeleteId(null);
+    },
+  });
 
   const isLoading = projectLoading || contributionsLoading || groupLoading;
   const isAdmin = user?.id === group?.adminId;
@@ -165,6 +193,19 @@ export default function ProjectProofs() {
                         {formatCurrency(contribution.amount, projectCurrency)}
                       </span>
                       <Eye className="w-4 h-4 text-gray-400" />
+                      {isAdmin && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteId(contribution.id);
+                          }}
+                          className="p-1 hover:bg-red-100 rounded-lg transition-colors text-red-400 hover:text-red-600"
+                          title="Remove upload"
+                          data-testid={`button-delete-contribution-${contribution.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -197,6 +238,27 @@ export default function ProjectProofs() {
           </div>
         </div>
       )}
+
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove this upload?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the payment upload. If it was already confirmed, the collected amount will be adjusted accordingly.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => deleteId && deleteMutation.mutate(deleteId)}
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? "Removing..." : "Remove"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
