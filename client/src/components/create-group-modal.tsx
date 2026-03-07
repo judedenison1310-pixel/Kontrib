@@ -250,8 +250,8 @@ export function CreateGroupModal({ open, onOpenChange }: CreateGroupModalProps) 
                                 <p className="font-medium text-gray-900">Private Group (Ajo)</p>
                                 <p className="text-sm text-gray-500">
                                   {field.value === "private" 
-                                    ? "Only admin sees members & payments" 
-                                    : "Everyone sees who contributed"}
+                                    ? "Members cannot see each other — only the admin sees who joined and who paid" 
+                                    : "Members can see each other's contributions and who has paid"}
                                 </p>
                               </div>
                             </div>
