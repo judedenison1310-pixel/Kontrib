@@ -322,18 +322,30 @@ export default function ProjectDetails() {
 
         {/* Project Header */}
         <div className="bg-primary rounded-2xl p-5 text-white">
-          {/* Group Name */}
-          {group && (
-            <button
-              onClick={() => setLocation(`/group/${group.id}`)}
-              className="flex items-center gap-1 text-green-200 text-sm mb-2 hover:text-white transition-colors"
-              data-testid="link-group"
-            >
-              <Building2 className="h-4 w-4" />
-              <span>{group.name}</span>
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          )}
+          {/* Top row: group name + edit button */}
+          <div className="flex items-start justify-between mb-2">
+            {group ? (
+              <button
+                onClick={() => setLocation(`/group/${group.id}`)}
+                className="flex items-center gap-1 text-green-200 text-sm hover:text-white transition-colors"
+                data-testid="link-group"
+              >
+                <Building2 className="h-4 w-4" />
+                <span>{group.name}</span>
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            ) : <span />}
+            {isAdmin && (
+              <button
+                onClick={() => setEditProjectModalOpen(true)}
+                className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 text-white text-xs font-medium px-3 py-1.5 rounded-full transition-colors"
+                data-testid="button-edit-project"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Edit Details
+              </button>
+            )}
+          </div>
           <div className="flex items-center gap-2 mb-2">
             <Badge className="bg-white/20 text-white border-0 text-xs">
               {getProjectTypeLabel(project.projectType)}
@@ -342,21 +354,9 @@ export default function ProjectDetails() {
               {project.status}
             </Badge>
           </div>
-          <div className="flex items-center gap-2 mb-2">
-            <h1 className="text-2xl font-bold" data-testid="text-project-name">
-              {project.name}
-            </h1>
-            {isAdmin && (
-              <button
-                onClick={() => setEditProjectModalOpen(true)}
-                className="p-1 hover:bg-white/20 rounded-lg transition-colors"
-                title="Edit project"
-                data-testid="button-edit-project"
-              >
-                <Pencil className="h-4 w-4" />
-              </button>
-            )}
-          </div>
+          <h1 className="text-2xl font-bold mb-2" data-testid="text-project-name">
+            {project.name}
+          </h1>
           {project.description && (
             <p className="text-green-100 text-sm mb-4">
               {project.description}
