@@ -76,6 +76,7 @@ export const disbursements = pgTable("disbursements", {
   recipient: text("recipient").notNull(),
   purpose: text("purpose").notNull(),
   disbursementDate: timestamp("disbursement_date").notNull(),
+  receipt: text("receipt"), // Base64 encoded receipt image
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });

@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation, useParams } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Navigation } from "@/components/navigation";
@@ -31,6 +32,7 @@ import {
   Lock,
   PlusCircle,
   Banknote,
+  Receipt,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -63,6 +65,7 @@ export default function ProjectDetails() {
   const [linkCopied, setLinkCopied] = useState(false);
   const [editProjectModalOpen, setEditProjectModalOpen] = useState(false);
   const [disbursementModalOpen, setDisbursementModalOpen] = useState(false);
+  const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
   const { toast } = useToast();
   const user = getCurrentUser();
 
@@ -617,10 +620,20 @@ export default function ProjectDetails() {
                           })}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1 shrink-0">
                         <span className="text-sm font-semibold text-orange-700">
                           {formatCurrency(parseFloat(d.amount), projectCurrency)}
                         </span>
+                        {d.receipt && (
+                          <button
+                            onClick={() => setViewingReceipt(d.receipt!)}
+                            className="text-gray-400 hover:text-primary transition-colors p-1"
+                            title="View receipt"
+                            data-testid={`button-view-receipt-${d.id}`}
+                          >
+                            <Receipt className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         {isAdmin && (
                           <button
                             onClick={() => deleteDisbursementMutation.mutate(d.id)}
@@ -789,6 +802,22 @@ export default function ProjectDetails() {
           createdBy={user.id}
         />
       )}
+
+      {/* Receipt Viewer */}
+      <Dialog open={!!viewingReceipt} onOpenChange={(o) => !o && setViewingReceipt(null)}>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Disbursement Receipt</DialogTitle>
+          </DialogHeader>
+          {viewingReceipt && (
+            <img
+              src={viewingReceipt}
+              alt="Disbursement receipt"
+              className="w-full rounded-xl object-contain max-h-[60vh]"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

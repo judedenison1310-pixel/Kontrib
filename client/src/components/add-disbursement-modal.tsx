@@ -1,3 +1,4 @@
+import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
@@ -19,7 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, Upload, X, ImageIcon } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -51,6 +52,9 @@ export function AddDisbursementModal({
   createdBy,
 }: AddDisbursementModalProps) {
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [receiptPreview, setReceiptPreview] = useState<string>("");
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -62,6 +66,37 @@ export function AddDisbursementModal({
     },
   });
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please select a file smaller than 5MB",
+        variant: "destructive",
+      });
+      return;
+    }
+    setReceiptFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setReceiptPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const removeReceipt = () => {
+    setReceiptFile(null);
+    setReceiptPreview("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleClose = (open: boolean) => {
+    if (!open) {
+      form.reset();
+      removeReceipt();
+    }
+    onOpenChange(open);
+  };
+
   const mutation = useMutation({
     mutationFn: (values: FormValues) =>
       apiRequest("POST", `/api/projects/${projectId}/disbursements`, {
@@ -69,6 +104,7 @@ export function AddDisbursementModal({
         recipient: values.recipient,
         purpose: values.purpose,
         disbursementDate: values.disbursementDate,
+        receipt: receiptPreview || null,
         createdBy,
       }),
     onSuccess: () => {
@@ -77,6 +113,7 @@ export function AddDisbursementModal({
       });
       toast({ title: "Disbursement recorded" });
       form.reset();
+      removeReceipt();
       onOpenChange(false);
     },
     onError: () => {
@@ -88,8 +125,8 @@ export function AddDisbursementModal({
   });
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm rounded-2xl">
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-sm rounded-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Record Disbursement</DialogTitle>
         </DialogHeader>
@@ -142,7 +179,7 @@ export function AddDisbursementModal({
                   <FormControl>
                     <Textarea
                       placeholder="What were the funds used for?"
-                      rows={3}
+                      rows={2}
                       {...field}
                     />
                   </FormControl>
@@ -165,12 +202,50 @@ export function AddDisbursementModal({
               )}
             />
 
+            {/* Receipt Upload */}
+            <div>
+              <p className="text-sm font-medium mb-2">Receipt (optional)</p>
+              {receiptPreview ? (
+                <div className="relative rounded-xl overflow-hidden border border-gray-200">
+                  <img
+                    src={receiptPreview}
+                    alt="Receipt preview"
+                    className="w-full max-h-40 object-contain bg-gray-50"
+                  />
+                  <button
+                    type="button"
+                    onClick={removeReceipt}
+                    className="absolute top-2 right-2 bg-white rounded-full p-1 shadow-md"
+                  >
+                    <X className="w-4 h-4 text-gray-600" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full border-2 border-dashed border-gray-200 rounded-xl p-4 flex flex-col items-center gap-1 text-gray-400 hover:border-primary hover:text-primary transition-colors"
+                >
+                  <Upload className="w-5 h-5" />
+                  <span className="text-xs">Tap to upload receipt</span>
+                  <span className="text-xs">JPG, PNG or PDF · Max 5MB</span>
+                </button>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,application/pdf"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+            </div>
+
             <div className="flex gap-3 pt-1">
               <Button
                 type="button"
                 variant="outline"
                 className="flex-1"
-                onClick={() => onOpenChange(false)}
+                onClick={() => handleClose(false)}
                 disabled={mutation.isPending}
               >
                 Cancel
