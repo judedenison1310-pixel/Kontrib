@@ -134,7 +134,7 @@ export default function GroupProjects() {
       <main className="max-w-lg mx-auto px-4 py-6 space-y-6">
         <Button
           variant="ghost"
-          onClick={() => setLocation(`/group/${groupId}`)}
+          onClick={() => setLocation(`/groups`)}
           className="mb-2 -ml-2"
           data-testid="button-back"
         >
