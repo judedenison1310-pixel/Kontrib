@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Navigation } from "@/components/navigation";
 import { CreateProjectModal } from "@/components/create-project-modal";
-import { PaymentModal } from "@/components/payment-modal";
+import { EditProjectModal } from "@/components/edit-project-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,12 +13,15 @@ import {
   Target,
   Calendar,
   ChevronRight,
-  CreditCard,
+  Copy,
+  Check,
+  Pencil,
   Users,
   Plus,
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { formatNaira } from "@/lib/currency";
+import { useToast } from "@/hooks/use-toast";
 import { Project, Group } from "@shared/schema";
 
 interface ProjectWithGroup extends Project {
@@ -29,9 +32,11 @@ interface ProjectWithGroup extends Project {
 export default function AdminProjects() {
   const user = getCurrentUser();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const [createProjectModalOpen, setCreateProjectModalOpen] = useState(false);
-  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<ProjectWithGroup | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editProject, setEditProject] = useState<ProjectWithGroup | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
 
   const { data: projects = [], isLoading: projectsLoading } = useQuery<ProjectWithGroup[]>({
@@ -55,9 +60,25 @@ export default function AdminProjects() {
     setCreateProjectModalOpen(true);
   };
 
-  const handlePaymentClick = (project: ProjectWithGroup) => {
-    setSelectedProject(project);
-    setPaymentModalOpen(true);
+  const generateProjectUrl = (project: ProjectWithGroup, groupSlug?: string) => {
+    const projectSlug = project.name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '').slice(0, 50);
+    if (groupSlug) return `https://kontrib.app/join/${groupSlug}/${projectSlug}`;
+    return `${window.location.origin}/project/${project.id}`;
+  };
+
+  const handleCopyLink = async (e: React.MouseEvent, project: ProjectWithGroup, groupSlug?: string) => {
+    e.stopPropagation();
+    const url = generateProjectUrl(project, groupSlug);
+    await navigator.clipboard.writeText(url);
+    setCopiedId(project.id);
+    toast({ title: "Link copied!", description: "Share it with group members" });
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleEditClick = (e: React.MouseEvent, project: ProjectWithGroup) => {
+    e.stopPropagation();
+    setEditProject(project);
+    setEditModalOpen(true);
   };
 
   const getStatusColor = (status: string) => {
@@ -233,17 +254,25 @@ export default function AdminProjects() {
                       </div>
                     )}
 
-                    <div className="pt-3 border-t border-gray-100">
+                    <div className="pt-3 border-t border-gray-100 flex gap-2">
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePaymentClick(project);
-                        }}
-                        className="w-full bg-primary hover:bg-primary/90 text-white font-medium py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors"
-                        data-testid={`button-payment-${project.id}`}
+                        onClick={(e) => handleCopyLink(e, project)}
+                        className="flex-1 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-medium py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors"
+                        data-testid={`button-copy-link-${project.id}`}
                       >
-                        <CreditCard className="h-4 w-4" />
-                        Submit Payment Proof
+                        {copiedId === project.id ? (
+                          <><Check className="h-4 w-4 text-green-600" /> Copied!</>
+                        ) : (
+                          <><Copy className="h-4 w-4" /> Share Link</>
+                        )}
+                      </button>
+                      <button
+                        onClick={(e) => handleEditClick(e, project)}
+                        className="flex-1 bg-primary hover:bg-primary/90 text-white font-medium py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors"
+                        data-testid={`button-edit-${project.id}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Edit Details
                       </button>
                     </div>
                   </CardContent>
@@ -263,11 +292,11 @@ export default function AdminProjects() {
         />
       )}
 
-      {selectedProject && (
-        <PaymentModal
-          open={paymentModalOpen}
-          onOpenChange={setPaymentModalOpen}
-          project={selectedProject}
+      {editProject && (
+        <EditProjectModal
+          open={editModalOpen}
+          onOpenChange={setEditModalOpen}
+          project={editProject}
         />
       )}
     </div>

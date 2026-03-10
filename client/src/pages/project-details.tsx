@@ -320,7 +320,8 @@ export default function ProjectDetails() {
           <span>Back</span>
         </button>
 
-        {/* Project Header */}
+        {/* Project Header - hidden for admins (they manage, not contribute) */}
+        {!isAdmin && (
         <div className="bg-primary rounded-2xl p-5 text-white">
           {/* Top row: group name + edit button */}
           <div className="flex items-start justify-between mb-2">
@@ -387,9 +388,10 @@ export default function ProjectDetails() {
             </div>
           )}
         </div>
+        )}
 
-        {/* Progress Card - only for target-based projects */}
-        {hasTarget && (
+        {/* Progress Card - hidden for admins */}
+        {!isAdmin && hasTarget && (
           <Card className="rounded-2xl border-0 shadow-sm">
             <CardContent className="p-5">
               <div className="flex justify-between items-center mb-2">
@@ -414,18 +416,20 @@ export default function ProjectDetails() {
           </Card>
         )}
 
-        {/* Primary CTA - Submit Payment Proof */}
-        <div className="bg-white rounded-2xl p-5 text-center shadow-sm">
-          <h3 className="text-gray-900 font-bold text-lg mb-4">Ready to Contribute?</h3>
-          <button
-            onClick={() => setPaymentOpen(true)}
-            className="w-full bg-primary hover:bg-primary/90 text-white font-bold text-lg py-4 rounded-full shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
-            data-testid="button-submit-proof-primary"
-          >
-            <CreditCard className="h-5 w-5" />
-            Submit Payment Proof
-          </button>
-        </div>
+        {/* Primary CTA - hidden for admins */}
+        {!isAdmin && (
+          <div className="bg-white rounded-2xl p-5 text-center shadow-sm">
+            <h3 className="text-gray-900 font-bold text-lg mb-4">Ready to Contribute?</h3>
+            <button
+              onClick={() => setPaymentOpen(true)}
+              className="w-full bg-primary hover:bg-primary/90 text-white font-bold text-lg py-4 rounded-full shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+              data-testid="button-submit-proof-primary"
+            >
+              <CreditCard className="h-5 w-5" />
+              Submit Payment Proof
+            </button>
+          </div>
+        )}
 
         {/* Payment Details */}
         {hasPaymentDetails && (
@@ -607,17 +611,19 @@ export default function ProjectDetails() {
           </CardContent>
         </Card>
 
-        {/* Submit Proof Button */}
-        <div className="fixed bottom-6 left-4 right-4 max-w-lg mx-auto">
-          <button
-            onClick={() => setPaymentOpen(true)}
-            className="w-full bg-primary hover:bg-primary/90 text-white font-semibold text-lg py-4 rounded-full shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
-            data-testid="button-submit-proof"
-          >
-            <CreditCard className="h-5 w-5" />
-            Submit Payment Proof
-          </button>
-        </div>
+        {/* Submit Proof Button - hidden for admins */}
+        {!isAdmin && (
+          <div className="fixed bottom-6 left-4 right-4 max-w-lg mx-auto">
+            <button
+              onClick={() => setPaymentOpen(true)}
+              className="w-full bg-primary hover:bg-primary/90 text-white font-semibold text-lg py-4 rounded-full shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+              data-testid="button-submit-proof"
+            >
+              <CreditCard className="h-5 w-5" />
+              Submit Payment Proof
+            </button>
+          </div>
+        )}
       </div>
 
       <PaymentModal
