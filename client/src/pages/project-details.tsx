@@ -580,7 +580,7 @@ export default function ProjectDetails() {
                 <div className={`rounded-xl p-3 ${availableBalance < 0 ? "bg-red-50" : "bg-green-50"}`}>
                   <p className="text-xs text-gray-500 mb-0.5">Balance</p>
                   <p className={`text-sm font-semibold ${availableBalance < 0 ? "text-red-700" : "text-green-700"}`}>
-                    {formatCurrency(Math.abs(availableBalance), projectCurrency)}
+                    {availableBalance < 0 ? "-" : ""}{formatCurrency(Math.abs(availableBalance), projectCurrency)}
                   </p>
                 </div>
               </div>
