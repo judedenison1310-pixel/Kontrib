@@ -222,7 +222,8 @@ export class MemStorage implements IStorage {
         memberCount,
         projectCount: groupProjects.length,
         completionRate,
-        pendingPayments
+        pendingPayments,
+        totalCollected: totalProjectCollected,
       };
     });
   }
@@ -385,7 +386,8 @@ export class MemStorage implements IStorage {
         memberCount,
         projectCount,
         completionRate,
-        pendingPayments
+        pendingPayments,
+        totalCollected: totalProjectCollected,
       };
       
       return { ...membership, group: groupWithStats };
@@ -1140,7 +1142,8 @@ export class DbStorage implements IStorage {
         memberCount,
         projectCount: groupProjects.length,
         completionRate,
-        pendingPayments
+        pendingPayments,
+        totalCollected: totalProjectCollected,
       };
     }));
 
