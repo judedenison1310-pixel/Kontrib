@@ -221,17 +221,17 @@ export function AddDisbursementModal({
                   </button>
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full border-2 border-dashed border-gray-200 rounded-xl p-4 flex flex-col items-center gap-1 text-gray-400 hover:border-primary hover:text-primary transition-colors"
+                <label
+                  htmlFor="disbursement-receipt-input"
+                  className="w-full border-2 border-dashed border-gray-200 rounded-xl p-4 flex flex-col items-center gap-1 text-gray-400 hover:border-primary hover:text-primary transition-colors cursor-pointer"
                 >
                   <Upload className="w-5 h-5" />
                   <span className="text-xs">Tap to upload receipt</span>
                   <span className="text-xs">JPG, PNG or PDF · Max 5MB</span>
-                </button>
+                </label>
               )}
               <input
+                id="disbursement-receipt-input"
                 ref={fileInputRef}
                 type="file"
                 accept="image/*,application/pdf"
