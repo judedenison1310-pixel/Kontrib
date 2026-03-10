@@ -220,6 +220,7 @@ export type GroupWithStats = Group & {
   projectCount: number;
   completionRate: number;
   pendingPayments: number;
+  totalCollected: number;
 };
 
 export type MemberWithContributions = User & {

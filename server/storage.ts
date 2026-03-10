@@ -250,6 +250,7 @@ export class MemStorage implements IStorage {
         projectCount: groupProjects.length,
         completionRate,
         pendingPayments: 0,
+        totalCollected,
         role: 'admin',
         pendingApprovals,
       });
@@ -284,6 +285,7 @@ export class MemStorage implements IStorage {
           projectCount: groupProjects.length,
           completionRate,
           pendingPayments: 0,
+          totalCollected,
           role: 'member',
           myPendingPayments,
         });
@@ -1176,6 +1178,7 @@ export class DbStorage implements IStorage {
         projectCount: groupProjects.length,
         completionRate,
         pendingPayments: 0,
+        totalCollected,
         role: 'admin',
         pendingApprovals,
       });
@@ -1226,6 +1229,7 @@ export class DbStorage implements IStorage {
           projectCount: groupProjects.length,
           completionRate,
           pendingPayments: 0,
+          totalCollected,
           role: 'member',
           myPendingPayments,
         });

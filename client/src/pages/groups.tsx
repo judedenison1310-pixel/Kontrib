@@ -4,22 +4,22 @@ import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Navigation } from "@/components/navigation";
 import { CreateGroupModal } from "@/components/create-group-modal";
+import { EditNameModal } from "@/components/edit-name-modal";
 import { 
   Users, 
   Plus, 
   Search,
-  ChevronRight,
   FolderKanban,
   Shield,
   UserCheck,
-  CreditCard,
   Bell,
   Crown,
+  Pencil,
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
+import { formatNaira } from "@/lib/currency";
 import type { GroupWithRole } from "@shared/schema";
 
 type FilterType = 'all' | 'admin' | 'member';
@@ -28,6 +28,8 @@ export default function Groups() {
   const user = getCurrentUser();
   const [, setLocation] = useLocation();
   const [createGroupModalOpen, setCreateGroupModalOpen] = useState(false);
+  const [editGroupModalOpen, setEditGroupModalOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<GroupWithRole | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
 
@@ -48,58 +50,7 @@ export default function Groups() {
   const adminCount = groups.filter(g => g.role === 'admin' || g.role === 'both').length;
   const memberCount = groups.filter(g => g.role === 'member' || g.role === 'both').length;
 
-  const getRoleBadges = (role: 'admin' | 'member' | 'both') => {
-    if (role === 'both') {
-      return (
-        <div className="flex gap-1">
-          <Badge className="bg-green-100 text-green-700 text-xs px-2 py-0.5">
-            <Shield className="h-3 w-3 mr-1" />
-            Admin
-          </Badge>
-          <Badge className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5">
-            <UserCheck className="h-3 w-3 mr-1" />
-            Member
-          </Badge>
-        </div>
-      );
-    }
-    if (role === 'admin') {
-      return (
-        <Badge className="bg-green-100 text-green-700 text-xs px-2 py-0.5">
-          <Shield className="h-3 w-3 mr-1" />
-          Admin
-        </Badge>
-      );
-    }
-    return (
-      <Badge className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5">
-        <UserCheck className="h-3 w-3 mr-1" />
-        Member
-      </Badge>
-    );
-  };
-
-  const getActionButton = (group: GroupWithRole) => {
-    if (group.role === 'admin' || group.role === 'both') {
-      if (group.pendingApprovals && group.pendingApprovals > 0) {
-        return (
-          <div className="flex items-center gap-1 text-orange-600 text-sm font-medium">
-            <Bell className="h-4 w-4" />
-            {group.pendingApprovals} pending
-          </div>
-        );
-      }
-      return (
-        <span className="text-sm text-gray-500">Manage</span>
-      );
-    }
-    return (
-      <div className="flex items-center gap-1 text-primary text-sm font-medium">
-        <CreditCard className="h-4 w-4" />
-        Submit a Payment
-      </div>
-    );
-  };
+  const isGroupAdmin = (group: GroupWithRole) => group.role === 'admin' || group.role === 'both';
 
   if (isLoading) {
     return (
@@ -236,45 +187,71 @@ export default function Groups() {
               <Card
                 key={group.id}
                 className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all cursor-pointer active:scale-[0.99]"
-                onClick={() => setLocation(`/group/${group.id}`)}
+                onClick={() => setLocation(`/group/${group.id}/projects`)}
                 data-testid={`group-card-${group.id}`}
               >
                 <CardContent className="p-4">
+                  {/* Top row: name + pending bell */}
                   <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
-                        group.role === 'admin' || group.role === 'both'
-                          ? 'bg-green-100'
-                          : 'bg-blue-100'
-                      }`}>
-                        <Users className={`h-6 w-6 ${
-                          group.role === 'admin' || group.role === 'both'
-                            ? 'text-green-600'
-                            : 'text-blue-600'
-                        }`} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="font-bold text-gray-900 truncate" data-testid={`text-group-name-${group.id}`}>
-                          {group.name}
-                        </h3>
-                        {getRoleBadges(group.role)}
-                      </div>
+                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                      <h3 className="font-bold text-gray-900 truncate" data-testid={`text-group-name-${group.id}`}>
+                        {group.name}
+                      </h3>
+                      {isGroupAdmin(group) && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingGroup(group);
+                            setEditGroupModalOpen(true);
+                          }}
+                          className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors shrink-0"
+                          data-testid={`button-edit-group-name-${group.id}`}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </div>
-                    <ChevronRight className="h-5 w-5 text-gray-300 shrink-0 mt-2" />
+                    {isGroupAdmin(group) && group.pendingApprovals && group.pendingApprovals > 0 ? (
+                      <div className="flex items-center gap-1 text-orange-500 text-xs font-medium shrink-0 ml-2">
+                        <Bell className="h-3.5 w-3.5" />
+                        {group.pendingApprovals}
+                      </div>
+                    ) : null}
                   </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4 text-sm text-gray-500">
-                      <span className="flex items-center gap-1">
-                        <Users className="h-3 w-3" />
-                        {group.memberCount}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <FolderKanban className="h-3 w-3" />
-                        {group.projectCount}
-                      </span>
-                    </div>
-                    {getActionButton(group)}
+
+                  {/* Total Generated */}
+                  <div className="mb-3">
+                    <p className="text-xs text-gray-400 mb-0.5">Total Generated</p>
+                    <p className="font-bold text-primary text-lg" data-testid={`text-total-collected-${group.id}`}>
+                      {formatNaira(group.totalCollected)}
+                    </p>
+                  </div>
+
+                  {/* Members + Projects as links */}
+                  <div className="flex items-center gap-3 border-t border-gray-50 pt-3">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLocation(`/group/${group.id}/members`);
+                      }}
+                      className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary transition-colors"
+                      data-testid={`button-members-${group.id}`}
+                    >
+                      <Users className="h-3.5 w-3.5" />
+                      Members {group.memberCount}
+                    </button>
+                    <span className="text-gray-200">|</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLocation(`/group/${group.id}/projects`);
+                      }}
+                      className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary transition-colors"
+                      data-testid={`button-projects-${group.id}`}
+                    >
+                      <FolderKanban className="h-3.5 w-3.5" />
+                      Projects {group.projectCount}
+                    </button>
                   </div>
                 </CardContent>
               </Card>
@@ -319,6 +296,16 @@ export default function Groups() {
         open={createGroupModalOpen}
         onOpenChange={setCreateGroupModalOpen}
       />
+
+      {editingGroup && (
+        <EditNameModal
+          open={editGroupModalOpen}
+          onOpenChange={setEditGroupModalOpen}
+          type="group"
+          currentName={editingGroup.name}
+          entityId={editingGroup.id}
+        />
+      )}
     </div>
   );
 }

@@ -176,7 +176,7 @@ function Router() {
       <Route path="/group/:groupId/members">{user ? <GroupMembers /> : <Landing />}</Route>
       <Route path="/group/:groupId/projects">{user ? <GroupProjects /> : <Landing />}</Route>
       <Route path="/group/:groupId/pending">{user ? <PendingApprovals /> : <Landing />}</Route>
-      <Route path="/group/:groupId">{user ? <GroupDetails /> : <Landing />}</Route>
+      <Route path="/group/:groupId">{(params) => user ? <Redirect to={`/group/${params.groupId}/projects`} /> : <Landing />}</Route>
       <Route path="/project/:projectId">{user ? <ProjectDetails /> : <Landing />}</Route>
       <Route path="/project/:projectId/proofs">{user ? <ProjectProofs /> : <Landing />}</Route>
       <Route path="/project/:projectId/contributors">{user ? <ProjectContributors /> : <Landing />}</Route>

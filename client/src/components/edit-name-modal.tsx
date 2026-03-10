@@ -59,8 +59,7 @@ export function EditNameModal({
       });
       
       if (type === "group" && entityId) {
-        queryClient.invalidateQueries({ queryKey: ["/api/groups", entityId] });
-        queryClient.invalidateQueries({ queryKey: ["/api/groups/all"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/groups"] });
       } else if (type === "project" && entityId) {
         queryClient.invalidateQueries({ queryKey: ["/api/projects", entityId] });
         if (groupId) {
