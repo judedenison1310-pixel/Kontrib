@@ -17,6 +17,7 @@ import {
   UserCheck,
   CreditCard,
   Bell,
+  Crown,
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import type { GroupWithRole } from "@shared/schema";
@@ -278,6 +279,32 @@ export default function Groups() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        )}
+
+        {/* Prompt member-only users to start their own group */}
+        {groups.length > 0 && adminCount === 0 && (
+          <div
+            className="rounded-2xl border-2 border-dashed border-green-200 bg-green-50 p-5 flex items-start gap-4 cursor-pointer hover:bg-green-100 transition-colors"
+            onClick={() => setCreateGroupModalOpen(true)}
+            data-testid="banner-create-own-group"
+          >
+            <div className="w-11 h-11 rounded-xl bg-green-100 flex items-center justify-center shrink-0">
+              <Crown className="h-5 w-5 text-green-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-gray-900 mb-0.5">Start your own group</p>
+              <p className="text-sm text-gray-500">
+                Collect dues, funds, or Ajo contributions from your own members.
+              </p>
+            </div>
+            <button
+              onClick={(e) => { e.stopPropagation(); setCreateGroupModalOpen(true); }}
+              className="shrink-0 bg-primary text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-primary/90 transition-colors"
+              data-testid="button-create-own-group"
+            >
+              Create
+            </button>
           </div>
         )}
 
