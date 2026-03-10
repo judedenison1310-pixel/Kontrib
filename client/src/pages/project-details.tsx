@@ -541,7 +541,7 @@ export default function ProjectDetails() {
         )}
 
         {/* Funds Transparency */}
-        {(disbursements.length > 0 || isAdmin) && (
+        {(isAdmin || (group?.privacyMode !== "private" && disbursements.length > 0)) && (
           <Card className="rounded-2xl border-0 shadow-sm">
             <CardContent className="p-4 space-y-4">
               <div className="flex items-center justify-between">
