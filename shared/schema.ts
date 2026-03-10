@@ -68,6 +68,22 @@ export const projects = pgTable("projects", {
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
+export const disbursements = pgTable("disbursements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  groupId: varchar("group_id").notNull().references(() => groups.id),
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  recipient: text("recipient").notNull(),
+  purpose: text("purpose").notNull(),
+  disbursementDate: timestamp("disbursement_date").notNull(),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const insertDisbursementSchema = createInsertSchema(disbursements).omit({ id: true, createdAt: true });
+export type InsertDisbursement = z.infer<typeof insertDisbursementSchema>;
+export type Disbursement = typeof disbursements.$inferSelect;
+
 export const accountabilityPartners = pgTable("accountability_partners", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   groupId: varchar("group_id").notNull().references(() => groups.id),

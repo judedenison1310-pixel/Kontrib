@@ -819,6 +819,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Disbursement routes
+  app.get("/api/projects/:projectId/disbursements", async (req, res) => {
+    try {
+      const { projectId } = req.params;
+      const disbursements = await storage.getDisbursementsByProject(projectId);
+      res.json(disbursements);
+    } catch (error) {
+      console.error("Get disbursements error:", error);
+      res.status(500).json({ message: "Failed to fetch disbursements" });
+    }
+  });
+
+  app.post("/api/projects/:projectId/disbursements", async (req, res) => {
+    try {
+      const { projectId } = req.params;
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+      const data = {
+        ...req.body,
+        projectId,
+        groupId: project.groupId,
+        disbursementDate: new Date(req.body.disbursementDate),
+      };
+      const disbursement = await storage.createDisbursement(data);
+      res.status(201).json(disbursement);
+    } catch (error) {
+      console.error("Create disbursement error:", error);
+      res.status(500).json({ message: "Failed to create disbursement" });
+    }
+  });
+
+  app.delete("/api/disbursements/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteDisbursement(id);
+      if (!success) return res.status(404).json({ message: "Disbursement not found" });
+      res.json({ message: "Disbursement deleted" });
+    } catch (error) {
+      console.error("Delete disbursement error:", error);
+      res.status(500).json({ message: "Failed to delete disbursement" });
+    }
+  });
+
   // Notification routes
   app.get("/api/notifications/:userId", async (req, res) => {
     try {

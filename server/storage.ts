@@ -5,6 +5,8 @@ import {
   type Project,
   type AccountabilityPartner,
   type Contribution,
+  type Disbursement,
+  type InsertDisbursement,
   type Notification,
   type OtpVerification,
   type DeviceToken,
@@ -80,6 +82,11 @@ export interface IStorage {
   getAdminContributions(adminId: string): Promise<ContributionWithDetails[]>;
   updateContribution(id: string, updates: Partial<Contribution>): Promise<Contribution | undefined>;
   deleteContribution(id: string): Promise<void>;
+
+  // Disbursement methods
+  getDisbursementsByProject(projectId: string): Promise<Disbursement[]>;
+  createDisbursement(disbursement: InsertDisbursement): Promise<Disbursement>;
+  deleteDisbursement(id: string): Promise<boolean>;
   
   // Stats methods
   getUserStats(userId: string): Promise<MemberWithContributions>;
@@ -1041,11 +1048,34 @@ export class MemStorage implements IStorage {
   async removeDeviceToken(token: string): Promise<boolean> {
     return this.deviceTokens.delete(token);
   }
+
+  // Disbursement methods (MemStorage)
+  private disbursementsMap: Map<string, Disbursement> = new Map();
+
+  async getDisbursementsByProject(projectId: string): Promise<Disbursement[]> {
+    return Array.from(this.disbursementsMap.values())
+      .filter(d => d.projectId === projectId)
+      .sort((a, b) => new Date(b.disbursementDate).getTime() - new Date(a.disbursementDate).getTime());
+  }
+
+  async createDisbursement(data: InsertDisbursement): Promise<Disbursement> {
+    const disbursement: Disbursement = {
+      ...data,
+      id: randomUUID(),
+      createdAt: new Date(),
+    };
+    this.disbursementsMap.set(disbursement.id, disbursement);
+    return disbursement;
+  }
+
+  async deleteDisbursement(id: string): Promise<boolean> {
+    return this.disbursementsMap.delete(id);
+  }
 }
 
 // Database Storage implementation using Drizzle ORM
 import { db } from "./db";
-import { users as usersTable, groups as groupsTable, groupMembers as groupMembersTable, projects as projectsTable, accountabilityPartners as accountabilityPartnersTable, contributions as contributionsTable, notifications as notificationsTable, otpVerifications as otpVerificationsTable, deviceTokens as deviceTokensTable } from "@shared/schema";
+import { users as usersTable, groups as groupsTable, groupMembers as groupMembersTable, projects as projectsTable, accountabilityPartners as accountabilityPartnersTable, contributions as contributionsTable, notifications as notificationsTable, otpVerifications as otpVerificationsTable, deviceTokens as deviceTokensTable, disbursements as disbursementsTable } from "@shared/schema";
 import { eq, and, gt, lt, sql as drizzleSql, desc, inArray } from "drizzle-orm";
 
 export class DbStorage implements IStorage {
@@ -1793,6 +1823,28 @@ export class DbStorage implements IStorage {
 
   async removeDeviceToken(token: string): Promise<boolean> {
     const result = await db.delete(deviceTokensTable).where(eq(deviceTokensTable.token, token));
+    return true;
+  }
+
+  // Disbursement methods (DbStorage)
+  async getDisbursementsByProject(projectId: string): Promise<Disbursement[]> {
+    return await db
+      .select()
+      .from(disbursementsTable)
+      .where(eq(disbursementsTable.projectId, projectId))
+      .orderBy(desc(disbursementsTable.disbursementDate));
+  }
+
+  async createDisbursement(data: InsertDisbursement): Promise<Disbursement> {
+    const [disbursement] = await db
+      .insert(disbursementsTable)
+      .values(data)
+      .returning();
+    return disbursement;
+  }
+
+  async deleteDisbursement(id: string): Promise<boolean> {
+    await db.delete(disbursementsTable).where(eq(disbursementsTable.id, id));
     return true;
   }
 }

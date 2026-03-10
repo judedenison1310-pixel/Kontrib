@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation, useParams } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Navigation } from "@/components/navigation";
 import { PaymentModal } from "@/components/payment-modal";
 import { EditProjectModal } from "@/components/edit-project-modal";
+import { AddDisbursementModal } from "@/components/add-disbursement-modal";
 import {
   ArrowLeft,
   Target,
@@ -27,6 +29,8 @@ import {
   Send,
   UserX,
   Lock,
+  PlusCircle,
+  Banknote,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -38,7 +42,7 @@ import {
   generateWhatsAppLink,
   generateWhatsAppShareLink 
 } from "@/lib/reminders";
-import type { Project, ContributionWithDetails, Group } from "@shared/schema";
+import type { Project, ContributionWithDetails, Group, Disbursement } from "@shared/schema";
 
 interface GroupMemberWithUser {
   id: string;
@@ -58,6 +62,7 @@ export default function ProjectDetails() {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [editProjectModalOpen, setEditProjectModalOpen] = useState(false);
+  const [disbursementModalOpen, setDisbursementModalOpen] = useState(false);
   const { toast } = useToast();
   const user = getCurrentUser();
 
@@ -80,6 +85,24 @@ export default function ProjectDetails() {
   const { data: groupMembers = [] } = useQuery<GroupMemberWithUser[]>({
     queryKey: ["/api/groups", project?.groupId, "members"],
     enabled: !!project?.groupId,
+  });
+
+  const { data: disbursements = [] } = useQuery<Disbursement[]>({
+    queryKey: [`/api/projects/${projectId}/disbursements`],
+    enabled: !!projectId,
+  });
+
+  const deleteDisbursementMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/disbursements/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [`/api/projects/${projectId}/disbursements`],
+      });
+      toast({ title: "Disbursement removed" });
+    },
+    onError: () => {
+      toast({ title: "Failed to remove disbursement", variant: "destructive" });
+    },
   });
 
   const isLoading = projectLoading || contributionsLoading;
@@ -166,6 +189,18 @@ export default function ProjectDetails() {
         100,
       )
     : 0;
+
+  const totalDisbursed = disbursements.reduce(
+    (sum, d) => sum + parseFloat(d.amount || "0"),
+    0
+  );
+
+  const availableBalance = totalContributed - totalDisbursed;
+
+  const disbursedPercent =
+    totalContributed > 0
+      ? Math.min(Math.round((totalDisbursed / totalContributed) * 100), 100)
+      : 0;
 
   const copyToClipboard = async (text: string, fieldName: string) => {
     try {
@@ -505,6 +540,112 @@ export default function ProjectDetails() {
           </div>
         )}
 
+        {/* Funds Transparency */}
+        {(disbursements.length > 0 || isAdmin) && (
+          <Card className="rounded-2xl border-0 shadow-sm">
+            <CardContent className="p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Banknote className="w-5 h-5 text-primary" />
+                  <span className="font-semibold text-gray-900">Funds Disbursed</span>
+                </div>
+                {isAdmin && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs gap-1"
+                    onClick={() => setDisbursementModalOpen(true)}
+                    data-testid="button-add-disbursement"
+                  >
+                    <PlusCircle className="w-3.5 h-3.5" />
+                    Record
+                  </Button>
+                )}
+              </div>
+
+              {/* Mini stats */}
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-gray-50 rounded-xl p-3">
+                  <p className="text-xs text-gray-500 mb-0.5">Collected</p>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {formatCurrency(totalContributed, projectCurrency)}
+                  </p>
+                </div>
+                <div className="bg-orange-50 rounded-xl p-3">
+                  <p className="text-xs text-gray-500 mb-0.5">Disbursed</p>
+                  <p className="text-sm font-semibold text-orange-700">
+                    {formatCurrency(totalDisbursed, projectCurrency)}
+                  </p>
+                </div>
+                <div className={`rounded-xl p-3 ${availableBalance < 0 ? "bg-red-50" : "bg-green-50"}`}>
+                  <p className="text-xs text-gray-500 mb-0.5">Balance</p>
+                  <p className={`text-sm font-semibold ${availableBalance < 0 ? "text-red-700" : "text-green-700"}`}>
+                    {formatCurrency(Math.abs(availableBalance), projectCurrency)}
+                  </p>
+                </div>
+              </div>
+
+              {disbursedPercent > 0 && (
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>Disbursed</span>
+                    <span>{disbursedPercent}%</span>
+                  </div>
+                  <Progress
+                    value={disbursedPercent}
+                    className={`h-2 ${disbursedPercent > 80 ? "[&>div]:bg-red-500" : disbursedPercent > 50 ? "[&>div]:bg-orange-500" : "[&>div]:bg-primary"}`}
+                  />
+                </div>
+              )}
+
+              {/* Disbursement list */}
+              {disbursements.length > 0 && (
+                <div className="space-y-2 pt-1">
+                  {disbursements.map((d) => (
+                    <div
+                      key={d.id}
+                      className="flex items-start justify-between gap-3 p-3 bg-gray-50 rounded-xl"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-gray-900 truncate">{d.recipient}</p>
+                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{d.purpose}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {new Date(d.disbursementDate).toLocaleDateString("en-NG", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-sm font-semibold text-orange-700">
+                          {formatCurrency(parseFloat(d.amount), projectCurrency)}
+                        </span>
+                        {isAdmin && (
+                          <button
+                            onClick={() => deleteDisbursementMutation.mutate(d.id)}
+                            disabled={deleteDisbursementMutation.isPending}
+                            className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                            data-testid={`button-delete-disbursement-${d.id}`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {disbursements.length === 0 && isAdmin && (
+                <p className="text-sm text-gray-400 text-center py-2">
+                  No disbursements recorded yet. Tap "Record" to add one.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Share Project */}
         <Card className="rounded-2xl border-0 shadow-sm bg-green-50 border-green-100">
           <CardContent className="p-4">
@@ -637,6 +778,15 @@ export default function ProjectDetails() {
           open={editProjectModalOpen}
           onOpenChange={setEditProjectModalOpen}
           project={project}
+        />
+      )}
+
+      {projectId && user && (
+        <AddDisbursementModal
+          open={disbursementModalOpen}
+          onOpenChange={setDisbursementModalOpen}
+          projectId={projectId}
+          createdBy={user.id}
         />
       )}
     </div>

@@ -30,6 +30,7 @@ The frontend uses React 18 with TypeScript and Vite, leveraging Shadcn/UI (based
 - **Project Contribution Transparency**: Members can view detailed contributor lists for any project, showing all confirmed contributions sorted by amount, total contributions, and remaining balance.
 - **Unified Groups Page**: Single "My Groups" page with filter pills (All, Admin, Member) to filter groups by role. Each group card shows role badges and context-aware action buttons.
 - **Payment Reminders**: Admins can nudge unpaid members via WhatsApp. Project page shows "Unpaid Members" section with individual "Remind" buttons (opens direct WhatsApp message) and "Remind All via WhatsApp" for bulk reminders. Button states reflect phone number availability - disabled for members without phone numbers.
+- **Funds Disbursement Tracking**: Admins can record how collected funds are spent (amount, recipient, purpose, date). Project details page shows a "Funds Disbursed" section with three stats (Collected, Disbursed, Balance), a progress bar, and a full ledger of disbursement records. All group members can view disbursements for transparency. Admins can delete records. Schema: `disbursements` table with projectId, groupId, amount, recipient, purpose, disbursementDate, createdBy.
 
 ### System Design Choices
 - **Database**: PostgreSQL with Drizzle ORM for a relational schema (Users, Groups, Members, Contributions, OTPs).
