@@ -50,7 +50,9 @@ export function EditProjectModal({ open, onOpenChange, project }: EditProjectMod
     }
   }, [open, project]);
 
-  const hasTarget = project.projectType === "target";
+  const hasTarget =
+    project.projectType === "target" ||
+    (!!project.targetAmount && parseFloat(project.targetAmount) > 0);
 
   const mutation = useMutation({
     mutationFn: async () => {
