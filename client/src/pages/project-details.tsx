@@ -358,10 +358,75 @@ export default function ProjectDetails() {
           <span>Back</span>
         </button>
 
-        {/* Project Header - hidden for admins (they manage, not contribute) */}
+        {/* Project Header - admin view */}
+        {isAdmin && (
+          <div className="bg-primary rounded-2xl p-5 text-white">
+            <div className="flex items-start justify-between mb-2">
+              {group ? (
+                <button
+                  onClick={() => setLocation(`/group/${group.id}`)}
+                  className="flex items-center gap-1 text-green-200 text-sm hover:text-white transition-colors"
+                >
+                  <Building2 className="h-4 w-4" />
+                  <span>{group.name}</span>
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              ) : <span />}
+              <button
+                onClick={() => setEditProjectModalOpen(true)}
+                className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 text-white text-xs font-medium px-3 py-1.5 rounded-full transition-colors"
+                data-testid="button-edit-project"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Edit Details
+              </button>
+            </div>
+            <div className="flex items-center gap-2 mb-2">
+              <Badge className="bg-white/20 text-white border-0 text-xs">
+                {getProjectTypeLabel(project.projectType)}
+              </Badge>
+              <Badge className={`${getStatusColor(project.status)} text-xs`}>
+                {project.status}
+              </Badge>
+            </div>
+            <h1 className="text-2xl font-bold mb-2">{project.name}</h1>
+            {project.description && (
+              <p className="text-green-100 text-sm mb-3">{project.description}</p>
+            )}
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              {hasTarget && (
+                <div className="bg-white/10 rounded-xl p-3">
+                  <p className="text-green-200 text-xs flex items-center gap-1">
+                    <Target className="h-3 w-3" />
+                    Target
+                  </p>
+                  <p className="font-bold text-lg">{formatCurrency(project.targetAmount!, projectCurrency)}</p>
+                </div>
+              )}
+              <div className={`bg-white/10 rounded-xl p-3 ${!hasTarget ? 'col-span-2' : ''}`}>
+                <p className="text-green-200 text-xs">Collected</p>
+                <p className="font-bold text-lg">{formatCurrency(project.collectedAmount, projectCurrency)}</p>
+              </div>
+            </div>
+            {hasTarget && (
+              <div className="mt-3">
+                <Progress value={progress} className="h-2 bg-white/20 [&>div]:bg-white" />
+                <p className="text-green-200 text-xs mt-1">{progress}% of goal reached</p>
+              </div>
+            )}
+            {project.deadline && (
+              <div className="flex items-center gap-2 mt-3 text-sm text-green-100">
+                <Calendar className="h-4 w-4" />
+                <span>Due: {formatDeadline(project.deadline)}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Project Header - member view */}
         {!isAdmin && (
         <div className="bg-primary rounded-2xl p-5 text-white">
-          {/* Top row: group name + edit button */}
+          {/* Top row: group name */}
           <div className="flex items-start justify-between mb-2">
             {group ? (
               <button
@@ -374,16 +439,6 @@ export default function ProjectDetails() {
                 <ChevronRight className="h-4 w-4" />
               </button>
             ) : <span />}
-            {isAdmin && (
-              <button
-                onClick={() => setEditProjectModalOpen(true)}
-                className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 text-white text-xs font-medium px-3 py-1.5 rounded-full transition-colors"
-                data-testid="button-edit-project"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                Edit Details
-              </button>
-            )}
           </div>
           <div className="flex items-center gap-2 mb-2">
             <Badge className="bg-white/20 text-white border-0 text-xs">
