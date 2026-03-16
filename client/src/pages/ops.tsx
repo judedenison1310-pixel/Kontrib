@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -63,6 +63,7 @@ export default function Ops() {
   const [password, setPassword] = useState(() => sessionStorage.getItem(OPS_PASS_KEY) || "");
   const [inputPassword, setInputPassword] = useState("");
   const [nonce, setNonce] = useState(0);
+  const [authError, setAuthError] = useState(false);
   const [activeTab, setActiveTab] = useState<"referrals" | "payments">("payments");
   const [refFilter, setRefFilter] = useState<"all" | "complete" | "pending">("all");
 
@@ -71,7 +72,7 @@ export default function Ops() {
     queryFn: async () => {
       const res = await fetch(`/api/ops/overview?password=${encodeURIComponent(password)}`);
       if (!res.ok) {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({ message: "Failed" }));
         throw new Error(err.message || "Failed");
       }
       return res.json();
@@ -80,8 +81,19 @@ export default function Ops() {
     retry: false,
   });
 
+  // When any query error occurs, clear stored session and reset to lock screen
+  useEffect(() => {
+    if (isError) {
+      sessionStorage.removeItem(OPS_PASS_KEY);
+      setAuthError(true);
+      setPassword("");
+    }
+  }, [isError]);
+
   const handleUnlock = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!inputPassword.trim()) return;
+    setAuthError(false);
     sessionStorage.setItem(OPS_PASS_KEY, inputPassword);
     setPassword(inputPassword);
     setNonce(n => n + 1);
@@ -91,6 +103,7 @@ export default function Ops() {
   const handleLock = () => {
     sessionStorage.removeItem(OPS_PASS_KEY);
     setPassword("");
+    setAuthError(false);
   };
 
   const filteredReferrals = (data?.referrals || []).filter(r =>
@@ -98,7 +111,7 @@ export default function Ops() {
   );
 
   // Lock screen
-  if (!password || (isError && (error as Error).message === "Unauthorised")) {
+  if (!password) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
         <div className="w-full max-w-sm">
@@ -133,7 +146,7 @@ export default function Ops() {
                 >
                   Unlock
                 </button>
-                {isError && <p className="text-red-400 text-xs text-center">Incorrect password</p>}
+                {authError && <p className="text-red-400 text-xs text-center">Incorrect password. Please try again.</p>}
               </form>
             </CardContent>
           </Card>
