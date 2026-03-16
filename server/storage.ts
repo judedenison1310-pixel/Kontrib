@@ -7,6 +7,8 @@ import {
   type Contribution,
   type Disbursement,
   type InsertDisbursement,
+  type Referral,
+  type InsertReferral,
   type Notification,
   type OtpVerification,
   type DeviceToken,
@@ -87,6 +89,14 @@ export interface IStorage {
   getDisbursementsByProject(projectId: string): Promise<Disbursement[]>;
   createDisbursement(disbursement: InsertDisbursement): Promise<Disbursement>;
   deleteDisbursement(id: string): Promise<boolean>;
+
+  // Referral methods
+  getOrCreateReferralCode(userId: string): Promise<string>;
+  getUserByReferralCode(code: string): Promise<User | undefined>;
+  createReferral(referrerId: string, refereeId: string): Promise<Referral>;
+  getReferralByReferee(refereeId: string): Promise<Referral | undefined>;
+  getReferralsByReferrer(referrerId: string): Promise<(Referral & { referee: User })[]>;
+  checkAndCompleteReferrals(groupId: string): Promise<void>;
   
   // Stats methods
   getUserStats(userId: string): Promise<MemberWithContributions>;
@@ -1071,11 +1081,18 @@ export class MemStorage implements IStorage {
   async deleteDisbursement(id: string): Promise<boolean> {
     return this.disbursementsMap.delete(id);
   }
+
+  async getOrCreateReferralCode(_userId: string): Promise<string> { return ""; }
+  async getUserByReferralCode(_code: string): Promise<User | undefined> { return undefined; }
+  async createReferral(_referrerId: string, _refereeId: string): Promise<Referral> { throw new Error("Not implemented"); }
+  async getReferralByReferee(_refereeId: string): Promise<Referral | undefined> { return undefined; }
+  async getReferralsByReferrer(_referrerId: string): Promise<(Referral & { referee: User })[]> { return []; }
+  async checkAndCompleteReferrals(_groupId: string): Promise<void> {}
 }
 
 // Database Storage implementation using Drizzle ORM
 import { db } from "./db";
-import { users as usersTable, groups as groupsTable, groupMembers as groupMembersTable, projects as projectsTable, accountabilityPartners as accountabilityPartnersTable, contributions as contributionsTable, notifications as notificationsTable, otpVerifications as otpVerificationsTable, deviceTokens as deviceTokensTable, disbursements as disbursementsTable } from "@shared/schema";
+import { users as usersTable, groups as groupsTable, groupMembers as groupMembersTable, projects as projectsTable, accountabilityPartners as accountabilityPartnersTable, contributions as contributionsTable, notifications as notificationsTable, otpVerifications as otpVerificationsTable, deviceTokens as deviceTokensTable, disbursements as disbursementsTable, referrals as referralsTable } from "@shared/schema";
 import { eq, and, gt, lt, sql as drizzleSql, desc, inArray } from "drizzle-orm";
 
 export class DbStorage implements IStorage {
@@ -1344,6 +1361,14 @@ export class DbStorage implements IStorage {
 
   async addGroupMember(member: InsertGroupMember): Promise<GroupMember> {
     const result = await db.insert(groupMembersTable).values(member).returning();
+    // Check if this group now has 5+ members → complete any pending referrals
+    const countResult = await db
+      .select({ count: drizzleSql<number>`count(*)::int` })
+      .from(groupMembersTable)
+      .where(and(eq(groupMembersTable.groupId, member.groupId), eq(groupMembersTable.status, "active")));
+    if ((countResult[0]?.count || 0) >= 5) {
+      await this.checkAndCompleteReferrals(member.groupId);
+    }
     return result[0];
   }
 
@@ -1846,6 +1871,101 @@ export class DbStorage implements IStorage {
   async deleteDisbursement(id: string): Promise<boolean> {
     await db.delete(disbursementsTable).where(eq(disbursementsTable.id, id));
     return true;
+  }
+
+  // Referral methods
+  private generateReferralCode(): string {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let code = "KTB";
+    for (let i = 0; i < 5; i++) {
+      code += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return code;
+  }
+
+  async getOrCreateReferralCode(userId: string): Promise<string> {
+    const user = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+    if (!user[0]) throw new Error("User not found");
+    if (user[0].referralCode) return user[0].referralCode;
+    // Generate unique code
+    let code: string;
+    let attempts = 0;
+    do {
+      code = this.generateReferralCode();
+      const existing = await db.select().from(usersTable).where(eq(usersTable.referralCode, code)).limit(1);
+      if (existing.length === 0) break;
+      attempts++;
+    } while (attempts < 10);
+    await db.update(usersTable).set({ referralCode: code! }).where(eq(usersTable.id, userId));
+    return code!;
+  }
+
+  async getUserByReferralCode(code: string): Promise<User | undefined> {
+    const result = await db.select().from(usersTable).where(eq(usersTable.referralCode, code)).limit(1);
+    return result[0];
+  }
+
+  async createReferral(referrerId: string, refereeId: string): Promise<Referral> {
+    // Set referredBy on the referee user
+    await db.update(usersTable).set({ referredBy: referrerId }).where(eq(usersTable.id, refereeId));
+    // Create referral record
+    const [referral] = await db.insert(referralsTable).values({
+      referrerId,
+      refereeId,
+      status: "pending",
+      rewardAmount: "20000",
+    }).returning();
+    return referral;
+  }
+
+  async getReferralByReferee(refereeId: string): Promise<Referral | undefined> {
+    const result = await db.select().from(referralsTable).where(eq(referralsTable.refereeId, refereeId)).limit(1);
+    return result[0];
+  }
+
+  async getReferralsByReferrer(referrerId: string): Promise<(Referral & { referee: User })[]> {
+    const results = await db
+      .select({ referral: referralsTable, referee: usersTable })
+      .from(referralsTable)
+      .innerJoin(usersTable, eq(referralsTable.refereeId, usersTable.id))
+      .where(eq(referralsTable.referrerId, referrerId))
+      .orderBy(desc(referralsTable.createdAt));
+    return results.map(r => ({ ...r.referral, referee: r.referee }));
+  }
+
+  async checkAndCompleteReferrals(groupId: string): Promise<void> {
+    // Get all active members of this group
+    const members = await db
+      .select({ userId: groupMembersTable.userId })
+      .from(groupMembersTable)
+      .where(and(eq(groupMembersTable.groupId, groupId), eq(groupMembersTable.status, "active")));
+    const memberIds = members.map(m => m.userId);
+    if (memberIds.length === 0) return;
+    // Find pending referrals where any of these members is the referee
+    const pendingReferrals = await db
+      .select()
+      .from(referralsTable)
+      .where(and(
+        eq(referralsTable.status, "pending"),
+        inArray(referralsTable.refereeId, memberIds)
+      ));
+    // Mark each as complete
+    for (const referral of pendingReferrals) {
+      await db.update(referralsTable).set({
+        status: "complete",
+        completedAt: new Date(),
+        triggerGroupId: groupId,
+      }).where(eq(referralsTable.id, referral.id));
+      // Notify the referrer
+      const referee = await db.select().from(usersTable).where(eq(usersTable.id, referral.refereeId)).limit(1);
+      await db.insert(notificationsTable).values({
+        userId: referral.referrerId,
+        type: "referral_complete",
+        title: "Referral reward earned!",
+        message: `${referee[0]?.fullName || "Your referral"} joined a group with 5+ members. You've earned ₦20,000!`,
+        read: false,
+      });
+    }
   }
 }
 

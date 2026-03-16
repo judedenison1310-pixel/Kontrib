@@ -6,7 +6,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Shield, ArrowRight, Lock, CheckCircle2, Zap, Eye, ChevronDown } from "lucide-react";
+import { Users, Shield, ArrowRight, Lock, CheckCircle2, Zap, Eye, ChevronDown, Gift } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { type User as UserType } from "@shared/schema";
 import { sendOtp, verifyOtp, updateProfile } from "@/lib/auth";
@@ -14,6 +14,21 @@ import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import kontribLogo from "@assets/8_1764455185903.png";
 import heroImage from "@assets/Komntrib (2)_1764653626078.jpg";
+
+const REF_KEY = "kontrib_referral_code";
+
+async function captureReferral(referralCode: string, refereeId: string) {
+  try {
+    await fetch("/api/referrals/capture", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ referralCode, refereeId }),
+    });
+    localStorage.removeItem(REF_KEY);
+  } catch {
+    // Non-critical — silent fail
+  }
+}
 
 const COUNTRY_CODES = [
   { code: "+234", country: "NG", flag: "🇳🇬", name: "Nigeria" },
@@ -58,8 +73,19 @@ export default function Landing() {
   const [countryCode, setCountryCode] = useState("+234");
   const [newUser, setNewUser] = useState<UserType | null>(null);
   const [devOtp, setDevOtp] = useState<string | null>(null);
+  const [manualRefCode, setManualRefCode] = useState("");
+  const [showRefField, setShowRefField] = useState(false);
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  
+
+  // Pre-fill referral code from localStorage (set by /ref/:code capture)
+  useEffect(() => {
+    const stored = localStorage.getItem(REF_KEY);
+    if (stored) {
+      setManualRefCode(stored);
+      setShowRefField(true);
+    }
+  }, []);
+
   const selectedCountry = COUNTRY_CODES.find(c => c.code === countryCode) || COUNTRY_CODES[0];
 
   const getRedirectPath = () => {
@@ -116,6 +142,11 @@ export default function Landing() {
     onSuccess: (data) => {
       if (data.verified && data.user) {
         setNewUser(data.user);
+        // Capture referral in background if a code is present
+        const code = manualRefCode.trim() || localStorage.getItem(REF_KEY) || "";
+        if (code) {
+          captureReferral(code, data.user.id);
+        }
         if (data.isNewUser) {
           setStep("profile");
           toast({ title: "Phone verified!", description: "Let's set up your profile" });
@@ -309,6 +340,50 @@ export default function Landing() {
                   </button>
                 </form>
               </Form>
+
+              {/* Referral code input */}
+              <div className="mt-4">
+                {!showRefField ? (
+                  <button
+                    onClick={() => setShowRefField(true)}
+                    className="w-full text-center text-sm text-gray-400 hover:text-gray-600 transition-colors py-1"
+                    data-testid="button-show-ref-field"
+                  >
+                    Have a referral code?
+                  </button>
+                ) : (
+                  <div className="flex gap-2 mt-1">
+                    <input
+                      type="text"
+                      value={manualRefCode}
+                      onChange={(e) => setManualRefCode(e.target.value.toUpperCase())}
+                      placeholder="e.g. KTBAB123"
+                      className="flex-1 h-10 text-sm border border-gray-200 rounded-xl px-3 focus:outline-none focus:border-green-500 font-mono tracking-widest uppercase"
+                      data-testid="input-referral-code"
+                    />
+                    <button
+                      onClick={() => { setShowRefField(false); setManualRefCode(""); }}
+                      className="text-xs text-gray-400 hover:text-gray-600 px-2"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Refer & Earn banner */}
+            <div
+              className="bg-primary/5 border border-primary/20 rounded-2xl p-4 flex items-center gap-3 cursor-pointer"
+              onClick={() => {}}
+            >
+              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
+                <Gift className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-800">Earn ₦20,000 per referral</p>
+                <p className="text-xs text-gray-500 mt-0.5">Sign up → refer friends → get paid when their group hits 5 members</p>
+              </div>
             </div>
 
             {/* Trust Indicators */}

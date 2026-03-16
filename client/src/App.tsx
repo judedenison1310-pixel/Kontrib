@@ -30,6 +30,22 @@ import PendingApprovals from "@/pages/pending-approvals";
 import ProjectProofs from "@/pages/project-proofs";
 import ProjectContributors from "@/pages/project-contributors";
 import ProjectUnpaid from "@/pages/project-unpaid";
+import Referrals from "@/pages/referrals";
+
+const REF_KEY = "kontrib_referral_code";
+
+// Captures a /ref/:code visit — stores code and shows landing or redirects to groups
+function ReferralCapture({ user, code }: { user: User | null; code: string }) {
+  const [, navigate] = useLocation();
+  if (typeof window !== "undefined") {
+    localStorage.setItem(REF_KEY, code);
+  }
+  if (user) {
+    navigate("/referrals");
+    return null;
+  }
+  return <Landing />;
+}
 
 // Component to handle shared links - redirects logged-in users directly to project/group
 function SharedLinkRedirect({ user }: { user: User | null }) {
@@ -162,6 +178,7 @@ function Router() {
       <Route path="/join/:groupSlug">{() => <SharedLinkRedirect user={user} />}</Route>
       <Route path="/join-group" component={JoinGroup} />
       <Route path="/member-payment" component={MemberPayment} />
+      <Route path="/ref/:code">{(params) => <ReferralCapture user={user} code={params.code || ""} />}</Route>
       
       {/* Redirect old dashboard routes to /groups */}
       <Route path="/dashboard">{user ? <Redirect to="/groups" /> : <Landing />}</Route>
@@ -182,11 +199,12 @@ function Router() {
       <Route path="/project/:projectId/contributors">{user ? <ProjectContributors /> : <Landing />}</Route>
       <Route path="/project/:projectId/unpaid">{user ? <ProjectUnpaid /> : <Landing />}</Route>
       <Route path="/whatsapp">{user ? <WhatsAppIntegration /> : <Landing />}</Route>
+      <Route path="/referrals">{user ? <Referrals /> : <Landing />}</Route>
       
       {/* Short URL patterns - catches custom slugs like /groupname or /groupname/projectname */}
       <Route path="/:groupSlug/:projectSlug">
         {(params) => {
-          const knownRoutes = ['api', 'assets', 'login', 'register', 'join', 'admin', 'dashboard', 'member', 'groups', 'group', 'project', 'submit-proof', 'my-contributions', 'updates', 'whatsapp', 'join-group', 'member-payment', 'members'];
+          const knownRoutes = ['api', 'assets', 'login', 'register', 'join', 'admin', 'dashboard', 'member', 'groups', 'group', 'project', 'submit-proof', 'my-contributions', 'updates', 'whatsapp', 'join-group', 'member-payment', 'members', 'ref', 'referrals'];
           if (knownRoutes.includes(params.groupSlug?.toLowerCase() || '')) {
             return <NotFound />;
           }
@@ -195,7 +213,7 @@ function Router() {
       </Route>
       <Route path="/:groupSlug">
         {(params) => {
-          const knownRoutes = ['api', 'assets', 'login', 'register', 'join', 'admin', 'dashboard', 'member', 'groups', 'group', 'project', 'submit-proof', 'my-contributions', 'updates', 'whatsapp', 'join-group', 'member-payment', 'members'];
+          const knownRoutes = ['api', 'assets', 'login', 'register', 'join', 'admin', 'dashboard', 'member', 'groups', 'group', 'project', 'submit-proof', 'my-contributions', 'updates', 'whatsapp', 'join-group', 'member-payment', 'members', 'ref', 'referrals'];
           if (knownRoutes.includes(params.groupSlug?.toLowerCase() || '')) {
             return <NotFound />;
           }

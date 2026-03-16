@@ -862,6 +862,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Referral routes
+  app.get("/api/referrals/me", async (req, res) => {
+    try {
+      const userId = req.query.userId as string;
+      if (!userId) return res.status(400).json({ message: "userId required" });
+      const code = await storage.getOrCreateReferralCode(userId);
+      const referrals = await storage.getReferralsByReferrer(userId);
+      const total = referrals.length;
+      const completed = referrals.filter(r => r.status === "complete").length;
+      const pending = referrals.filter(r => r.status === "pending").length;
+      const totalEarned = completed * 20000;
+      const pendingEarned = pending * 20000;
+      res.json({ code, referrals, stats: { total, completed, pending, totalEarned, pendingEarned } });
+    } catch (error) {
+      console.error("Get referrals error:", error);
+      res.status(500).json({ message: "Failed to fetch referrals" });
+    }
+  });
+
+  app.post("/api/referrals/capture", async (req, res) => {
+    try {
+      const { referralCode, refereeId } = req.body;
+      if (!referralCode || !refereeId) return res.status(400).json({ message: "referralCode and refereeId required" });
+      // Find referrer by code
+      const referrer = await storage.getUserByReferralCode(referralCode);
+      if (!referrer) return res.status(404).json({ message: "Invalid referral code" });
+      if (referrer.id === refereeId) return res.status(400).json({ message: "Cannot refer yourself" });
+      // Check if already referred
+      const existing = await storage.getReferralByReferee(refereeId);
+      if (existing) return res.json({ message: "Already captured", referral: existing });
+      const referral = await storage.createReferral(referrer.id, refereeId);
+      res.json({ message: "Referral captured", referral });
+    } catch (error) {
+      console.error("Capture referral error:", error);
+      res.status(500).json({ message: "Failed to capture referral" });
+    }
+  });
+
   // Notification routes
   app.get("/api/notifications/:userId", async (req, res) => {
     try {

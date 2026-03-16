@@ -8,6 +8,7 @@ import {
   LogOut,
   ShieldCheck,
   Pencil,
+  Gift,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -33,13 +34,14 @@ export function Navigation() {
 
   const navLinks = [
     { href: "/groups", icon: Users, label: "My Groups" },
-    { href: "/submit-proof", icon: CreditCard, label: "Submit Proof" },
+    { href: "/submit-proof", icon: CreditCard, label: "Pay" },
     { href: "/my-contributions", icon: History, label: "History" },
+    { href: "/referrals", icon: Gift, label: "Refer" },
   ];
 
   return (
     <>
-      {/* Top Header Bar - Clean White */}
+      {/* Top Header Bar */}
       <header className="bg-white border-b border-gray-100 sticky top-0 z-50 safe-top">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex justify-between items-center h-14">
@@ -51,11 +53,16 @@ export function Navigation() {
               </div>
             </Link>
 
-            {/* Secure Badge */}
-            <div className="flex items-center gap-2 text-primary border border-primary/20 rounded-full px-3 py-1.5">
-              <ShieldCheck className="h-4 w-4" />
-              <span className="text-sm font-medium">Secure</span>
-            </div>
+            {/* Refer & Earn button (replaces Secure badge) */}
+            <Link href="/referrals">
+              <div
+                className="flex items-center gap-1.5 bg-primary text-white text-sm font-semibold px-3.5 py-1.5 rounded-full cursor-pointer hover:bg-primary/90 transition-colors"
+                data-testid="button-refer-header"
+              >
+                <Gift className="h-4 w-4" />
+                <span>Refer &amp; Earn</span>
+              </div>
+            </Link>
 
             {/* Right side - Desktop */}
             <div className="hidden sm:flex items-center gap-3">
@@ -146,13 +153,22 @@ export function Navigation() {
                           >
                             <link.icon className="h-5 w-5" />
                             <span className="font-medium">{link.label}</span>
+                            {link.href === "/referrals" && (
+                              <span className="ml-auto text-xs bg-primary text-white px-2 py-0.5 rounded-full">
+                                ₦20k
+                              </span>
+                            )}
                           </div>
                         </Link>
                       ))}
                     </div>
 
-                    {/* Logout Button */}
-                    <div className="p-4 border-t">
+                    {/* Footer: Secure badge + Logout */}
+                    <div className="p-4 border-t space-y-3">
+                      <div className="flex items-center justify-center gap-1.5 text-gray-400 text-xs">
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        <span>Secured &amp; Protected</span>
+                      </div>
                       <Button
                         variant="outline"
                         onClick={() => {

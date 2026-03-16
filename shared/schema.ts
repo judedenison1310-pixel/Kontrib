@@ -11,6 +11,8 @@ export const users = pgTable("users", {
   phoneNumber: text("phone_number").notNull(), // Primary identifier (find by phone)
   role: text("role").notNull().default("member"), // "admin" or "member"
   profileCompletedAt: timestamp("profile_completed_at"), // When user added their name
+  referralCode: text("referral_code").unique(), // Unique code for sharing referral links
+  referredBy: varchar("referred_by"), // userId of the person who referred them
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
@@ -85,6 +87,21 @@ export const insertDisbursementSchema = createInsertSchema(disbursements).omit({
 export type InsertDisbursement = z.infer<typeof insertDisbursementSchema>;
 export type Disbursement = typeof disbursements.$inferSelect;
 
+export const referrals = pgTable("referrals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  referrerId: varchar("referrer_id").notNull().references(() => users.id),
+  refereeId: varchar("referee_id").notNull().references(() => users.id),
+  status: text("status").notNull().default("pending"), // "pending" | "complete"
+  rewardAmount: decimal("reward_amount", { precision: 10, scale: 2 }).notNull().default("20000"),
+  triggerGroupId: varchar("trigger_group_id").references(() => groups.id),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertReferralSchema = createInsertSchema(referrals).omit({ id: true, createdAt: true, completedAt: true });
+export type InsertReferral = z.infer<typeof insertReferralSchema>;
+export type Referral = typeof referrals.$inferSelect;
+
 export const accountabilityPartners = pgTable("accountability_partners", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   groupId: varchar("group_id").notNull().references(() => groups.id),
@@ -131,6 +148,8 @@ export const deviceTokens = pgTable("device_tokens", {
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   profileCompletedAt: true,
+  referralCode: true,
+  referredBy: true,
   createdAt: true,
 });
 
