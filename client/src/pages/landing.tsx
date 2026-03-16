@@ -386,6 +386,84 @@ export default function Landing() {
               </div>
             </div>
 
+            {/* Testimonials - scrolling right to left */}
+            <div className="overflow-hidden -mx-6">
+              <style>{`
+                @keyframes scroll-rtl {
+                  0%   { transform: translateX(0); }
+                  100% { transform: translateX(-50%); }
+                }
+                .scroll-rtl {
+                  animation: scroll-rtl 22s linear infinite;
+                  display: flex;
+                  width: max-content;
+                }
+                .scroll-rtl:hover { animation-play-state: paused; }
+              `}</style>
+              <div className="scroll-rtl gap-3 flex">
+                {[
+                  {
+                    name: "Bisi of Lagos",
+                    role: "Osusu Group Admin",
+                    avatar: "BL",
+                    color: "bg-pink-100 text-pink-700",
+                    quote: "Managing our osusu used to be so stressful. Kontrib made it simple — even members who aren't tech-savvy love it.",
+                  },
+                  {
+                    name: "Dr Scalzy",
+                    role: "Alpha FC Social Club Admin",
+                    avatar: "DS",
+                    color: "bg-blue-100 text-blue-700",
+                    quote: "We run Alpha FC's club contributions through Kontrib. Payment tracking and reminders have never been this smooth.",
+                  },
+                  {
+                    name: "Mrs Deb",
+                    role: "Office Group Admin",
+                    avatar: "MD",
+                    color: "bg-purple-100 text-purple-700",
+                    quote: "No more chasing colleagues for contributions. Kontrib handles all of it — collection, reminders, and records.",
+                  },
+                  {
+                    name: "Bisi of Lagos",
+                    role: "Osusu Group Admin",
+                    avatar: "BL",
+                    color: "bg-pink-100 text-pink-700",
+                    quote: "Managing our osusu used to be so stressful. Kontrib made it simple — even members who aren't tech-savvy love it.",
+                  },
+                  {
+                    name: "Dr Scalzy",
+                    role: "Alpha FC Social Club Admin",
+                    avatar: "DS",
+                    color: "bg-blue-100 text-blue-700",
+                    quote: "We run Alpha FC's club contributions through Kontrib. Payment tracking and reminders have never been this smooth.",
+                  },
+                  {
+                    name: "Mrs Deb",
+                    role: "Office Group Admin",
+                    avatar: "MD",
+                    color: "bg-purple-100 text-purple-700",
+                    quote: "No more chasing colleagues for contributions. Kontrib handles all of it — collection, reminders, and records.",
+                  },
+                ].map((t, i) => (
+                  <div
+                    key={i}
+                    className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex-shrink-0 w-64"
+                  >
+                    <p className="text-xs text-gray-600 leading-relaxed mb-3">"{t.quote}"</p>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${t.color}`}>
+                        {t.avatar}
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-gray-800">{t.name}</p>
+                        <p className="text-xs text-gray-400">{t.role}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Trust Indicators */}
             <div className="flex items-center justify-center gap-6">
               <div className="flex items-center gap-2 text-gray-500 text-sm">
