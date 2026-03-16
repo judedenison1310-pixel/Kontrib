@@ -97,6 +97,13 @@ export interface IStorage {
   getReferralByReferee(refereeId: string): Promise<Referral | undefined>;
   getReferralsByReferrer(referrerId: string): Promise<(Referral & { referee: User })[]>;
   checkAndCompleteReferrals(groupId: string): Promise<void>;
+
+  // Ops overview
+  getOpsOverview(): Promise<{
+    referrals: (Referral & { referrer: User; referee: User })[];
+    contributions: ContributionWithDetails[];
+    stats: { totalUsers: number; totalReferrals: number; completedReferrals: number; pendingReferrals: number; totalRewardsOwed: number; totalPaymentProofs: number; pendingProofs: number; };
+  }>;
   
   // Stats methods
   getUserStats(userId: string): Promise<MemberWithContributions>;
@@ -1088,6 +1095,7 @@ export class MemStorage implements IStorage {
   async getReferralByReferee(_refereeId: string): Promise<Referral | undefined> { return undefined; }
   async getReferralsByReferrer(_referrerId: string): Promise<(Referral & { referee: User })[]> { return []; }
   async checkAndCompleteReferrals(_groupId: string): Promise<void> {}
+  async getOpsOverview() { return { referrals: [], contributions: [], stats: { totalUsers: 0, totalReferrals: 0, completedReferrals: 0, pendingReferrals: 0, totalRewardsOwed: 0, totalPaymentProofs: 0, pendingProofs: 0 } }; }
 }
 
 // Database Storage implementation using Drizzle ORM
@@ -1956,16 +1964,92 @@ export class DbStorage implements IStorage {
         completedAt: new Date(),
         triggerGroupId: groupId,
       }).where(eq(referralsTable.id, referral.id));
-      // Notify the referrer
-      const referee = await db.select().from(usersTable).where(eq(usersTable.id, referral.refereeId)).limit(1);
+
+      const [refereeRows, referrerRows, groupRows] = await Promise.all([
+        db.select().from(usersTable).where(eq(usersTable.id, referral.refereeId)).limit(1),
+        db.select().from(usersTable).where(eq(usersTable.id, referral.referrerId)).limit(1),
+        db.select().from(groupsTable).where(eq(groupsTable.id, groupId)).limit(1),
+      ]);
+      const referee = refereeRows[0];
+      const referrer = referrerRows[0];
+      const group = groupRows[0];
+
+      // In-app notification for referrer
       await db.insert(notificationsTable).values({
         userId: referral.referrerId,
         type: "referral_complete",
         title: "Referral reward earned!",
-        message: `${referee[0]?.fullName || "Your referral"} joined a group with 5+ members. You've earned ₦20,000!`,
+        message: `${referee?.fullName || "Your referral"} joined a group with 5+ members. You've earned ₦20,000!`,
         read: false,
       });
+
+      // WhatsApp alert to ops team (fire-and-forget)
+      const teamNumber = process.env.TEAM_WHATSAPP_NUMBER;
+      if (teamNumber) {
+        const { whatsappService } = await import("./whatsapp-service");
+        whatsappService.sendMessage(
+          teamNumber,
+          `🎉 *Referral Complete — ₦20,000 Reward*\n` +
+          `Referrer: ${referrer?.fullName || referrer?.phoneNumber || "Unknown"}\n` +
+          `Referee: ${referee?.fullName || referee?.phoneNumber || "Unknown"}\n` +
+          `Group: ${group?.name || groupId}\n` +
+          `Date: ${new Date().toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}`
+        ).catch(() => {});
+      }
     }
+  }
+
+  async getOpsOverview() {
+    // All referrals with referrer + referee
+    const referralRows = await db
+      .select({ referral: referralsTable, referrer: usersTable })
+      .from(referralsTable)
+      .innerJoin(usersTable, eq(referralsTable.referrerId, usersTable.id))
+      .orderBy(desc(referralsTable.createdAt));
+
+    const referrals = await Promise.all(referralRows.map(async (row) => {
+      const [refereeRow] = await db.select().from(usersTable).where(eq(usersTable.id, row.referral.refereeId)).limit(1);
+      return { ...row.referral, referrer: row.referrer, referee: refereeRow };
+    }));
+
+    // All contributions with user + group + project names
+    const contribRows = await db
+      .select({
+        contribution: contributionsTable,
+        userName: usersTable.fullName,
+        userPhone: usersTable.phoneNumber,
+        groupName: groupsTable.name,
+      })
+      .from(contributionsTable)
+      .innerJoin(usersTable, eq(contributionsTable.userId, usersTable.id))
+      .innerJoin(groupsTable, eq(contributionsTable.groupId, groupsTable.id))
+      .orderBy(desc(contributionsTable.createdAt));
+
+    const contributions: ContributionWithDetails[] = contribRows.map(r => ({
+      ...r.contribution,
+      userName: r.userName || r.userPhone || "Unknown",
+      groupName: r.groupName,
+    }));
+
+    // Stats
+    const [userCount] = await db.select({ count: drizzleSql<number>`count(*)::int` }).from(usersTable);
+    const completedReferrals = referrals.filter(r => r.status === "complete").length;
+    const pendingReferrals = referrals.filter(r => r.status === "pending").length;
+    const pendingProofs = contributions.filter(c => c.status === "pending").length;
+
+    return {
+      referrals,
+      contributions,
+      stats: {
+        totalUsers: userCount?.count || 0,
+        totalReferrals: referrals.length,
+        completedReferrals,
+        pendingReferrals,
+        totalRewardsOwed: completedReferrals * 20000,
+        totalPaymentProofs: contributions.length,
+        pendingProofs,
+      },
+    };
   }
 }
 

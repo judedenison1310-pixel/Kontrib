@@ -13,6 +13,17 @@ import { z } from "zod";
 // Track connected WebSocket clients by userId
 const wsClients = new Map<string, Set<WebSocket>>();
 
+// Send a WhatsApp alert to the Kontrib ops team (non-blocking, silent fail)
+async function notifyTeam(message: string): Promise<void> {
+  const teamNumber = process.env.TEAM_WHATSAPP_NUMBER;
+  if (!teamNumber) return; // silently skip if not configured
+  try {
+    await whatsappService.sendMessage(teamNumber, message);
+  } catch {
+    // Non-critical — never block the main request
+  }
+}
+
 export function broadcastNotification(userId: string, notification: any) {
   const clients = wsClients.get(userId);
   if (clients) {
@@ -747,6 +758,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const contributionData = insertContributionSchema.parse(req.body);
       console.log("Parsed contribution data:", contributionData);
       const contribution = await storage.createContribution(contributionData);
+
+      // Alert ops team on WhatsApp (fire-and-forget)
+      const [user, group, project] = await Promise.all([
+        storage.getUser(contribution.userId),
+        storage.getGroup(contribution.groupId),
+        contribution.projectId ? storage.getProject(contribution.projectId) : Promise.resolve(undefined),
+      ]);
+      notifyTeam(
+        `💳 *New Payment Proof*\n` +
+        `Member: ${user?.fullName || user?.phoneNumber || "Unknown"}\n` +
+        `Group: ${group?.name || "Unknown"}\n` +
+        `${project ? `Project: ${project.name}\n` : ""}` +
+        `Amount: ₦${parseFloat(contribution.amount).toLocaleString()}\n` +
+        `Status: Pending review`
+      );
+
       res.json(contribution);
     } catch (error) {
       console.error("Create contribution error:", error);
@@ -859,6 +886,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Delete disbursement error:", error);
       res.status(500).json({ message: "Failed to delete disbursement" });
+    }
+  });
+
+  // Ops dashboard route (password-protected internal tool)
+  app.get("/api/ops/overview", async (req, res) => {
+    try {
+      const password = req.query.password as string;
+      const opsPassword = process.env.OPS_PASSWORD;
+      if (!opsPassword || password !== opsPassword) {
+        return res.status(401).json({ message: "Unauthorised" });
+      }
+      const data = await storage.getOpsOverview();
+      res.json(data);
+    } catch (error) {
+      console.error("Ops overview error:", error);
+      res.status(500).json({ message: "Failed to load ops data" });
     }
   });
 
