@@ -62,11 +62,12 @@ type OpsData = {
 export default function Ops() {
   const [password, setPassword] = useState(() => sessionStorage.getItem(OPS_PASS_KEY) || "");
   const [inputPassword, setInputPassword] = useState("");
+  const [nonce, setNonce] = useState(0);
   const [activeTab, setActiveTab] = useState<"referrals" | "payments">("payments");
   const [refFilter, setRefFilter] = useState<"all" | "complete" | "pending">("all");
 
   const { data, isLoading, isError, error, refetch } = useQuery<OpsData>({
-    queryKey: ["/api/ops/overview", password],
+    queryKey: ["/api/ops/overview", password, nonce],
     queryFn: async () => {
       const res = await fetch(`/api/ops/overview?password=${encodeURIComponent(password)}`);
       if (!res.ok) {
@@ -83,6 +84,7 @@ export default function Ops() {
     e.preventDefault();
     sessionStorage.setItem(OPS_PASS_KEY, inputPassword);
     setPassword(inputPassword);
+    setNonce(n => n + 1);
     setInputPassword("");
   };
 
