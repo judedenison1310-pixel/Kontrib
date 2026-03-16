@@ -476,6 +476,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Manage co-admins (primary admin only, max 2)
+  app.patch("/api/groups/:groupId/co-admins", async (req, res) => {
+    try {
+      const { groupId } = req.params;
+      const { adminId, userId, action } = req.body; // action: "add" | "remove"
+
+      if (!adminId || !userId || !action) {
+        return res.status(400).json({ message: "adminId, userId, and action are required" });
+      }
+
+      const group = await storage.getGroup(groupId);
+      if (!group) {
+        return res.status(404).json({ message: "Group not found" });
+      }
+
+      if (group.adminId !== adminId) {
+        return res.status(403).json({ message: "Only the primary group admin can manage co-admins" });
+      }
+
+      if (userId === adminId) {
+        return res.status(400).json({ message: "The primary admin cannot be assigned as a co-admin" });
+      }
+
+      const member = await storage.getGroupMember(groupId, userId);
+      if (!member) {
+        return res.status(400).json({ message: "User must be a group member to become a co-admin" });
+      }
+
+      const currentCoAdmins: string[] = group.coAdmins ?? [];
+
+      let updatedCoAdmins: string[];
+      if (action === "add") {
+        if (currentCoAdmins.includes(userId)) {
+          return res.status(400).json({ message: "User is already a co-admin" });
+        }
+        if (currentCoAdmins.length >= 2) {
+          return res.status(400).json({ message: "A group can have at most 2 co-admins" });
+        }
+        updatedCoAdmins = [...currentCoAdmins, userId];
+      } else if (action === "remove") {
+        if (!currentCoAdmins.includes(userId)) {
+          return res.status(400).json({ message: "User is not a co-admin" });
+        }
+        updatedCoAdmins = currentCoAdmins.filter(id => id !== userId);
+      } else {
+        return res.status(400).json({ message: "action must be 'add' or 'remove'" });
+      }
+
+      const updatedGroup = await storage.updateGroup(groupId, { coAdmins: updatedCoAdmins });
+      res.json(updatedGroup);
+    } catch (error) {
+      console.error("Manage co-admins error:", error);
+      res.status(500).json({ message: "Failed to update co-admins" });
+    }
+  });
+
   app.get("/api/groups/:groupId/members", async (req, res) => {
     try {
       const { groupId } = req.params;

@@ -353,6 +353,7 @@ export class MemStorage implements IStorage {
       customSlug: groupSlug,
       status: "active",
       adminId,
+      coAdmins: [],
       createdAt: new Date(),
       whatsappLink,
     };

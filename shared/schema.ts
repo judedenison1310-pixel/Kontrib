@@ -26,6 +26,7 @@ export const groups = pgTable("groups", {
   status: text("status").notNull().default("active"), // "active", "completed", "paused"
   privacyMode: text("privacy_mode").notNull().default("standard"), // "standard" or "private" (Ajo mode)
   adminId: varchar("admin_id").notNull().references(() => users.id),
+  coAdmins: text("co_admins").array().default(sql`'{}'::text[]`), // Up to 2 co-admin user IDs
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
