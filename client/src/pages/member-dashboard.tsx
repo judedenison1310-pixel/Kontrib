@@ -199,7 +199,7 @@ export default function MemberDashboard() {
                         data-testid={`button-submit-proof-${group.id}`}
                       >
                         <CreditCard className="h-4 w-4" />
-                        Submit Payment Proof
+                        Post Receipt
                       </button>
                     </div>
                   </div>

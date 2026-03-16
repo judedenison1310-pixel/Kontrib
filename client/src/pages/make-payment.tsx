@@ -135,8 +135,8 @@ export default function MakePayment() {
           <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
             <CreditCard className="h-8 w-8 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Submit Payment Proof</h1>
-          <p className="text-gray-600 mt-1">Upload your payment proof for admin approval</p>
+          <h1 className="text-2xl font-bold text-gray-900">Post Receipt</h1>
+          <p className="text-gray-600 mt-1">Upload your receipt for admin confirmation</p>
         </div>
 
         {userGroups.length === 0 ? (
@@ -397,7 +397,7 @@ export default function MakePayment() {
                   icon={<Upload className="h-5 w-5" />}
                   data-testid="submit-payment-proof"
                 >
-                  Submit Payment Proof
+                  Post Receipt
                 </BigButton>
               </form>
             </Form>

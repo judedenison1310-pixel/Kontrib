@@ -34,7 +34,7 @@ export function Navigation() {
 
   const navLinks = [
     { href: "/groups", icon: Users, label: "My Groups" },
-    { href: "/submit-proof", icon: CreditCard, label: "Pay" },
+    { href: "/submit-proof", icon: CreditCard, label: "Post Receipt" },
     { href: "/my-contributions", icon: History, label: "History" },
     { href: "/referrals", icon: Gift, label: "Refer" },
   ];

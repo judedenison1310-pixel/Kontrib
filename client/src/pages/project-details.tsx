@@ -519,7 +519,7 @@ export default function ProjectDetails() {
               data-testid="button-submit-proof-primary"
             >
               <CreditCard className="h-5 w-5" />
-              Submit Payment Proof
+              Post Receipt
             </button>
           </div>
         )}
@@ -829,7 +829,7 @@ export default function ProjectDetails() {
               data-testid="button-submit-proof"
             >
               <CreditCard className="h-5 w-5" />
-              Submit Payment Proof
+              Post Receipt
             </button>
           </div>
         )}

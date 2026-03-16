@@ -648,7 +648,7 @@ export default function Landing() {
                   </div>
                   <div>
                     <p className="font-bold text-gray-900">Join a Group</p>
-                    <p className="text-gray-500 text-sm">Pay and track contributions</p>
+                    <p className="text-gray-500 text-sm">Post and track receipts</p>
                   </div>
                 </div>
               </button>

@@ -163,7 +163,7 @@ export function PaymentModal({ open, onOpenChange, project }: PaymentModalProps)
           <div className="flex-1 overflow-y-auto px-5 py-6">
             <div className="space-y-6">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">Submit Payment Proof</h2>
+                <h2 className="text-2xl font-bold text-gray-900">Post Receipt</h2>
                 <p className="text-gray-500 mt-1">
                   For <span className="font-medium text-gray-700">{project.name}</span>
                 </p>
@@ -412,7 +412,7 @@ export function PaymentModal({ open, onOpenChange, project }: PaymentModalProps)
                         Submitting...
                       </div>
                     ) : (
-                      "Submit Payment Proof"
+                      "Post Receipt"
                     )}
                   </button>
                 </form>

@@ -505,7 +505,7 @@ export default function MemberPayment() {
                   data-testid="submit-payment-button"
                 >
                   {submitContributionMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Submit Payment Proof
+                  Post Receipt
                 </Button>
               </div>
             </CardContent>

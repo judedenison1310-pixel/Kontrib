@@ -135,7 +135,7 @@ export function GroupCard({
               className="w-full h-11 bg-nigerian-green hover:bg-forest-green font-medium"
               data-testid={`submit-proof-${group.id}`}
             >
-              Submit Payment Proof
+              Post Receipt
             </Button>
           )}
         </div>
