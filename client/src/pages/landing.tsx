@@ -606,7 +606,7 @@ export default function Landing() {
       {/* Footer - pushed to bottom */}
       <footer className="py-6 mt-auto">
         <div className="text-center text-sm text-gray-400">
-          kontrib.app
+          kontrib.app &middot; A product of VibeCore Labs
         </div>
       </footer>
     </div>
