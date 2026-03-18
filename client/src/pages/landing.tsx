@@ -257,7 +257,7 @@ export default function Landing() {
         {step === "phone" && (
           <div className="space-y-8">
             {/* Hero Image - text embedded in image */}
-            <div className="rounded-2xl overflow-hidden shadow-lg">
+            <div className="rounded-2xl overflow-hidden shadow-lg ml-4">
               <img 
                 src={heroImage} 
                 alt="Track group money with ease" 
