@@ -13,7 +13,7 @@ import { sendOtp, verifyOtp, updateProfile } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import kontribLogo from "@assets/8_1764455185903.png";
-import heroImage from "@assets/Komntrib (2)_1764653626078.jpg";
+import heroImage from "@assets/Landing_Page_Image_1773841158213.jpg";
 
 const REF_KEY = "kontrib_referral_code";
 
@@ -267,10 +267,6 @@ export default function Landing() {
 
             {/* Login Card */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <p className="text-gray-600 text-center mb-6">
-                Contribute with peace of mind.
-              </p>
-
               <Form {...phoneForm}>
                 <form onSubmit={phoneForm.handleSubmit(onPhoneSubmit)} className="space-y-4">
                   <FormField
