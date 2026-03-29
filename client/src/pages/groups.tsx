@@ -14,9 +14,10 @@ import {
   FolderKanban,
   Shield,
   UserCheck,
-  Bell,
+  Clock,
   Crown,
   Pencil,
+  ChevronRight,
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { formatNaira } from "@/lib/currency";
@@ -190,69 +191,90 @@ export default function Groups() {
                 onClick={() => setLocation(`/group/${group.id}/projects`)}
                 data-testid={`group-card-${group.id}`}
               >
-                <CardContent className="p-4">
-                  {/* Top row: name + pending bell */}
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                      <h3 className="font-bold text-gray-900 truncate" data-testid={`text-group-name-${group.id}`}>
-                        {group.name}
-                      </h3>
-                      {isGroupAdmin(group) && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingGroup(group);
-                            setEditGroupModalOpen(true);
-                          }}
-                          className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors shrink-0"
-                          data-testid={`button-edit-group-name-${group.id}`}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </div>
-                    {isGroupAdmin(group) && group.pendingApprovals && group.pendingApprovals > 0 ? (
-                      <div className="flex items-center gap-1 text-orange-500 text-xs font-medium shrink-0 ml-2">
-                        <Bell className="h-3.5 w-3.5" />
-                        {group.pendingApprovals}
+                <CardContent className="p-0">
+                  <div className="p-4">
+                    {/* Top row: name + edit */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                        <h3 className="font-bold text-gray-900 truncate" data-testid={`text-group-name-${group.id}`}>
+                          {group.name}
+                        </h3>
+                        {isGroupAdmin(group) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingGroup(group);
+                              setEditGroupModalOpen(true);
+                            }}
+                            className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors shrink-0"
+                            data-testid={`button-edit-group-name-${group.id}`}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                       </div>
-                    ) : null}
+                    </div>
+
+                    {/* Total Generated */}
+                    <div className="mb-3">
+                      <p className="text-xs text-gray-400 mb-0.5">Total Generated</p>
+                      <p className="font-bold text-primary text-lg" data-testid={`text-total-collected-${group.id}`}>
+                        {formatNaira(group.totalCollected)}
+                      </p>
+                    </div>
+
+                    {/* Members + Projects as links */}
+                    <div className="flex items-center gap-3 border-t border-gray-50 pt-3">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLocation(`/group/${group.id}/members`);
+                        }}
+                        className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary transition-colors"
+                        data-testid={`button-members-${group.id}`}
+                      >
+                        <Users className="h-3.5 w-3.5" />
+                        Members {group.memberCount}
+                      </button>
+                      <span className="text-gray-200">|</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLocation(`/group/${group.id}/projects`);
+                        }}
+                        className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary transition-colors"
+                        data-testid={`button-projects-${group.id}`}
+                      >
+                        <FolderKanban className="h-3.5 w-3.5" />
+                        Projects {group.projectCount}
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Total Generated */}
-                  <div className="mb-3">
-                    <p className="text-xs text-gray-400 mb-0.5">Total Generated</p>
-                    <p className="font-bold text-primary text-lg" data-testid={`text-total-collected-${group.id}`}>
-                      {formatNaira(group.totalCollected)}
-                    </p>
-                  </div>
-
-                  {/* Members + Projects as links */}
-                  <div className="flex items-center gap-3 border-t border-gray-50 pt-3">
+                  {/* Pending approvals action strip — visible only to admins with pending receipts */}
+                  {isGroupAdmin(group) && group.pendingApprovals && group.pendingApprovals > 0 ? (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setLocation(`/group/${group.id}/members`);
+                        setLocation(`/group/${group.id}/pending`);
                       }}
-                      className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary transition-colors"
-                      data-testid={`button-members-${group.id}`}
+                      className="w-full flex items-center justify-between px-4 py-3 bg-orange-50 border-t border-orange-100 rounded-b-2xl hover:bg-orange-100 transition-colors"
+                      data-testid={`button-pending-approvals-${group.id}`}
                     >
-                      <Users className="h-3.5 w-3.5" />
-                      Members {group.memberCount}
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center">
+                          <Clock className="h-3.5 w-3.5 text-white" />
+                        </div>
+                        <span className="text-sm font-semibold text-orange-700">
+                          {group.pendingApprovals} receipt{group.pendingApprovals > 1 ? 's' : ''} pending approval
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 text-orange-600 text-sm font-medium">
+                        Review
+                        <ChevronRight className="h-4 w-4" />
+                      </div>
                     </button>
-                    <span className="text-gray-200">|</span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setLocation(`/group/${group.id}/projects`);
-                      }}
-                      className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary transition-colors"
-                      data-testid={`button-projects-${group.id}`}
-                    >
-                      <FolderKanban className="h-3.5 w-3.5" />
-                      Projects {group.projectCount}
-                    </button>
-                  </div>
+                  ) : null}
                 </CardContent>
               </Card>
             ))}
