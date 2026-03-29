@@ -20,6 +20,7 @@ import {
 import { formatNaira } from "@/lib/currency";
 import { apiRequest } from "@/lib/queryClient";
 import { useNotificationsWebSocket } from "@/hooks/use-notifications-ws";
+import { usePushNotifications } from "@/hooks/use-push-notifications";
 import type { Notification, ContributionWithDetails } from "@shared/schema";
 
 interface NotificationBellProps {
@@ -32,6 +33,7 @@ export function NotificationBell({ userId, onContributionClick }: NotificationBe
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const { hasNewNotification, clearNewNotification } = useNotificationsWebSocket(userId);
+  const { isSupported, isSubscribed, permission, isLoading: pushLoading, requestAndSubscribe } = usePushNotifications(userId);
 
   const { data: notifications = [] } = useQuery<Notification[]>({
     queryKey: ["/api/notifications", userId],
@@ -267,11 +269,25 @@ export function NotificationBell({ userId, onContributionClick }: NotificationBe
           </div>
         </ScrollArea>
 
-        {notifications.length > 10 && (
-          <div className="border-t p-3 text-center">
-            <Button variant="ghost" size="sm" className="text-sm">
-              View all notifications
-            </Button>
+        {/* Push notification opt-in */}
+        {isSupported && !isSubscribed && permission !== "denied" && (
+          <div className="border-t px-4 py-3 bg-gray-50">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Bell className="h-4 w-4 text-green-600 shrink-0" />
+                <p className="text-xs text-gray-600">Get instant push alerts even when the app is closed</p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs border-green-600 text-green-700 hover:bg-green-50 shrink-0"
+                onClick={requestAndSubscribe}
+                disabled={pushLoading}
+                data-testid="button-enable-push"
+              >
+                {pushLoading ? "..." : "Enable"}
+              </Button>
+            </div>
           </div>
         )}
       </PopoverContent>

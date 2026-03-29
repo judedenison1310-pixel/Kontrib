@@ -3,12 +3,27 @@ import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { whatsappService } from "./whatsapp-service";
+import { sendPushToSubscription, vapidPublicKey, type PushPayload } from "./push-service";
 import { 
   insertUserSchema, insertGroupSchema, insertGroupMemberSchema,
   insertProjectSchema, insertAccountabilityPartnerSchema, insertContributionSchema,
-  insertNotificationSchema, insertOtpVerificationSchema
+  insertNotificationSchema, insertOtpVerificationSchema, insertPushSubscriptionSchema
 } from "@shared/schema";
 import { z } from "zod";
+
+async function sendPushToUser(userId: string, payload: PushPayload): Promise<void> {
+  try {
+    const subscriptions = await storage.getUserPushSubscriptions(userId);
+    const results = await Promise.all(subscriptions.map(sub => sendPushToSubscription(sub, payload)));
+    for (let i = 0; i < results.length; i++) {
+      if (!results[i]) {
+        await storage.deletePushSubscription(subscriptions[i].endpoint).catch(() => {});
+      }
+    }
+  } catch (err) {
+    console.error("sendPushToUser error:", err);
+  }
+}
 
 // Track connected WebSocket clients by userId
 const wsClients = new Map<string, Set<WebSocket>>();
@@ -830,18 +845,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `Status: Pending review`
       );
 
-      // Broadcast real-time notification to group admin and co-admins
+      // Broadcast real-time notification and push to group admin and co-admins
       if (group) {
         const notificationPayload = {
           type: "payment_submitted",
           contributionId: contribution.id,
           groupId: contribution.groupId,
         };
-        broadcastNotification(group.adminId, notificationPayload);
-        if (group.coAdmins && group.coAdmins.length > 0) {
-          for (const coAdminId of group.coAdmins) {
-            broadcastNotification(coAdminId, notificationPayload);
-          }
+        const adminIds = [group.adminId, ...(group.coAdmins || [])];
+        const entityName = project ? project.name : group.name;
+        const pushPayload = {
+          title: "New Receipt Posted",
+          body: `${user?.fullName || "A member"} posted a receipt of ₦${parseFloat(contribution.amount).toLocaleString()} for ${entityName}`,
+          url: `/group/${contribution.groupId}/pending`,
+          tag: `receipt-${contribution.id}`,
+        };
+        for (const adminId of adminIds) {
+          broadcastNotification(adminId, notificationPayload);
+          sendPushToUser(adminId, pushPayload);
         }
       }
 
@@ -1572,6 +1593,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("OG image generation error:", error);
       res.status(500).json({ message: "Failed to generate OG image" });
+    }
+  });
+
+  // Push notification routes
+  app.get("/api/push/vapid-public-key", (_req, res) => {
+    if (!vapidPublicKey) return res.status(503).json({ message: "Push not configured" });
+    res.json({ publicKey: vapidPublicKey });
+  });
+
+  app.post("/api/push/subscribe", async (req, res) => {
+    try {
+      const body = insertPushSubscriptionSchema.parse(req.body);
+      const sub = await storage.savePushSubscription(body);
+      res.json(sub);
+    } catch (err) {
+      console.error("Push subscribe error:", err);
+      res.status(400).json({ message: "Invalid subscription data" });
+    }
+  });
+
+  app.delete("/api/push/unsubscribe", async (req, res) => {
+    try {
+      const { endpoint } = z.object({ endpoint: z.string() }).parse(req.body);
+      await storage.deletePushSubscription(endpoint);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(400).json({ message: "Invalid request" });
     }
   });
 

@@ -12,6 +12,8 @@ import {
   type Notification,
   type OtpVerification,
   type DeviceToken,
+  type PushSubscription,
+  type InsertPushSubscription,
   type InsertUser, 
   type InsertGroup, 
   type InsertGroupMember, 
@@ -125,6 +127,11 @@ export interface IStorage {
   createDeviceToken(userId: string, deviceInfo?: string): Promise<string>;
   validateDeviceToken(token: string): Promise<User | null>;
   removeDeviceToken(token: string): Promise<boolean>;
+
+  // Push subscription methods
+  savePushSubscription(sub: InsertPushSubscription): Promise<PushSubscription>;
+  getUserPushSubscriptions(userId: string): Promise<PushSubscription[]>;
+  deletePushSubscription(endpoint: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -1097,11 +1104,31 @@ export class MemStorage implements IStorage {
   async getReferralsByReferrer(_referrerId: string): Promise<(Referral & { referee: User })[]> { return []; }
   async checkAndCompleteReferrals(_groupId: string): Promise<void> {}
   async getOpsOverview() { return { referrals: [], contributions: [], stats: { totalUsers: 0, totalReferrals: 0, completedReferrals: 0, pendingReferrals: 0, totalRewardsOwed: 0, totalPaymentProofs: 0, pendingProofs: 0 } }; }
+
+  private pushSubscriptions: Map<string, PushSubscription> = new Map();
+
+  async savePushSubscription(sub: InsertPushSubscription): Promise<PushSubscription> {
+    const existing = Array.from(this.pushSubscriptions.values()).find(s => s.endpoint === sub.endpoint);
+    if (existing) return existing;
+    const record: PushSubscription = { ...sub, id: randomUUID(), createdAt: new Date() };
+    this.pushSubscriptions.set(record.id, record);
+    return record;
+  }
+
+  async getUserPushSubscriptions(userId: string): Promise<PushSubscription[]> {
+    return Array.from(this.pushSubscriptions.values()).filter(s => s.userId === userId);
+  }
+
+  async deletePushSubscription(endpoint: string): Promise<void> {
+    for (const [id, sub] of this.pushSubscriptions.entries()) {
+      if (sub.endpoint === endpoint) { this.pushSubscriptions.delete(id); break; }
+    }
+  }
 }
 
 // Database Storage implementation using Drizzle ORM
 import { db } from "./db";
-import { users as usersTable, groups as groupsTable, groupMembers as groupMembersTable, projects as projectsTable, accountabilityPartners as accountabilityPartnersTable, contributions as contributionsTable, notifications as notificationsTable, otpVerifications as otpVerificationsTable, deviceTokens as deviceTokensTable, disbursements as disbursementsTable, referrals as referralsTable } from "@shared/schema";
+import { users as usersTable, groups as groupsTable, groupMembers as groupMembersTable, projects as projectsTable, accountabilityPartners as accountabilityPartnersTable, contributions as contributionsTable, notifications as notificationsTable, otpVerifications as otpVerificationsTable, deviceTokens as deviceTokensTable, disbursements as disbursementsTable, referrals as referralsTable, pushSubscriptions as pushSubscriptionsTable } from "@shared/schema";
 import { eq, and, gt, lt, sql as drizzleSql, desc, inArray } from "drizzle-orm";
 
 export class DbStorage implements IStorage {
@@ -2051,6 +2078,24 @@ export class DbStorage implements IStorage {
         pendingProofs,
       },
     };
+  }
+
+  async savePushSubscription(sub: InsertPushSubscription): Promise<PushSubscription> {
+    const existing = await db.select().from(pushSubscriptionsTable)
+      .where(eq(pushSubscriptionsTable.endpoint, sub.endpoint)).limit(1);
+    if (existing[0]) return existing[0];
+    const result = await db.insert(pushSubscriptionsTable).values(sub).returning();
+    return result[0];
+  }
+
+  async getUserPushSubscriptions(userId: string): Promise<PushSubscription[]> {
+    return db.select().from(pushSubscriptionsTable)
+      .where(eq(pushSubscriptionsTable.userId, userId));
+  }
+
+  async deletePushSubscription(endpoint: string): Promise<void> {
+    await db.delete(pushSubscriptionsTable)
+      .where(eq(pushSubscriptionsTable.endpoint, endpoint));
   }
 }
 
