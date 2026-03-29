@@ -77,6 +77,7 @@ export function NotificationBell({ userId, onContributionClick }: NotificationBe
   const unreadNotifications = notifications.filter(n => !n.read);
   const pendingContributions = contributions.filter(c => c.status === 'pending');
   const totalUnreadCount = unreadNotifications.length;
+  const badgeCount = totalUnreadCount || pendingContributions.length;
 
   const handleNotificationClick = async (notification: Notification) => {
     if (!notification.read) {
@@ -133,12 +134,12 @@ export function NotificationBell({ userId, onContributionClick }: NotificationBe
           data-testid="notification-bell"
         >
           <Bell className={`h-5 w-5 text-gray-600 ${hasNewNotification ? 'animate-bounce' : ''}`} />
-          {(totalUnreadCount > 0 || hasNewNotification) && (
+          {(badgeCount > 0 || hasNewNotification) && (
             <Badge 
               variant="destructive" 
               className={`absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs ${hasNewNotification ? 'animate-pulse ring-2 ring-red-300' : ''}`}
             >
-              {totalUnreadCount > 9 ? '9+' : totalUnreadCount || '!'}
+              {badgeCount > 9 ? '9+' : badgeCount || '!'}
             </Badge>
           )}
         </Button>
@@ -147,108 +148,122 @@ export function NotificationBell({ userId, onContributionClick }: NotificationBe
         <div className="border-b px-4 py-3">
           <h3 className="font-semibold text-gray-900">Notifications</h3>
           <p className="text-sm text-gray-600">
-            {totalUnreadCount > 0 ? `${totalUnreadCount} unread notifications` : 'All caught up!'}
+            {pendingContributions.length > 0
+              ? `${pendingContributions.length} pending review${totalUnreadCount > 0 ? `, ${totalUnreadCount} unread` : ''}`
+              : totalUnreadCount > 0 ? `${totalUnreadCount} unread` : 'All caught up!'}
           </p>
         </div>
 
         <ScrollArea className="max-h-96">
-          <div className="p-2">
-            {notifications.length === 0 ? (
+          <div className="p-2 space-y-1">
+
+            {/* Pending Approvals — shown first so admin can act immediately */}
+            {pendingContributions.length > 0 && (
+              <div className="mb-1">
+                <div className="flex items-center justify-between px-1 pb-1">
+                  <h4 className="text-xs font-semibold text-orange-700 uppercase tracking-wide flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Needs Review ({pendingContributions.length})
+                  </h4>
+                </div>
+                <div className="space-y-1">
+                  {pendingContributions.slice(0, 3).map((contribution) => (
+                    <div
+                      key={contribution.id}
+                      className="p-3 bg-orange-50 rounded-lg border-l-4 border-l-orange-500 cursor-pointer hover:bg-orange-100 transition-colors"
+                      onClick={() => {
+                        setLocation(`/group/${contribution.groupId}/pending`);
+                        setOpen(false);
+                      }}
+                      data-testid={`pending-contribution-${contribution.id}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">
+                            {contribution.userName}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {contribution.groupName}
+                            {contribution.projectName && (
+                              <span> · {contribution.projectName}</span>
+                            )}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-orange-600">
+                            {formatNaira(Number(contribution.amount))}
+                          </p>
+                          <p className="text-xs text-orange-500">Tap to review</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {pendingContributions.length > 3 && (
+                    <p className="text-xs text-gray-500 text-center py-1">
+                      +{pendingContributions.length - 3} more pending
+                    </p>
+                  )}
+                </div>
+                {notifications.length > 0 && <div className="border-t mt-2 mb-1" />}
+              </div>
+            )}
+
+            {/* Notifications list */}
+            {notifications.length === 0 && pendingContributions.length === 0 ? (
               <div className="text-center py-8 px-4">
                 <Bell className="h-12 w-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-sm text-gray-500">No notifications yet</p>
               </div>
-            ) : (
-              <div className="space-y-1">
-                {notifications.map((notification) => (
-                  <div
-                    key={notification.id}
-                    className={`p-3 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors relative group ${
-                      !notification.read ? 'bg-blue-50 border-l-4 border-l-blue-500' : 'bg-white'
-                    }`}
-                    onClick={() => handleNotificationClick(notification)}
-                    data-testid={`notification-${notification.id}`}
-                  >
-                    <button
-                      onClick={(e) => handleDismiss(e, notification.id)}
-                      className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-200 opacity-0 group-hover:opacity-100 transition-opacity"
-                      data-testid={`dismiss-notification-${notification.id}`}
+            ) : notifications.length > 0 ? (
+              <>
+                {pendingContributions.length > 0 && (
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1 pb-1">Activity</p>
+                )}
+                <div className="space-y-1">
+                  {notifications.map((notification) => (
+                    <div
+                      key={notification.id}
+                      className={`p-3 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors relative group ${
+                        !notification.read ? 'bg-blue-50 border-l-4 border-l-blue-500' : 'bg-white'
+                      }`}
+                      onClick={() => handleNotificationClick(notification)}
+                      data-testid={`notification-${notification.id}`}
                     >
-                      <X className="h-3 w-3 text-gray-500" />
-                    </button>
-                    <div className="flex items-start gap-3 pr-6">
-                      <div className="flex-shrink-0">
-                        {getNotificationIcon(notification.type)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between">
-                          <p className={`text-sm font-medium ${
-                            !notification.read ? 'text-gray-900' : 'text-gray-700'
-                          }`}>
-                            {notification.title}
-                          </p>
-                          {!notification.read && (
-                            <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1"></div>
-                          )}
+                      <button
+                        onClick={(e) => handleDismiss(e, notification.id)}
+                        className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-200 opacity-0 group-hover:opacity-100 transition-opacity"
+                        data-testid={`dismiss-notification-${notification.id}`}
+                      >
+                        <X className="h-3 w-3 text-gray-500" />
+                      </button>
+                      <div className="flex items-start gap-3 pr-6">
+                        <div className="flex-shrink-0">
+                          {getNotificationIcon(notification.type)}
                         </div>
-                        <p className="text-sm text-gray-600 mt-1 line-clamp-2">
-                          {notification.message}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-2">
-                          {formatNotificationTime(notification.createdAt.toString())}
-                        </p>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between">
+                            <p className={`text-sm font-medium ${
+                              !notification.read ? 'text-gray-900' : 'text-gray-700'
+                            }`}>
+                              {notification.title}
+                            </p>
+                            {!notification.read && (
+                              <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1"></div>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                            {notification.message}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-2">
+                            {formatNotificationTime(notification.createdAt.toString())}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            
-            {pendingContributions.length > 0 && (
-              <>
-                <div className="border-t pt-3 mt-3">
-                  <h4 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-orange-600" />
-                    Pending Approvals ({pendingContributions.length})
-                  </h4>
-                  <div className="space-y-2">
-                    {pendingContributions.slice(0, 3).map((contribution) => (
-                      <div
-                        key={contribution.id}
-                        className="p-2 bg-orange-50 rounded border-l-4 border-l-orange-500 cursor-pointer hover:bg-orange-100 transition-colors"
-                        onClick={() => {
-                          setLocation(`/group/${contribution.groupId}/pending`);
-                          setOpen(false);
-                        }}
-                        data-testid={`pending-contribution-${contribution.id}`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">
-                              {contribution.userName}
-                            </p>
-                            <p className="text-xs text-gray-600">
-                              {contribution.groupName}
-                              {contribution.projectName && (
-                                <span> → {contribution.projectName}</span>
-                              )}
-                            </p>
-                          </div>
-                          <p className="text-sm font-semibold text-orange-600">
-                            {formatNaira(Number(contribution.amount))}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                    {pendingContributions.length > 3 && (
-                      <p className="text-xs text-gray-500 text-center">
-                        +{pendingContributions.length - 3} more pending...
-                      </p>
-                    )}
-                  </div>
+                  ))}
                 </div>
               </>
-            )}
+            ) : null}
           </div>
         </ScrollArea>
 

@@ -27,6 +27,7 @@ export function useNotificationsWebSocket(userId: string | undefined) {
           if (data.type === 'notification') {
             setHasNewNotification(true);
             queryClient.invalidateQueries({ queryKey: ["/api/notifications", userId] });
+            queryClient.invalidateQueries({ queryKey: ["/api/contributions/admin", userId] });
           }
         } catch (e) {
           console.error('WebSocket message parse error:', e);

@@ -830,6 +830,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `Status: Pending review`
       );
 
+      // Broadcast real-time notification to group admin and co-admins
+      if (group) {
+        const notificationPayload = {
+          type: "payment_submitted",
+          contributionId: contribution.id,
+          groupId: contribution.groupId,
+        };
+        broadcastNotification(group.adminId, notificationPayload);
+        if (group.coAdmins && group.coAdmins.length > 0) {
+          for (const coAdminId of group.coAdmins) {
+            broadcastNotification(coAdminId, notificationPayload);
+          }
+        }
+      }
+
       res.json(contribution);
     } catch (error) {
       console.error("Create contribution error:", error);
