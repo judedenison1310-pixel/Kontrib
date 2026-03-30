@@ -338,75 +338,89 @@ export default function Landing() {
             </div>
 
             {/* Testimonials - scrolling right to left */}
-            <div className="overflow-hidden -mx-6">
+            <div className="overflow-hidden -mx-4">
               <style>{`
                 @keyframes scroll-rtl {
                   0%   { transform: translateX(0); }
                   100% { transform: translateX(-50%); }
                 }
                 .scroll-rtl {
-                  animation: scroll-rtl 22s linear infinite;
+                  animation: scroll-rtl 26s linear infinite;
                   display: flex;
                   width: max-content;
                 }
                 .scroll-rtl:hover { animation-play-state: paused; }
               `}</style>
-              <div className="scroll-rtl gap-3 flex">
+              <div className="scroll-rtl gap-4 flex px-4">
                 {[
                   {
                     name: "Bisi of Lagos",
                     role: "Osusu Group Admin",
                     avatar: "BL",
-                    color: "bg-pink-100 text-pink-700",
+                    gradient: "from-pink-500 to-rose-400",
                     quote: "Managing our osusu used to be so stressful. Kontrib made it simple — even members who aren't tech-savvy love it.",
                   },
                   {
                     name: "Dr Scalzy",
                     role: "Alpha FC Social Club Admin",
                     avatar: "DS",
-                    color: "bg-blue-100 text-blue-700",
+                    gradient: "from-blue-500 to-cyan-400",
                     quote: "We run Alpha FC's club contributions through Kontrib. Payment tracking and reminders have never been this smooth.",
                   },
                   {
                     name: "Mrs Deb",
                     role: "Office Group Admin",
                     avatar: "MD",
-                    color: "bg-purple-100 text-purple-700",
+                    gradient: "from-violet-500 to-purple-400",
                     quote: "No more chasing colleagues for contributions. Kontrib handles all of it — collection, reminders, and records.",
                   },
                   {
                     name: "Bisi of Lagos",
                     role: "Osusu Group Admin",
                     avatar: "BL",
-                    color: "bg-pink-100 text-pink-700",
+                    gradient: "from-pink-500 to-rose-400",
                     quote: "Managing our osusu used to be so stressful. Kontrib made it simple — even members who aren't tech-savvy love it.",
                   },
                   {
                     name: "Dr Scalzy",
                     role: "Alpha FC Social Club Admin",
                     avatar: "DS",
-                    color: "bg-blue-100 text-blue-700",
+                    gradient: "from-blue-500 to-cyan-400",
                     quote: "We run Alpha FC's club contributions through Kontrib. Payment tracking and reminders have never been this smooth.",
                   },
                   {
                     name: "Mrs Deb",
                     role: "Office Group Admin",
                     avatar: "MD",
-                    color: "bg-purple-100 text-purple-700",
+                    gradient: "from-violet-500 to-purple-400",
                     quote: "No more chasing colleagues for contributions. Kontrib handles all of it — collection, reminders, and records.",
                   },
                 ].map((t, i) => (
                   <div
                     key={i}
-                    className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex-shrink-0 w-64"
+                    className="bg-gray-900 rounded-2xl p-5 flex-shrink-0 w-72 flex flex-col justify-between gap-4"
                   >
-                    <p className="text-xs text-gray-600 leading-relaxed mb-3">"{t.quote}"</p>
-                    <div className="flex items-center gap-2">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${t.color}`}>
+                    {/* Stars */}
+                    <div className="flex items-center gap-0.5">
+                      {[...Array(5)].map((_, s) => (
+                        <svg key={s} className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" viewBox="0 0 20 20">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                      ))}
+                    </div>
+
+                    {/* Quote */}
+                    <p className="text-sm text-gray-200 leading-relaxed flex-1">
+                      "{t.quote}"
+                    </p>
+
+                    {/* Author */}
+                    <div className="flex items-center gap-3 pt-1 border-t border-white/10">
+                      <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${t.gradient} flex items-center justify-center text-xs font-bold text-white shrink-0`}>
                         {t.avatar}
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-gray-800">{t.name}</p>
+                        <p className="text-sm font-semibold text-white leading-tight">{t.name}</p>
                         <p className="text-xs text-gray-400">{t.role}</p>
                       </div>
                     </div>
