@@ -328,7 +328,7 @@ export default function Landing() {
               </Form>
 
               <p className="text-center text-xs text-gray-400 mt-3">
-                Your number is only used to verify your identity — no spam, ever
+                Your number is only used to verify your identity. No spam. 100% Secure.
               </p>
             </div>
 
