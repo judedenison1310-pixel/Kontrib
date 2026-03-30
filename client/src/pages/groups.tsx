@@ -52,6 +52,8 @@ export default function Groups() {
   const memberCount = groups.filter(g => g.role === 'member' || g.role === 'both').length;
 
   const isGroupAdmin = (group: GroupWithRole) => group.role === 'admin' || group.role === 'both';
+  const isGroupReviewer = (group: GroupWithRole) =>
+    isGroupAdmin(group) || (group.coAdmins ?? []).includes(user?.id ?? '');
 
   if (isLoading) {
     return (
@@ -251,8 +253,8 @@ export default function Groups() {
                     </div>
                   </div>
 
-                  {/* Pending approvals action strip — visible only to admins with pending receipts */}
-                  {isGroupAdmin(group) && group.pendingApprovals && group.pendingApprovals > 0 ? (
+                  {/* Pending approvals action strip — visible to admins and co-admins with pending receipts */}
+                  {isGroupReviewer(group) && group.pendingApprovals && group.pendingApprovals > 0 ? (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

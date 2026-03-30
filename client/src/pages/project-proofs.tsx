@@ -62,6 +62,8 @@ export default function ProjectProofs() {
 
   const isLoading = projectLoading || contributionsLoading || groupLoading;
   const isAdmin = user?.id === group?.adminId;
+  const isCoAdmin = (group?.coAdmins ?? []).includes(user?.id ?? '');
+  const isReviewer = isAdmin || isCoAdmin;
   const projectCurrency = (project?.currency as CurrencyCode) || "NGN";
 
   const proofsWithPayment = contributions
@@ -79,7 +81,7 @@ export default function ProjectProofs() {
     );
   }
 
-  if (!isAdmin) {
+  if (!isReviewer) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation />

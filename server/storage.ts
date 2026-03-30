@@ -1309,6 +1309,17 @@ export class DbStorage implements IStorage {
         existing.role = 'both';
         existing.myPendingPayments = myPendingPayments;
       } else {
+        // Check if user is a co-admin of this group to populate pendingApprovals
+        const isCoAdmin = (group.coAdmins ?? []).includes(userId);
+        let pendingApprovals: number | undefined = undefined;
+        if (isCoAdmin) {
+          const pendingApprovalsResult = await db
+            .select({ count: drizzleSql<number>`count(*)::int` })
+            .from(contributionsTable)
+            .where(and(eq(contributionsTable.groupId, group.id), eq(contributionsTable.status, "pending")));
+          pendingApprovals = pendingApprovalsResult[0]?.count || 0;
+        }
+
         groupMap.set(group.id, {
           ...group,
           memberCount,
@@ -1318,6 +1329,7 @@ export class DbStorage implements IStorage {
           totalCollected,
           role: 'member',
           myPendingPayments,
+          ...(pendingApprovals !== undefined ? { pendingApprovals } : {}),
         });
       }
     }

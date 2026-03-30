@@ -60,6 +60,8 @@ export default function GroupDetails() {
 
   const isLoading = groupLoading || projectsLoading || membersLoading;
   const isAdmin = user?.id === group?.adminId;
+  const isCoAdmin = (group?.coAdmins ?? []).includes(user?.id ?? '');
+  const isReviewer = isAdmin || isCoAdmin;
   const isMember = members.some(m => m.userId === user?.id);
   const isBoth = isAdmin && isMember;
 
@@ -211,8 +213,8 @@ export default function GroupDetails() {
           </div>
         </div>
 
-        {/* Show pending approvals banner for admins */}
-        {isAdmin && pendingApprovals > 0 && (
+        {/* Show pending approvals banner for admins and co-admins */}
+        {isReviewer && pendingApprovals > 0 && (
           <Card className="bg-orange-50 border-orange-200 rounded-2xl">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">

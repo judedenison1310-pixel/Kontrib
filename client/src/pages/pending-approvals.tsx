@@ -38,6 +38,8 @@ export default function PendingApprovals() {
 
   const isLoading = groupLoading || contributionsLoading;
   const isAdmin = user?.id === group?.adminId;
+  const isCoAdmin = (group?.coAdmins ?? []).includes(user?.id ?? '');
+  const isReviewer = isAdmin || isCoAdmin;
 
   const pendingContributions = contributions.filter(c => c.status === "pending");
 
@@ -59,7 +61,7 @@ export default function PendingApprovals() {
     );
   }
 
-  if (!group || !isAdmin) {
+  if (!group || !isReviewer) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation />
