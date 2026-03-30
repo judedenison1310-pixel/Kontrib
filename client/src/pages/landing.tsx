@@ -358,47 +358,47 @@ export default function Landing() {
                     role: "Osusu Group Admin",
                     avatar: "BL",
                     gradient: "from-pink-500 to-rose-400",
-                    quote: "Managing our osusu used to be so stressful. Kontrib made it simple — even members who aren't tech-savvy love it.",
+                    quote: "Kontrib made our osusu so simple. Even the least tech-savvy members love it.",
                   },
                   {
                     name: "Dr Scalzy",
                     role: "Alpha FC Social Club Admin",
                     avatar: "DS",
                     gradient: "from-blue-500 to-cyan-400",
-                    quote: "We run Alpha FC's club contributions through Kontrib. Payment tracking and reminders have never been this smooth.",
+                    quote: "Payment tracking for our club has never been this smooth. Couldn't imagine going back.",
                   },
                   {
                     name: "Mrs Deb",
                     role: "Office Group Admin",
                     avatar: "MD",
                     gradient: "from-violet-500 to-purple-400",
-                    quote: "No more chasing colleagues for contributions. Kontrib handles all of it — collection, reminders, and records.",
+                    quote: "No more chasing colleagues. Kontrib handles collection, reminders, and records.",
                   },
                   {
                     name: "Bisi of Lagos",
                     role: "Osusu Group Admin",
                     avatar: "BL",
                     gradient: "from-pink-500 to-rose-400",
-                    quote: "Managing our osusu used to be so stressful. Kontrib made it simple — even members who aren't tech-savvy love it.",
+                    quote: "Kontrib made our osusu so simple. Even the least tech-savvy members love it.",
                   },
                   {
                     name: "Dr Scalzy",
                     role: "Alpha FC Social Club Admin",
                     avatar: "DS",
                     gradient: "from-blue-500 to-cyan-400",
-                    quote: "We run Alpha FC's club contributions through Kontrib. Payment tracking and reminders have never been this smooth.",
+                    quote: "Payment tracking for our club has never been this smooth. Couldn't imagine going back.",
                   },
                   {
                     name: "Mrs Deb",
                     role: "Office Group Admin",
                     avatar: "MD",
                     gradient: "from-violet-500 to-purple-400",
-                    quote: "No more chasing colleagues for contributions. Kontrib handles all of it — collection, reminders, and records.",
+                    quote: "No more chasing colleagues. Kontrib handles collection, reminders, and records.",
                   },
                 ].map((t, i) => (
                   <div
                     key={i}
-                    className="bg-gray-900 rounded-2xl p-5 flex-shrink-0 w-72 flex flex-col justify-between gap-4"
+                    className="flex-shrink-0 w-64 flex flex-col gap-3 px-2"
                   >
                     {/* Stars */}
                     <div className="flex items-center gap-0.5">
@@ -410,17 +410,17 @@ export default function Landing() {
                     </div>
 
                     {/* Quote */}
-                    <p className="text-sm text-gray-200 leading-relaxed flex-1">
+                    <p className="text-sm text-gray-700 leading-relaxed italic">
                       "{t.quote}"
                     </p>
 
                     {/* Author */}
-                    <div className="flex items-center gap-3 pt-1 border-t border-white/10">
-                      <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${t.gradient} flex items-center justify-center text-xs font-bold text-white shrink-0`}>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${t.gradient} flex items-center justify-center text-xs font-bold text-white shrink-0`}>
                         {t.avatar}
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-white leading-tight">{t.name}</p>
+                        <p className="text-xs font-semibold text-gray-800 leading-tight">{t.name}</p>
                         <p className="text-xs text-gray-400">{t.role}</p>
                       </div>
                     </div>
