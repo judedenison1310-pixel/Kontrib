@@ -332,20 +332,6 @@ export default function Landing() {
               </p>
             </div>
 
-            {/* Refer & Earn banner */}
-            <div
-              className="bg-yellow-400 border border-yellow-300 rounded-2xl p-4 flex items-center gap-3 cursor-pointer"
-              onClick={() => {}}
-            >
-              <div className="w-10 h-10 bg-yellow-300 rounded-xl flex items-center justify-center shrink-0">
-                <Gift className="h-5 w-5 text-yellow-800" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-yellow-900">Earn ₦20,000 per referral</p>
-                <p className="text-xs text-yellow-800 mt-0.5">Sign up → refer friends → get paid when their group hits 5 members</p>
-              </div>
-            </div>
-
             {/* Testimonials heading */}
             <div className="text-center">
               <p className="text-3xl font-extrabold text-gray-900 tracking-tight">Trusted by 100+ contribution groups</p>
@@ -426,6 +412,20 @@ export default function Landing() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            {/* Refer & Earn banner */}
+            <div
+              className="bg-yellow-400 border border-yellow-300 rounded-2xl p-4 flex items-center gap-3 cursor-pointer"
+              onClick={() => {}}
+            >
+              <div className="w-10 h-10 bg-yellow-300 rounded-xl flex items-center justify-center shrink-0">
+                <Gift className="h-5 w-5 text-yellow-800" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-yellow-900">Earn ₦20,000 per referral</p>
+                <p className="text-xs text-yellow-800 mt-0.5">Sign up → refer friends → get paid when their group hits 5 members</p>
               </div>
             </div>
 
