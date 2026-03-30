@@ -6,7 +6,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Shield, ArrowRight, Lock, CheckCircle2, Zap, Eye, ChevronDown, Gift } from "lucide-react";
+import { Users, Shield, ArrowRight, Lock, CheckCircle2, Zap, Eye, Gift } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { type User as UserType } from "@shared/schema";
 import { sendOtp, verifyOtp, updateProfile } from "@/lib/auth";
@@ -73,18 +73,8 @@ export default function Landing() {
   const [countryCode, setCountryCode] = useState("+234");
   const [newUser, setNewUser] = useState<UserType | null>(null);
   const [devOtp, setDevOtp] = useState<string | null>(null);
-  const [manualRefCode, setManualRefCode] = useState("");
-  const [showRefField, setShowRefField] = useState(false);
+  const [manualRefCode] = useState(() => localStorage.getItem(REF_KEY) || "");
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
-
-  // Pre-fill referral code from localStorage (set by /ref/:code capture)
-  useEffect(() => {
-    const stored = localStorage.getItem(REF_KEY);
-    if (stored) {
-      setManualRefCode(stored);
-      setShowRefField(true);
-    }
-  }, []);
 
   const selectedCountry = COUNTRY_CODES.find(c => c.code === countryCode) || COUNTRY_CODES[0];
 
@@ -337,49 +327,28 @@ export default function Landing() {
                 </form>
               </Form>
 
-              {/* Referral code input */}
-              <div className="mt-4">
-                {!showRefField ? (
-                  <button
-                    onClick={() => setShowRefField(true)}
-                    className="w-full text-center text-sm text-gray-400 hover:text-gray-600 transition-colors py-1"
-                    data-testid="button-show-ref-field"
-                  >
-                    Have a referral code?
-                  </button>
-                ) : (
-                  <div className="flex gap-2 mt-1">
-                    <input
-                      type="text"
-                      value={manualRefCode}
-                      onChange={(e) => setManualRefCode(e.target.value.toUpperCase())}
-                      placeholder="e.g. KTBAB123"
-                      className="flex-1 h-10 text-sm border border-gray-200 rounded-xl px-3 focus:outline-none focus:border-green-500 font-mono tracking-widest uppercase"
-                      data-testid="input-referral-code"
-                    />
-                    <button
-                      onClick={() => { setShowRefField(false); setManualRefCode(""); }}
-                      className="text-xs text-gray-400 hover:text-gray-600 px-2"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
-              </div>
+              <p className="text-center text-xs text-gray-400 mt-3">
+                Your number is only used to verify your identity — no spam, ever
+              </p>
             </div>
 
             {/* Refer & Earn banner */}
             <div
-              className="bg-primary/5 border border-primary/20 rounded-2xl p-4 flex items-center gap-3 cursor-pointer"
+              className="bg-yellow-400 border border-yellow-300 rounded-2xl p-4 flex items-center gap-3 cursor-pointer"
               onClick={() => {}}
             >
-              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
-                <Gift className="h-5 w-5 text-primary" />
+              <div className="w-10 h-10 bg-yellow-300 rounded-xl flex items-center justify-center shrink-0">
+                <Gift className="h-5 w-5 text-yellow-800" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-gray-800">Earn ₦20,000 per referral</p>
-                <p className="text-xs text-gray-500 mt-0.5">Sign up → refer friends → get paid when their group hits 5 members</p>
+                <p className="text-sm font-semibold text-yellow-900">Earn ₦20,000 per referral</p>
+                <p className="text-xs text-yellow-800 mt-0.5">Sign up → refer friends → get paid when their group hits 5 members</p>
               </div>
+            </div>
+
+            {/* Testimonials heading */}
+            <div className="text-center">
+              <p className="text-3xl font-extrabold text-gray-900 tracking-tight">Trusted by 100+ contribution groups</p>
             </div>
 
             {/* Testimonials - scrolling right to left */}
