@@ -817,6 +817,24 @@ export default function ProjectDetails() {
                 </div>
               </button>
             )}
+
+            {/* Public Report Link */}
+            <button
+              onClick={() => window.open(`/report/${projectId}`, "_blank")}
+              className="w-full flex items-center justify-between p-3 bg-green-50 rounded-xl hover:bg-green-100 transition-colors"
+              data-testid="link-public-report"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                  <Share2 className="w-5 h-5 text-green-600" />
+                </div>
+                <div className="text-left">
+                  <span className="font-medium text-gray-900 block">Shareable Report</span>
+                  <span className="text-xs text-gray-500">Share progress publicly on WhatsApp</span>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-gray-400 shrink-0" />
+            </button>
           </CardContent>
         </Card>
 

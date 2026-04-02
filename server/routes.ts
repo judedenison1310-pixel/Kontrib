@@ -1659,5 +1659,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
   
+  // Public contribution report — no auth required
+  app.get("/api/report/:projectId", async (req, res) => {
+    try {
+      const { projectId } = req.params;
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const group = await storage.getGroup(project.groupId);
+      if (!group) return res.status(404).json({ message: "Group not found" });
+
+      const contributions = await storage.getProjectContributions(projectId);
+      const confirmed = contributions.filter(c => c.status === "confirmed");
+      const pending = contributions.filter(c => c.status === "pending");
+
+      const totalConfirmed = confirmed.reduce((sum, c) => sum + Number(c.amount), 0);
+      const totalPending = pending.reduce((sum, c) => sum + Number(c.amount), 0);
+
+      res.json({
+        group: { id: group.id, name: group.name, description: group.description },
+        project: {
+          id: project.id,
+          name: project.name,
+          projectType: project.projectType,
+          currency: project.currency,
+          targetAmount: project.targetAmount,
+          collectedAmount: project.collectedAmount,
+          deadline: project.deadline,
+          status: project.status,
+          description: project.description,
+        },
+        summary: {
+          totalConfirmed,
+          totalPending,
+          confirmedCount: confirmed.length,
+          pendingCount: pending.length,
+          progressPercent: project.targetAmount && Number(project.targetAmount) > 0
+            ? Math.min(100, Math.round((totalConfirmed / Number(project.targetAmount)) * 100))
+            : null,
+        },
+        contributors: confirmed
+          .sort((a, b) => Number(b.amount) - Number(a.amount))
+          .map((c, i) => ({
+            rank: i + 1,
+            name: c.userName,
+            amount: Number(c.amount),
+            date: c.createdAt,
+          })),
+        generatedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Report error:", error);
+      res.status(500).json({ message: "Failed to generate report" });
+    }
+  });
+
   return httpServer;
 }
