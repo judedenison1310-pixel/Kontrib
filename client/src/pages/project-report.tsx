@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "wouter";
 import { formatCurrency, CurrencyCode } from "@/lib/currency";
-import { Loader2, CheckCircle2, Clock, Trophy, Share2, Printer, AlertCircle } from "lucide-react";
+import { Loader2, CheckCircle2, Clock, Trophy, Share2, Printer, AlertCircle, Users } from "lucide-react";
 import kontribLogo from "@assets/8_1764455185903.png";
 
 interface ReportData {
