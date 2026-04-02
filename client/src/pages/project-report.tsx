@@ -267,22 +267,51 @@ export default function ProjectReport() {
           )}
         </div>
 
-        {/* Footer */}
-        <div className="text-center space-y-3 pb-4">
-          <p className="text-xs text-gray-400">
-            Report generated {generatedDate}
-          </p>
-          <div className="flex items-center justify-center gap-2 print:hidden">
-            <img src={kontribLogo} alt="Kontrib" className="w-5 h-5" />
-            <span className="text-xs text-gray-400">Powered by <strong className="text-gray-600">Kontrib</strong> — Group contribution management</span>
-          </div>
+        {/* Share CTA */}
+        <div className="print:hidden text-center">
           <button
             onClick={handleShare}
-            className="print:hidden mx-auto flex items-center gap-2 px-5 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors"
+            className="mx-auto flex items-center gap-2 px-5 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors"
           >
             <Share2 className="h-4 w-4" />
             Share this Report on WhatsApp
           </button>
+        </div>
+
+        {/* Kontrib channel — visible to anyone viewing the public report */}
+        <div className="print:hidden bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-5 pt-5 pb-2 text-center">
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <img src={kontribLogo} alt="Kontrib" className="w-7 h-7" />
+              <span className="font-extrabold text-gray-900 text-base">Kontrib</span>
+            </div>
+            <p className="text-sm text-gray-500 leading-snug">
+              Manage group savings with full transparency — track contributions, approve payments, and share progress in real time.
+            </p>
+          </div>
+          <div className="p-4 grid grid-cols-2 gap-3">
+            <a
+              href="/"
+              className="flex flex-col items-center gap-1.5 p-3.5 rounded-xl bg-green-600 text-white text-center hover:bg-green-700 transition-colors"
+            >
+              <Users className="h-5 w-5" />
+              <span className="text-xs font-bold leading-tight">Start Your Group</span>
+              <span className="text-[10px] opacity-80 leading-tight">Free to get started</span>
+            </a>
+            <a
+              href="/"
+              className="flex flex-col items-center gap-1.5 p-3.5 rounded-xl bg-gray-900 text-white text-center hover:bg-gray-800 transition-colors"
+            >
+              <CheckCircle2 className="h-5 w-5" />
+              <span className="text-xs font-bold leading-tight">Log In</span>
+              <span className="text-[10px] opacity-60 leading-tight">Access your account</span>
+            </a>
+          </div>
+        </div>
+
+        {/* Generated timestamp */}
+        <div className="text-center pb-6">
+          <p className="text-xs text-gray-400">Report generated {generatedDate}</p>
         </div>
       </main>
     </div>
