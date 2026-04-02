@@ -1659,6 +1659,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
   
+  // Public disbursement report — no auth required
+  app.get("/api/disbursement-report/:projectId", async (req, res) => {
+    try {
+      const { projectId } = req.params;
+      const project = await storage.getProject(projectId);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      const group = await storage.getGroup(project.groupId);
+      if (!group) return res.status(404).json({ message: "Group not found" });
+
+      const disbursements = await storage.getDisbursementsByProject(projectId);
+
+      const totalDisbursed = disbursements.reduce((sum, d) => sum + Number(d.amount), 0);
+
+      res.json({
+        group: { id: group.id, name: group.name, description: group.description },
+        project: {
+          id: project.id,
+          name: project.name,
+          projectType: project.projectType,
+          currency: project.currency,
+          targetAmount: project.targetAmount,
+          collectedAmount: project.collectedAmount,
+          status: project.status,
+        },
+        summary: {
+          totalDisbursed,
+          count: disbursements.length,
+        },
+        disbursements: disbursements.map((d) => ({
+          id: d.id,
+          recipient: d.recipient,
+          purpose: d.purpose,
+          amount: Number(d.amount),
+          disbursementDate: d.disbursementDate,
+          hasReceipt: !!d.receipt,
+        })),
+        generatedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Disbursement report error:", error);
+      res.status(500).json({ message: "Failed to generate disbursement report" });
+    }
+  });
+
   // Public contribution report — no auth required
   app.get("/api/report/:projectId", async (req, res) => {
     try {

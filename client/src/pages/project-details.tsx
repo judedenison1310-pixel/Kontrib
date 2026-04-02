@@ -818,7 +818,7 @@ export default function ProjectDetails() {
               </button>
             )}
 
-            {/* Public Report Link */}
+            {/* Public Contribution Report Link */}
             <button
               onClick={() => window.open(`/report/${projectId}`, "_blank")}
               className="w-full flex items-center justify-between p-3 bg-green-50 rounded-xl hover:bg-green-100 transition-colors"
@@ -829,8 +829,26 @@ export default function ProjectDetails() {
                   <Share2 className="w-5 h-5 text-green-600" />
                 </div>
                 <div className="text-left">
-                  <span className="font-medium text-gray-900 block">Shareable Report</span>
-                  <span className="text-xs text-gray-500">Share progress publicly on WhatsApp</span>
+                  <span className="font-medium text-gray-900 block">Contribution Report</span>
+                  <span className="text-xs text-gray-500">Share who paid and how much</span>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-gray-400 shrink-0" />
+            </button>
+
+            {/* Public Disbursement Report Link */}
+            <button
+              onClick={() => window.open(`/disbursement-report/${projectId}`, "_blank")}
+              className="w-full flex items-center justify-between p-3 bg-orange-50 rounded-xl hover:bg-orange-100 transition-colors"
+              data-testid="link-disbursement-report"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                  <Banknote className="w-5 h-5 text-orange-600" />
+                </div>
+                <div className="text-left">
+                  <span className="font-medium text-gray-900 block">Disbursement Report</span>
+                  <span className="text-xs text-gray-500">Share how funds were spent</span>
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-gray-400 shrink-0" />

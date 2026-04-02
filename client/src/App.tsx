@@ -32,6 +32,7 @@ import ProjectContributors from "@/pages/project-contributors";
 import ProjectUnpaid from "@/pages/project-unpaid";
 import Referrals from "@/pages/referrals";
 import ProjectReport from "@/pages/project-report";
+import DisbursementReport from "@/pages/disbursement-report";
 import Ops from "@/pages/ops";
 
 const REF_KEY = "kontrib_referral_code";
@@ -203,6 +204,7 @@ function Router() {
       <Route path="/whatsapp">{user ? <WhatsAppIntegration /> : <Landing />}</Route>
       <Route path="/referrals">{user ? <Referrals /> : <Landing />}</Route>
       <Route path="/report/:projectId" component={ProjectReport} />
+      <Route path="/disbursement-report/:projectId" component={DisbursementReport} />
       <Route path="/ops" component={Ops} />
       
       {/* Short URL patterns - catches custom slugs like /groupname or /groupname/projectname */}
