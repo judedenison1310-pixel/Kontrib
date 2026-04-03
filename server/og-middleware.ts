@@ -100,6 +100,23 @@ export async function handleDynamicOGTags(
   if (urlPath.startsWith('/api/')) {
     return false;
   }
+
+  // Handle root and login paths — serve Kontrib branding OG tags
+  if (urlPath === '/' || urlPath === '/login' || urlPath === '') {
+    const host = req.get('host');
+    const protocol = host.includes('localhost') ? 'http' : 'https';
+    const baseUrl = `${protocol}://${host}`;
+
+    const html = generateOGHtml({
+      title: 'Track any contributions — Kontrib',
+      description: 'Organise and track group money contributions. Simple, transparent and easy to manage for Ajo, Osusu and any group savings.',
+      imageUrl: `${baseUrl}/hero.jpg`,
+      url: `${baseUrl}/`,
+      baseHtml,
+    });
+    res.status(200).set({ 'Content-Type': 'text/html' }).send(html);
+    return true;
+  }
   
   // Match multiple route patterns:
   // 1. /register/:groupLink

@@ -246,13 +246,21 @@ export default function Landing() {
       <main className="flex-1 max-w-lg mx-auto px-4 py-6 w-full">
         {step === "phone" && (
           <div className="space-y-8">
-            {/* Hero Image - text embedded in image */}
-            <div className="rounded-2xl overflow-hidden shadow-lg ml-4">
+            {/* Hero Image with text overlay */}
+            <div className="relative rounded-2xl overflow-hidden shadow-lg ml-4">
               <img 
                 src={heroImage} 
                 alt="Track group money with ease" 
                 className="w-full aspect-square object-cover"
               />
+              {/* Bottom gradient + bold headline overlay */}
+              <div className="absolute inset-0 flex items-end">
+                <div className="w-full bg-gradient-to-t from-black/70 via-black/30 to-transparent px-5 pb-6 pt-12">
+                  <p className="text-white font-extrabold text-2xl leading-tight drop-shadow-lg">
+                    Track any contributions
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* Login Card */}
