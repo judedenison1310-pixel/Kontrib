@@ -13,7 +13,7 @@ import { sendOtp, verifyOtp, updateProfile } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import kontribLogo from "@assets/8_1764455185903.png";
-import heroImage from "@assets/Landing_Page_Image_1773841158213.jpg";
+import heroImage from "@assets/IMG_2885_1775247892695.jpeg";
 
 const REF_KEY = "kontrib_referral_code";
 
@@ -251,15 +251,13 @@ export default function Landing() {
               <img 
                 src={heroImage} 
                 alt="Track group money with ease" 
-                className="w-full aspect-square object-cover"
+                className="w-full aspect-square object-cover object-top"
               />
-              {/* Bottom gradient + bold headline overlay */}
-              <div className="absolute inset-0 flex items-end">
-                <div className="w-full bg-gradient-to-t from-black/70 via-black/30 to-transparent px-5 pb-6 pt-12">
-                  <p className="text-white font-extrabold text-2xl leading-tight drop-shadow-lg">
-                    Track any contributions
-                  </p>
-                </div>
+              {/* Top-center bold headline overlay */}
+              <div className="absolute top-0 inset-x-0 flex justify-center pt-5 px-4">
+                <p className="text-gray-900 font-extrabold text-2xl leading-tight text-center drop-shadow-sm">
+                  Track any contributions
+                </p>
               </div>
             </div>
 
