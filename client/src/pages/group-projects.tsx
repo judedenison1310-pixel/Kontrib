@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import { Navigation } from "@/components/navigation";
 import { CreateProjectModal } from "@/components/create-project-modal";
@@ -20,7 +20,20 @@ import {
   Check,
   Pencil,
   Plus,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getCurrentUser } from "@/lib/auth";
 import { formatNaira } from "@/lib/currency";
 import { useToast } from "@/hooks/use-toast";
@@ -39,6 +52,20 @@ export default function GroupProjects() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [deleteGroupOpen, setDeleteGroupOpen] = useState(false);
+
+  const deleteGroupMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("DELETE", `/api/groups/${groupId}`, { userId: user?.id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/groups"] });
+      toast({ title: "Group deleted", description: "The group and all its data have been removed." });
+      setLocation("/groups");
+    },
+    onError: () => {
+      toast({ title: "Failed to delete group", variant: "destructive" });
+    },
+  });
 
   const { data: group, isLoading: groupLoading } = useQuery<Group>({
     queryKey: ["/api/groups", groupId],
@@ -149,15 +176,27 @@ export default function GroupProjects() {
             </h1>
             <p className="text-gray-500">{group.name}</p>
           </div>
-          {isAdmin && projects.length > 0 && (
-            <button
-              onClick={() => setCreateProjectModalOpen(true)}
-              className="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white shadow-lg hover:bg-primary/90 transition-colors"
-              data-testid="button-create-project-fab"
-            >
-              <Plus className="h-6 w-6" />
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <button
+                onClick={() => setDeleteGroupOpen(true)}
+                className="w-10 h-10 rounded-full flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                data-testid="button-delete-group"
+                title="Delete group"
+              >
+                <Trash2 className="h-5 w-5" />
+              </button>
+            )}
+            {isAdmin && projects.length > 0 && (
+              <button
+                onClick={() => setCreateProjectModalOpen(true)}
+                className="w-12 h-12 bg-amber-400 rounded-full flex items-center justify-center text-gray-900 shadow-lg hover:bg-amber-500 transition-colors"
+                data-testid="button-create-project-fab"
+              >
+                <Plus className="h-6 w-6" />
+              </button>
+            )}
+          </div>
         </div>
 
         {projects.length === 0 ? (
@@ -337,6 +376,36 @@ export default function GroupProjects() {
           project={editProject}
         />
       )}
+
+      {/* Delete Group Confirmation */}
+      <AlertDialog open={deleteGroupOpen} onOpenChange={setDeleteGroupOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              Delete "{group?.name}"?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <span className="block">
+                This will permanently delete the group along with <strong>all its projects, contributions, disbursements, and member records</strong>. This cannot be undone.
+              </span>
+              <span className="block text-red-600 font-medium">
+                Only you (the primary admin) can perform this action.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteGroupMutation.mutate()}
+              disabled={deleteGroupMutation.isPending}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {deleteGroupMutation.isPending ? "Deleting…" : "Yes, delete group"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

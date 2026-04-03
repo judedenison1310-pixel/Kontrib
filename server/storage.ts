@@ -48,6 +48,7 @@ export interface IStorage {
   getAllUserGroups(userId: string): Promise<GroupWithRole[]>;
   createGroup(group: InsertGroup, adminId: string): Promise<Group>;
   updateGroup(id: string, updates: Partial<Group>): Promise<Group | undefined>;
+  deleteGroup(id: string): Promise<boolean>;
   
   // Group member methods
   getGroupMembers(groupId: string): Promise<(GroupMember & { user: User })[]>;
@@ -382,6 +383,18 @@ export class MemStorage implements IStorage {
     const updatedGroup = { ...group, ...updates };
     this.groups.set(id, updatedGroup);
     return updatedGroup;
+  }
+
+  async deleteGroup(id: string): Promise<boolean> {
+    if (!this.groups.has(id)) return false;
+    // Cascade: remove all related data
+    for (const [mid, m] of this.groupMembers) { if (m.groupId === id) this.groupMembers.delete(mid); }
+    for (const [pid, p] of this.projects) { if (p.groupId === id) this.projects.delete(pid); }
+    for (const [cid, c] of this.contributions) { if (c.groupId === id) this.contributions.delete(cid); }
+    for (const [aid, a] of this.accountabilityPartners) { if (a.groupId === id) this.accountabilityPartners.delete(aid); }
+    for (const [did, d] of this.disbursementsMap) { if (d.groupId === id) this.disbursementsMap.delete(did); }
+    this.groups.delete(id);
+    return true;
   }
 
   async getGroupMembers(groupId: string): Promise<(GroupMember & { user: User })[]> {
@@ -1377,6 +1390,17 @@ export class DbStorage implements IStorage {
   async updateGroup(id: string, updates: Partial<Group>): Promise<Group | undefined> {
     const result = await db.update(groupsTable).set(updates).where(eq(groupsTable.id, id)).returning();
     return result[0];
+  }
+
+  async deleteGroup(id: string): Promise<boolean> {
+    // Cascade delete in FK-safe order
+    await db.delete(disbursementsTable).where(eq(disbursementsTable.groupId, id));
+    await db.delete(contributionsTable).where(eq(contributionsTable.groupId, id));
+    await db.delete(accountabilityPartnersTable).where(eq(accountabilityPartnersTable.groupId, id));
+    await db.delete(projectsTable).where(eq(projectsTable.groupId, id));
+    await db.delete(groupMembersTable).where(eq(groupMembersTable.groupId, id));
+    const result = await db.delete(groupsTable).where(eq(groupsTable.id, id)).returning();
+    return result.length > 0;
   }
 
   async getGroupMembers(groupId: string): Promise<(GroupMember & { user: User })[]> {

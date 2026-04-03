@@ -491,6 +491,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete group — primary admin only
+  app.delete("/api/groups/:groupId", async (req, res) => {
+    try {
+      const { groupId } = req.params;
+      const userId = req.body?.userId || req.query.userId;
+
+      const group = await storage.getGroup(groupId);
+      if (!group) return res.status(404).json({ message: "Group not found" });
+
+      if (group.adminId !== userId) {
+        return res.status(403).json({ message: "Only the primary admin can delete this group" });
+      }
+
+      await storage.deleteGroup(groupId);
+      res.json({ message: "Group deleted successfully" });
+    } catch (error) {
+      console.error("Delete group error:", error);
+      res.status(500).json({ message: "Failed to delete group" });
+    }
+  });
+
   // Manage co-admins (primary admin only, max 2)
   app.patch("/api/groups/:groupId/co-admins", async (req, res) => {
     try {

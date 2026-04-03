@@ -338,6 +338,16 @@ export default function ProjectReport() {
         <div className="text-center pb-6">
           <p className="text-xs text-gray-400">Report generated {generatedDate}</p>
         </div>
+
+        {/* Print-only footer */}
+        <div className="hidden print:block text-center py-4 border-t border-gray-200 mt-4">
+          <p className="text-xs text-gray-400">
+            Developed on{" "}
+            <a href="https://kontrib.app" className="text-green-600 font-semibold">
+              Kontrib.app
+            </a>
+          </p>
+        </div>
       </main>
     </div>
   );
