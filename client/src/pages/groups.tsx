@@ -223,6 +223,12 @@ export default function Groups() {
                             </button>
                           </>
                         )}
+                        {!isGroupAdmin(group) && (group.coAdmins ?? []).includes(user?.id ?? '') && (
+                          <span className="shrink-0 flex items-center gap-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                            <Shield className="h-2.5 w-2.5" />
+                            Co-admin
+                          </span>
+                        )}
                         {group.privacyMode === "private" && (
                           <span className="shrink-0 flex items-center gap-0.5 bg-gray-100 text-gray-500 text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
                             <Lock className="h-2.5 w-2.5" />

@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import {
   Dialog,
@@ -17,12 +17,22 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Loader2, Upload, X, ImageIcon } from "lucide-react";
+import { Loader2, Upload, X, Users } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import type { GroupMember, User } from "@shared/schema";
+
+type GroupMemberWithUser = GroupMember & { user: User };
 
 const schema = z.object({
   amount: z
@@ -31,6 +41,8 @@ const schema = z.object({
     .refine((v) => !isNaN(parseFloat(v)) && parseFloat(v) > 0, {
       message: "Enter a valid amount greater than 0",
     }),
+  recipientType: z.enum(["member", "other"]),
+  recipientUserId: z.string().optional(),
   recipient: z.string().min(2, "Recipient name is required"),
   purpose: z.string().min(3, "Purpose is required"),
   disbursementDate: z.string().min(1, "Date is required"),
@@ -42,6 +54,7 @@ interface AddDisbursementModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: string;
+  groupId: string;
   createdBy: string;
 }
 
@@ -49,6 +62,7 @@ export function AddDisbursementModal({
   open,
   onOpenChange,
   projectId,
+  groupId,
   createdBy,
 }: AddDisbursementModalProps) {
   const { toast } = useToast();
@@ -56,25 +70,38 @@ export function AddDisbursementModal({
   const [receiptPreview, setReceiptPreview] = useState<string>("");
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
 
+  const { data: members = [] } = useQuery<GroupMemberWithUser[]>({
+    queryKey: [`/api/groups/${groupId}/members`],
+    enabled: !!groupId && open,
+  });
+
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       amount: "",
+      recipientType: "member",
+      recipientUserId: "",
       recipient: "",
       purpose: "",
       disbursementDate: new Date().toISOString().split("T")[0],
     },
   });
 
+  const recipientType = form.watch("recipientType");
+
+  const handleMemberSelect = (userId: string) => {
+    form.setValue("recipientUserId", userId);
+    const member = members.find((m) => m.userId === userId);
+    if (member?.user?.fullName) {
+      form.setValue("recipient", member.user.fullName);
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: "File too large",
-        description: "Please select a file smaller than 5MB",
-        variant: "destructive",
-      });
+      toast({ title: "File too large", description: "Max 5MB", variant: "destructive" });
       return;
     }
     setReceiptFile(file);
@@ -102,25 +129,21 @@ export function AddDisbursementModal({
       apiRequest("POST", `/api/projects/${projectId}/disbursements`, {
         amount: values.amount,
         recipient: values.recipient,
+        recipientUserId: values.recipientType === "member" ? values.recipientUserId || null : null,
         purpose: values.purpose,
         disbursementDate: values.disbursementDate,
         receipt: receiptPreview || null,
         createdBy,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: [`/api/projects/${projectId}/disbursements`],
-      });
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/disbursements`] });
       toast({ title: "Disbursement recorded" });
       form.reset();
       removeReceipt();
       onOpenChange(false);
     },
     onError: () => {
-      toast({
-        title: "Failed to record disbursement",
-        variant: "destructive",
-      });
+      toast({ title: "Failed to record disbursement", variant: "destructive" });
     },
   });
 
@@ -141,31 +164,94 @@ export function AddDisbursementModal({
               name="amount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Amount (₦)</FormLabel>
+                  <FormLabel>Amount</FormLabel>
                   <FormControl>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="0.00"
-                      {...field}
-                    />
+                    <Input type="number" min="0" step="0.01" placeholder="0.00" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
+            {/* Recipient type toggle */}
             <FormField
               control={form.control}
-              name="recipient"
+              name="recipientType"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Recipient</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Who received the funds?" {...field} />
-                  </FormControl>
-                  <FormMessage />
+                  <div className="flex gap-2 mb-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        field.onChange("member");
+                        form.setValue("recipientUserId", "");
+                        form.setValue("recipient", "");
+                      }}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                        field.value === "member"
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                      }`}
+                    >
+                      <Users className="h-3.5 w-3.5" />
+                      Group Member
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        field.onChange("other");
+                        form.setValue("recipientUserId", "");
+                        form.setValue("recipient", "");
+                      }}
+                      className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                        field.value === "other"
+                          ? "bg-gray-800 text-white border-gray-800"
+                          : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                      }`}
+                    >
+                      Other Person
+                    </button>
+                  </div>
+
+                  {field.value === "member" ? (
+                    <FormField
+                      control={form.control}
+                      name="recipientUserId"
+                      render={() => (
+                        <FormItem>
+                          <Select onValueChange={handleMemberSelect}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Choose a group member…" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {members.map((m) => (
+                                <SelectItem key={m.userId} value={m.userId}>
+                                  {m.user?.fullName || m.user?.phoneNumber || m.userId}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ) : (
+                    <FormField
+                      control={form.control}
+                      name="recipient"
+                      render={({ field: f }) => (
+                        <FormItem>
+                          <FormControl>
+                            <Input placeholder="Recipient full name" {...f} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                 </FormItem>
               )}
             />
@@ -177,11 +263,7 @@ export function AddDisbursementModal({
                 <FormItem>
                   <FormLabel>Purpose</FormLabel>
                   <FormControl>
-                    <Textarea
-                      placeholder="What were the funds used for?"
-                      rows={2}
-                      {...field}
-                    />
+                    <Textarea placeholder="What were the funds used for?" rows={2} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -250,14 +332,8 @@ export function AddDisbursementModal({
               >
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                className="flex-1"
-                disabled={mutation.isPending}
-              >
-                {mutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : null}
+              <Button type="submit" className="flex-1" disabled={mutation.isPending}>
+                {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                 Record
               </Button>
             </div>

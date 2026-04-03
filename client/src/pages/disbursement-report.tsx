@@ -29,6 +29,9 @@ interface DisbursementReportData {
     amount: number;
     disbursementDate: string;
     hasReceipt: boolean;
+    memberConfirmed: boolean;
+    memberConfirmedAt: string | null;
+    isMemberRecipient: boolean;
   }[];
   generatedAt: string;
 }
@@ -246,7 +249,7 @@ export default function DisbursementReport() {
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2 mt-1.5">
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                       <p className="text-xs text-gray-400">
                         {new Date(d.disbursementDate).toLocaleDateString("en-NG", {
                           day: "numeric",
@@ -258,6 +261,16 @@ export default function DisbursementReport() {
                         <span className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
                           <Receipt className="h-3 w-3" />
                           Receipt attached
+                        </span>
+                      )}
+                      {d.isMemberRecipient && d.memberConfirmed && (
+                        <span className="flex items-center gap-1 text-xs text-green-700 bg-green-100 px-2 py-0.5 rounded-full font-semibold">
+                          ✓ Confirmed by Member
+                        </span>
+                      )}
+                      {d.isMemberRecipient && !d.memberConfirmed && (
+                        <span className="flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
+                          ⏳ Awaiting Confirmation
                         </span>
                       )}
                     </div>

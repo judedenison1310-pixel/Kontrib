@@ -77,14 +77,17 @@ export const disbursements = pgTable("disbursements", {
   groupId: varchar("group_id").notNull().references(() => groups.id),
   amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
   recipient: text("recipient").notNull(),
+  recipientUserId: varchar("recipient_user_id").references(() => users.id), // Set if recipient is a group member
   purpose: text("purpose").notNull(),
   disbursementDate: timestamp("disbursement_date").notNull(),
   receipt: text("receipt"), // Base64 encoded receipt image
+  memberConfirmed: boolean("member_confirmed").notNull().default(false), // Member confirmed receipt
+  memberConfirmedAt: timestamp("member_confirmed_at"), // When member confirmed
   createdBy: varchar("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
-export const insertDisbursementSchema = createInsertSchema(disbursements).omit({ id: true, createdAt: true });
+export const insertDisbursementSchema = createInsertSchema(disbursements).omit({ id: true, createdAt: true, memberConfirmed: true, memberConfirmedAt: true });
 export type InsertDisbursement = z.infer<typeof insertDisbursementSchema>;
 export type Disbursement = typeof disbursements.$inferSelect;
 

@@ -581,6 +581,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updatedGroup = await storage.updateGroup(groupId, { coAdmins: updatedCoAdmins });
+
+      // Notify the newly assigned co-admin
+      if (action === "add") {
+        try {
+          const newCoAdmin = await storage.getUser(userId);
+          if (newCoAdmin) {
+            const notification = await storage.createNotification({
+              userId,
+              type: "co_admin_assigned",
+              title: "You're now a Co-Admin",
+              message: `You have been appointed as a co-admin of "${group.name}". You can now approve/reject contribution receipts.`,
+            });
+            broadcastNotification(userId, notification);
+          }
+        } catch (notifErr) {
+          console.error("Co-admin notification error:", notifErr);
+        }
+      }
+
       res.json(updatedGroup);
     } catch (error) {
       console.error("Manage co-admins error:", error);
@@ -1001,12 +1020,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         projectId,
         groupId: project.groupId,
         disbursementDate: new Date(req.body.disbursementDate),
+        recipientUserId: req.body.recipientUserId || null,
       };
       const disbursement = await storage.createDisbursement(data);
+
+      // Notify the recipient member if they are a group member
+      if (req.body.recipientUserId) {
+        try {
+          const group = await storage.getGroup(project.groupId);
+          const notification = await storage.createNotification({
+            userId: req.body.recipientUserId,
+            type: "disbursement_received",
+            title: "Funds Disbursed to You",
+            message: `You have received a disbursement of ${req.body.amount} from "${group?.name ?? "your group"}". Please confirm receipt in the app.`,
+          });
+          broadcastNotification(req.body.recipientUserId, notification);
+        } catch (notifErr) {
+          console.error("Disbursement notification error:", notifErr);
+        }
+      }
+
       res.status(201).json(disbursement);
     } catch (error) {
       console.error("Create disbursement error:", error);
       res.status(500).json({ message: "Failed to create disbursement" });
+    }
+  });
+
+  // Member confirms receipt of disbursement
+  app.post("/api/disbursements/:id/confirm", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { userId } = req.body;
+      const disbursement = await storage.getDisbursement(id);
+      if (!disbursement) return res.status(404).json({ message: "Disbursement not found" });
+      if (disbursement.recipientUserId !== userId) {
+        return res.status(403).json({ message: "Only the recipient member can confirm this disbursement" });
+      }
+      const updated = await storage.confirmDisbursement(id);
+      res.json(updated);
+    } catch (error) {
+      console.error("Confirm disbursement error:", error);
+      res.status(500).json({ message: "Failed to confirm disbursement" });
     }
   });
 
@@ -1731,11 +1786,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         disbursements: disbursements.map((d) => ({
           id: d.id,
-          recipient: d.recipient,
+          recipient: (group.privacyMode === "private" && d.recipientUserId) ? "Member" : d.recipient,
           purpose: d.purpose,
           amount: Number(d.amount),
           disbursementDate: d.disbursementDate,
           hasReceipt: !!d.receipt,
+          memberConfirmed: d.memberConfirmed,
+          memberConfirmedAt: d.memberConfirmedAt,
+          isMemberRecipient: !!d.recipientUserId,
         })),
         generatedAt: new Date().toISOString(),
       });

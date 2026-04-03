@@ -108,6 +108,20 @@ export default function ProjectDetails() {
     },
   });
 
+  const confirmDisbursementMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiRequest("POST", `/api/disbursements/${id}/confirm`, { userId: user?.id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [`/api/projects/${projectId}/disbursements`],
+      });
+      toast({ title: "Receipt confirmed!", description: "You've confirmed receiving these funds." });
+    },
+    onError: () => {
+      toast({ title: "Could not confirm receipt", variant: "destructive" });
+    },
+  });
+
   const isLoading = projectLoading || contributionsLoading;
   const isAdmin = user?.id === group?.adminId;
 
@@ -659,49 +673,78 @@ export default function ProjectDetails() {
               {/* Disbursement list */}
               {disbursements.length > 0 && (
                 <div className="space-y-2 pt-1">
-                  {disbursements.map((d) => (
-                    <div
-                      key={d.id}
-                      className="flex items-start justify-between gap-3 p-3 bg-gray-50 rounded-xl"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-gray-900 truncate">{d.recipient}</p>
-                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{d.purpose}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {new Date(d.disbursementDate).toLocaleDateString("en-NG", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <span className="text-sm font-semibold text-orange-700">
-                          {formatCurrency(parseFloat(d.amount), projectCurrency)}
-                        </span>
-                        {d.receipt && (
+                  {disbursements.map((d) => {
+                    const isMyReceipt = d.recipientUserId === user?.id;
+                    const canConfirm = isMyReceipt && !d.memberConfirmed;
+                    return (
+                      <div
+                        key={d.id}
+                        className="p-3 bg-gray-50 rounded-xl space-y-2"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="text-sm font-medium text-gray-900 truncate">{d.recipient}</p>
+                              {d.memberConfirmed && (
+                                <span className="flex items-center gap-0.5 bg-green-100 text-green-700 text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
+                                  <Check className="w-2.5 h-2.5" />
+                                  Confirmed
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{d.purpose}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {new Date(d.disbursementDate).toLocaleDateString("en-NG", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              })}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className="text-sm font-semibold text-orange-700">
+                              {formatCurrency(parseFloat(d.amount), projectCurrency)}
+                            </span>
+                            {d.receipt && (
+                              <button
+                                onClick={() => setViewingReceipt(d.receipt!)}
+                                className="text-gray-400 hover:text-primary transition-colors p-1"
+                                title="View receipt"
+                                data-testid={`button-view-receipt-${d.id}`}
+                              >
+                                <Receipt className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            {isAdmin && (
+                              <button
+                                onClick={() => deleteDisbursementMutation.mutate(d.id)}
+                                disabled={deleteDisbursementMutation.isPending}
+                                className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                                data-testid={`button-delete-disbursement-${d.id}`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        {canConfirm && (
                           <button
-                            onClick={() => setViewingReceipt(d.receipt!)}
-                            className="text-gray-400 hover:text-primary transition-colors p-1"
-                            title="View receipt"
-                            data-testid={`button-view-receipt-${d.id}`}
+                            onClick={() => confirmDisbursementMutation.mutate(d.id)}
+                            disabled={confirmDisbursementMutation.isPending}
+                            className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50"
+                            data-testid={`button-confirm-disbursement-${d.id}`}
                           >
-                            <Receipt className="w-3.5 h-3.5" />
+                            {confirmDisbursementMutation.isPending ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <Check className="w-3 h-3" />
+                            )}
+                            Confirm I Received These Funds
                           </button>
                         )}
-                        {isAdmin && (
-                          <button
-                            onClick={() => deleteDisbursementMutation.mutate(d.id)}
-                            disabled={deleteDisbursementMutation.isPending}
-                            className="text-gray-400 hover:text-red-500 transition-colors p-1"
-                            data-testid={`button-delete-disbursement-${d.id}`}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
@@ -885,11 +928,12 @@ export default function ProjectDetails() {
         />
       )}
 
-      {projectId && user && (
+      {projectId && user && project?.groupId && (
         <AddDisbursementModal
           open={disbursementModalOpen}
           onOpenChange={setDisbursementModalOpen}
           projectId={projectId}
+          groupId={project.groupId}
           createdBy={user.id}
         />
       )}

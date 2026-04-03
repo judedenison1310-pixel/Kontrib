@@ -90,8 +90,10 @@ export interface IStorage {
 
   // Disbursement methods
   getDisbursementsByProject(projectId: string): Promise<Disbursement[]>;
+  getDisbursement(id: string): Promise<Disbursement | undefined>;
   createDisbursement(disbursement: InsertDisbursement): Promise<Disbursement>;
   deleteDisbursement(id: string): Promise<boolean>;
+  confirmDisbursement(id: string): Promise<Disbursement | undefined>;
 
   // Referral methods
   getOrCreateReferralCode(userId: string): Promise<string>;
@@ -1096,9 +1098,16 @@ export class MemStorage implements IStorage {
       .sort((a, b) => new Date(b.disbursementDate).getTime() - new Date(a.disbursementDate).getTime());
   }
 
+  async getDisbursement(id: string): Promise<Disbursement | undefined> {
+    return this.disbursementsMap.get(id);
+  }
+
   async createDisbursement(data: InsertDisbursement): Promise<Disbursement> {
     const disbursement: Disbursement = {
       ...data,
+      recipientUserId: data.recipientUserId ?? null,
+      memberConfirmed: false,
+      memberConfirmedAt: null,
       id: randomUUID(),
       createdAt: new Date(),
     };
@@ -1108,6 +1117,14 @@ export class MemStorage implements IStorage {
 
   async deleteDisbursement(id: string): Promise<boolean> {
     return this.disbursementsMap.delete(id);
+  }
+
+  async confirmDisbursement(id: string): Promise<Disbursement | undefined> {
+    const d = this.disbursementsMap.get(id);
+    if (!d) return undefined;
+    const updated = { ...d, memberConfirmed: true, memberConfirmedAt: new Date() };
+    this.disbursementsMap.set(id, updated);
+    return updated;
   }
 
   async getOrCreateReferralCode(_userId: string): Promise<string> { return ""; }
@@ -1932,6 +1949,11 @@ export class DbStorage implements IStorage {
       .orderBy(desc(disbursementsTable.disbursementDate));
   }
 
+  async getDisbursement(id: string): Promise<Disbursement | undefined> {
+    const [d] = await db.select().from(disbursementsTable).where(eq(disbursementsTable.id, id));
+    return d;
+  }
+
   async createDisbursement(data: InsertDisbursement): Promise<Disbursement> {
     const [disbursement] = await db
       .insert(disbursementsTable)
@@ -1943,6 +1965,15 @@ export class DbStorage implements IStorage {
   async deleteDisbursement(id: string): Promise<boolean> {
     await db.delete(disbursementsTable).where(eq(disbursementsTable.id, id));
     return true;
+  }
+
+  async confirmDisbursement(id: string): Promise<Disbursement | undefined> {
+    const [updated] = await db
+      .update(disbursementsTable)
+      .set({ memberConfirmed: true, memberConfirmedAt: new Date() })
+      .where(eq(disbursementsTable.id, id))
+      .returning();
+    return updated;
   }
 
   // Referral methods
