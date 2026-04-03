@@ -13,7 +13,7 @@ import { sendOtp, verifyOtp, updateProfile } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import kontribLogo from "@assets/8_1764455185903.png";
-import heroImage from "@assets/IMG_2885_1775247892695.jpeg";
+import heroImage from "@assets/Black_and_White_Modern_Linkedln_Profile_Picture_1775248813485.png";
 
 const REF_KEY = "kontrib_referral_code";
 
@@ -246,19 +246,13 @@ export default function Landing() {
       <main className="flex-1 max-w-lg mx-auto px-4 py-6 w-full">
         {step === "phone" && (
           <div className="space-y-8">
-            {/* Hero Image with text overlay */}
-            <div className="relative rounded-2xl overflow-hidden shadow-lg ml-4">
+            {/* Hero Image */}
+            <div className="rounded-2xl overflow-hidden shadow-lg ml-4">
               <img 
                 src={heroImage} 
-                alt="Track group money with ease" 
+                alt="Track any contributions" 
                 className="w-full aspect-square object-cover object-top"
               />
-              {/* Top-center bold headline overlay */}
-              <div className="absolute top-0 inset-x-0 flex justify-center pt-5 px-4">
-                <p className="text-gray-900 font-extrabold text-2xl leading-tight text-center drop-shadow-sm">
-                  Track any contributions
-                </p>
-              </div>
             </div>
 
             {/* Login Card */}
