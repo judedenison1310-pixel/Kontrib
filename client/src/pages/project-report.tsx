@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "wouter";
 import { formatCurrency, CurrencyCode } from "@/lib/currency";
-import { Loader2, CheckCircle2, Clock, Trophy, Share2, Printer, AlertCircle, Users } from "lucide-react";
+import { Loader2, CheckCircle2, Clock, Trophy, Share2, Printer, AlertCircle, Users, ArrowLeft } from "lucide-react";
 import kontribLogo from "@assets/8_1764455185903.png";
 
 interface ReportData {
@@ -111,6 +111,13 @@ export default function ProjectReport() {
       {/* Action bar — hidden on print */}
       <div className="print:hidden sticky top-0 z-10 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2">
+          <a
+            href={`/project/${projectId}`}
+            className="p-1.5 rounded-lg text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors"
+            title="Back to project"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </a>
           <img src={kontribLogo} alt="Kontrib" className="w-7 h-7" />
           <span className="font-bold text-gray-900 text-sm">Kontrib Report</span>
         </div>

@@ -199,11 +199,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get member count
       const members = await storage.getGroupMembers(group.id);
       
-      // Check if current user is already a member
+      // Check if current user is already a member, auto-add if not
       let isMember = false;
       if (userId && typeof userId === 'string') {
         const membership = await storage.getGroupMember(group.id, userId);
         isMember = !!membership;
+
+        if (!isMember) {
+          try {
+            await storage.addGroupMember({ groupId: group.id, userId });
+            isMember = true;
+            console.log(`Auto-added user ${userId} to group ${group.id} via registration link`);
+          } catch (addError) {
+            console.error("Failed to auto-add user to group:", addError);
+          }
+        }
       }
       
       // Calculate totals across all projects
@@ -258,11 +268,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get member count
       const members = await storage.getGroupMembers(group.id);
       
-      // Check if current user is already a member
+      // Check if current user is already a member, auto-add if not
       let isMember = false;
       if (userId && typeof userId === 'string') {
         const membership = await storage.getGroupMember(group.id, userId);
         isMember = !!membership;
+
+        if (!isMember) {
+          try {
+            await storage.addGroupMember({ groupId: group.id, userId });
+            isMember = true;
+            console.log(`Auto-added user ${userId} to group ${group.id} via group slug link`);
+          } catch (addError) {
+            console.error("Failed to auto-add user to group:", addError);
+          }
+        }
       }
       
       // Calculate totals across all projects

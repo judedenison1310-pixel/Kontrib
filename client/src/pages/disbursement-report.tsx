@@ -3,7 +3,7 @@ import { useParams } from "wouter";
 import { formatCurrency, CurrencyCode } from "@/lib/currency";
 import {
   Loader2, Share2, Printer, AlertCircle, Users,
-  Banknote, Receipt, ArrowDownCircle, CheckCircle2,
+  Banknote, Receipt, ArrowDownCircle, CheckCircle2, ArrowLeft,
 } from "lucide-react";
 import kontribLogo from "@assets/8_1764455185903.png";
 
@@ -123,6 +123,13 @@ export default function DisbursementReport() {
       {/* Action bar */}
       <div className="print:hidden sticky top-0 z-10 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2">
+          <a
+            href={`/project/${projectId}`}
+            className="p-1.5 rounded-lg text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors"
+            title="Back to project"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </a>
           <img src={kontribLogo} alt="Kontrib" className="w-7 h-7" />
           <span className="font-bold text-gray-900 text-sm">Disbursement Report</span>
         </div>
