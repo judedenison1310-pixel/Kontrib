@@ -5,6 +5,7 @@ import { Loader2, CheckCircle2, Clock, Trophy, Share2, Printer, AlertCircle, Use
 import kontribLogo from "@assets/8_1764455185903.png";
 
 interface ReportData {
+  isPrivate: boolean;
   group: { id: string; name: string; description?: string };
   project: {
     id: string;
@@ -226,17 +227,39 @@ export default function ProjectReport() {
           </div>
         )}
 
-        {/* Contributors list */}
+        {/* Contributors section */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
             <h2 className="font-bold text-gray-900 flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-green-600" />
-              Confirmed Contributors
+              Contributors
             </h2>
-            <span className="text-sm font-semibold text-gray-500">{report.contributors.length}</span>
+            <span className="text-sm font-semibold text-gray-500">
+              {report.summary.confirmedCount}
+            </span>
           </div>
 
-          {report.contributors.length === 0 ? (
+          {report.isPrivate ? (
+            /* Private group — aggregate only, no names */
+            <div className="px-5 py-8 text-center space-y-3">
+              <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto">
+                <Users className="h-7 w-7 text-gray-400" />
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900">
+                  {report.summary.confirmedCount} member{report.summary.confirmedCount !== 1 ? "s" : ""} contributed
+                </p>
+                {report.summary.pendingCount > 0 && (
+                  <p className="text-sm text-gray-400 mt-0.5">
+                    {report.summary.pendingCount} pending review
+                  </p>
+                )}
+              </div>
+              <p className="text-xs text-gray-400 max-w-xs mx-auto">
+                Member identities are kept private in this group. Only the admin can view individual records.
+              </p>
+            </div>
+          ) : report.contributors.length === 0 ? (
             <div className="py-12 text-center">
               <p className="text-gray-400 text-sm">No confirmed contributions yet</p>
             </div>
@@ -255,7 +278,9 @@ export default function ProjectReport() {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-900 truncate">{c.name}</p>
                     <p className="text-xs text-gray-400">
-                      {new Date(c.date).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
+                      {new Date(c.date).toLocaleDateString("en-NG", {
+                        day: "numeric", month: "short", year: "numeric",
+                      })}
                     </p>
                   </div>
                   <p className="font-bold text-green-600 shrink-0">

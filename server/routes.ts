@@ -1734,6 +1734,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: project.status,
           description: project.description,
         },
+        isPrivate: group.privacyMode === "private",
         summary: {
           totalConfirmed,
           totalPending,
@@ -1743,14 +1744,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ? Math.min(100, Math.round((totalConfirmed / Number(project.targetAmount)) * 100))
             : null,
         },
-        contributors: confirmed
-          .sort((a, b) => Number(b.amount) - Number(a.amount))
-          .map((c, i) => ({
-            rank: i + 1,
-            name: c.userName,
-            amount: Number(c.amount),
-            date: c.createdAt,
-          })),
+        // Private groups: omit individual names — return aggregate only
+        contributors: group.privacyMode === "private"
+          ? []
+          : confirmed
+              .sort((a, b) => Number(b.amount) - Number(a.amount))
+              .map((c, i) => ({
+                rank: i + 1,
+                name: c.userName,
+                amount: Number(c.amount),
+                date: c.createdAt,
+              })),
         generatedAt: new Date().toISOString(),
       });
     } catch (error) {
