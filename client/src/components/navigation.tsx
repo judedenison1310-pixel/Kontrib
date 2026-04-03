@@ -53,10 +53,10 @@ export function Navigation() {
               </div>
             </Link>
 
-            {/* Refer & Earn button (replaces Secure badge) */}
+            {/* Refer & Earn button */}
             <Link href="/referrals">
               <div
-                className="flex items-center gap-1.5 bg-primary text-white text-sm font-semibold px-3.5 py-1.5 rounded-full cursor-pointer hover:bg-primary/90 transition-colors"
+                className="flex items-center gap-1.5 bg-amber-400 text-gray-900 text-sm font-bold px-3.5 py-1.5 rounded-full cursor-pointer hover:bg-amber-500 transition-colors shadow-sm"
                 data-testid="button-refer-header"
               >
                 <Gift className="h-4 w-4" />
@@ -154,7 +154,7 @@ export function Navigation() {
                             <link.icon className="h-5 w-5" />
                             <span className="font-medium">{link.label}</span>
                             {link.href === "/referrals" && (
-                              <span className="ml-auto text-xs bg-primary text-white px-2 py-0.5 rounded-full">
+                              <span className="ml-auto text-xs bg-amber-400 text-gray-900 font-bold px-2 py-0.5 rounded-full">
                                 ₦20k
                               </span>
                             )}
@@ -191,20 +191,24 @@ export function Navigation() {
       </header>
 
       {/* Bottom Navigation Bar - Mobile Only */}
-      <nav className="sm:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 safe-bottom">
+      <nav className="sm:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-50 safe-bottom">
         <div className="grid grid-cols-4 h-16">
           {navLinks.map((link) => (
             <Link key={link.href} href={link.href}>
               <div
-                className={`flex flex-col items-center justify-center h-full gap-1 transition-colors ${
-                  isActive(link.href)
-                    ? "text-primary"
-                    : "text-gray-500"
+                className={`relative flex flex-col items-center justify-center h-full gap-1 transition-colors ${
+                  isActive(link.href) ? "text-gray-900" : "text-gray-400"
                 }`}
                 data-testid={`nav-${link.label.toLowerCase().replace(" ", "-")}`}
               >
+                {/* Yellow active indicator line at top */}
+                {isActive(link.href) && (
+                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-[3px] bg-amber-400 rounded-b-full" />
+                )}
                 <link.icon className={`h-5 w-5 ${isActive(link.href) ? "stroke-[2.5]" : ""}`} />
-                <span className="text-[10px] font-medium">{link.label}</span>
+                <span className={`text-[10px] font-medium ${isActive(link.href) ? "font-bold" : ""}`}>
+                  {link.label}
+                </span>
               </div>
             </Link>
           ))}

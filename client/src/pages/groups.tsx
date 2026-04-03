@@ -82,7 +82,7 @@ export default function Groups() {
           </div>
           <button
             onClick={() => setCreateGroupModalOpen(true)}
-            className="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white shadow-lg hover:bg-primary/90 transition-colors"
+            className="w-12 h-12 bg-amber-400 rounded-full flex items-center justify-center text-gray-900 shadow-lg hover:bg-amber-500 transition-colors"
             data-testid="button-create-group-fab"
           >
             <Plus className="h-6 w-6" />
@@ -107,7 +107,7 @@ export default function Groups() {
                 onClick={() => setActiveFilter('admin')}
                 className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
                   activeFilter === 'admin'
-                    ? 'bg-green-600 text-white'
+                    ? 'bg-amber-400 text-gray-900'
                     : 'bg-white text-gray-600 border border-gray-200'
                 }`}
                 data-testid="filter-admin"
@@ -158,7 +158,7 @@ export default function Groups() {
                   </p>
                   <Button
                     onClick={() => setCreateGroupModalOpen(true)}
-                    className="bg-primary hover:bg-primary/90"
+                    className="bg-amber-400 hover:bg-amber-500 text-gray-900 font-bold"
                     data-testid="button-create-first-group"
                   >
                     <Plus className="h-4 w-4 mr-2" />
@@ -189,30 +189,38 @@ export default function Groups() {
             {filteredGroups.map((group) => (
               <Card
                 key={group.id}
-                className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all cursor-pointer active:scale-[0.99]"
+                className={`bg-white rounded-2xl border shadow-sm hover:shadow-md transition-all cursor-pointer active:scale-[0.99] ${
+                  isGroupAdmin(group) ? "border-amber-200" : "border-gray-100"
+                }`}
                 onClick={() => setLocation(`/group/${group.id}/projects`)}
                 data-testid={`group-card-${group.id}`}
               >
                 <CardContent className="p-0">
                   <div className="p-4">
-                    {/* Top row: name + edit */}
+                    {/* Top row: name + badges + edit */}
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-1.5 flex-1 min-w-0">
                         <h3 className="font-bold text-gray-900 truncate" data-testid={`text-group-name-${group.id}`}>
                           {group.name}
                         </h3>
                         {isGroupAdmin(group) && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingGroup(group);
-                              setEditGroupModalOpen(true);
-                            }}
-                            className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors shrink-0"
-                            data-testid={`button-edit-group-name-${group.id}`}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
+                          <>
+                            <span className="shrink-0 flex items-center gap-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                              <Crown className="h-2.5 w-2.5" />
+                              Admin
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingGroup(group);
+                                setEditGroupModalOpen(true);
+                              }}
+                              className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors shrink-0"
+                              data-testid={`button-edit-group-name-${group.id}`}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>
@@ -286,12 +294,12 @@ export default function Groups() {
         {/* Prompt member-only users to start their own group */}
         {groups.length > 0 && adminCount === 0 && (
           <div
-            className="rounded-2xl border-2 border-dashed border-green-200 bg-green-50 p-5 flex items-start gap-4 cursor-pointer hover:bg-green-100 transition-colors"
+            className="rounded-2xl border-2 border-dashed border-amber-200 bg-amber-50 p-5 flex items-start gap-4 cursor-pointer hover:bg-amber-100 transition-colors"
             onClick={() => setCreateGroupModalOpen(true)}
             data-testid="banner-create-own-group"
           >
-            <div className="w-11 h-11 rounded-xl bg-green-100 flex items-center justify-center shrink-0">
-              <Crown className="h-5 w-5 text-green-600" />
+            <div className="w-11 h-11 rounded-xl bg-amber-200 flex items-center justify-center shrink-0">
+              <Crown className="h-5 w-5 text-amber-700" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-bold text-gray-900 mb-0.5">Start your own group</p>
@@ -301,7 +309,7 @@ export default function Groups() {
             </div>
             <button
               onClick={(e) => { e.stopPropagation(); setCreateGroupModalOpen(true); }}
-              className="shrink-0 bg-primary text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-primary/90 transition-colors"
+              className="shrink-0 bg-amber-400 text-gray-900 text-sm font-bold px-4 py-2 rounded-xl hover:bg-amber-500 transition-colors"
               data-testid="button-create-own-group"
             >
               Create
