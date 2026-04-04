@@ -13,7 +13,7 @@ import { sendOtp, verifyOtp, updateProfile } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import kontribLogo from "@assets/8_1764455185903.png";
-import heroImage from "@assets/Black_and_White_Modern_Linkedln_Profile_Picture_1775248813485.png";
+import heroImage from "@assets/Black_and_White_Modern_Linkedln_Profile_Picture_1775281689928.png";
 
 const REF_KEY = "kontrib_referral_code";
 
