@@ -59,8 +59,8 @@ export default function Groups() {
     const msg =
       `💰 Join our group on Kontrib!\n\n` +
       `We use Kontrib to track all our contributions — Ajo, dues, everything. No more chasing people or confusion about who paid.\n\n` +
-      `👇 Tap to join *${group.name}*:\n${groupLink}\n\n` +
-      `✅ Sign up free in 30 seconds\n✅ See contributions in real time\n✅ No spreadsheets needed`;
+      `👇 Tap to join ${group.name}:\n${groupLink}\n` +
+      `Sign up free in 30 seconds`;
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   };
 
