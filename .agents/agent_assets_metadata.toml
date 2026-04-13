@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "cn_FBeLgHInE7QB3Hu4YZ"
+uri = "file://kontrib_users.csv"
+type = "table"
+title = "Kontrib Signed-Up Users"
