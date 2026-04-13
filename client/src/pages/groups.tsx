@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Navigation } from "@/components/navigation";
 import { CreateGroupModal } from "@/components/create-group-modal";
 import { EditNameModal } from "@/components/edit-name-modal";
+import { SiWhatsapp } from "react-icons/si";
 import { 
   Users, 
   Plus, 
@@ -39,6 +40,29 @@ export default function Groups() {
     queryKey: ["/api/groups", "all", user?.id],
     enabled: !!user,
   });
+
+  const { data: referralData } = useQuery<{ code: string }>({
+    queryKey: ["/api/referrals/me", user?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/referrals/me?userId=${user?.id}`);
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: !!user?.id,
+  });
+
+  const shareGroupViaWhatsApp = (group: GroupWithRole) => {
+    const slug = group.customSlug || group.registrationLink;
+    const baseLink = `${window.location.origin}/${slug}`;
+    const refCode = referralData?.code;
+    const groupLink = refCode ? `${baseLink}?ref=${refCode}` : baseLink;
+    const msg =
+      `💰 Join our group on Kontrib!\n\n` +
+      `We use Kontrib to track all our contributions — Ajo, dues, everything. No more chasing people or confusion about who paid.\n\n` +
+      `👇 Tap to join *${group.name}*:\n${groupLink}\n\n` +
+      `✅ Sign up free in 30 seconds\n✅ See contributions in real time\n✅ No spreadsheets needed`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+  };
 
   const filteredGroups = groups
     .filter((group) => group.name.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -281,7 +305,7 @@ export default function Groups() {
                         e.stopPropagation();
                         setLocation(`/group/${group.id}/pending`);
                       }}
-                      className="w-full flex items-center justify-between px-4 py-3 bg-orange-50 border-t border-orange-100 rounded-b-2xl hover:bg-orange-100 transition-colors"
+                      className="w-full flex items-center justify-between px-4 py-3 bg-orange-50 border-t border-orange-100 hover:bg-orange-100 transition-colors"
                       data-testid={`button-pending-approvals-${group.id}`}
                     >
                       <div className="flex items-center gap-2">
@@ -298,6 +322,31 @@ export default function Groups() {
                       </div>
                     </button>
                   ) : null}
+
+                  {/* Invite & Earn strip — admins only */}
+                  {isGroupAdmin(group) && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        shareGroupViaWhatsApp(group);
+                      }}
+                      className="w-full flex items-center justify-between px-4 py-3 bg-green-50 border-t border-green-100 rounded-b-2xl hover:bg-green-100 transition-colors"
+                      data-testid={`button-invite-earn-${group.id}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                          <SiWhatsapp className="h-3.5 w-3.5 text-white" />
+                        </div>
+                        <span className="text-sm font-semibold text-green-700">
+                          Invite members &amp; earn
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 text-green-600 text-sm font-medium">
+                        Share
+                        <ChevronRight className="h-4 w-4" />
+                      </div>
+                    </button>
+                  )}
                 </CardContent>
               </Card>
             ))}

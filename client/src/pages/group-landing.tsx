@@ -1,5 +1,6 @@
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -11,6 +12,20 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 const REDIRECT_KEY = "kontrib_redirectTo";
+const REF_KEY = "kontrib_referral_code";
+
+async function captureReferral(referralCode: string, refereeId: string) {
+  try {
+    await fetch("/api/referrals/capture", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ referralCode, refereeId }),
+    });
+    localStorage.removeItem(REF_KEY);
+  } catch {
+    // Non-critical — silent fail
+  }
+}
 
 interface GroupLandingData {
   group: {
@@ -43,6 +58,16 @@ export default function GroupLanding() {
   const [, navigate] = useLocation();
   const user = getCurrentUser();
   const { toast } = useToast();
+
+  // Capture ?ref= query param from URL and persist it so the signup flow
+  // (or an already-logged-in user's join) can credit the referring admin
+  const urlRef = new URLSearchParams(window.location.search).get("ref");
+
+  useEffect(() => {
+    if (urlRef) {
+      localStorage.setItem(REF_KEY, urlRef);
+    }
+  }, [urlRef]);
 
   const isJoinFormat = groupSlug && projectSlug;
   const isCustomSlug = groupSlug && !params.link && !params.registrationId && !projectSlug;
@@ -80,7 +105,13 @@ export default function GroupLanding() {
       toast({ title: "You're in!", description: `Welcome to ${groupData?.group.name}` });
       queryClient.invalidateQueries({ queryKey: ["/api/groups/user"] });
       queryClient.invalidateQueries({ queryKey: ["/api/groups/all"] });
-      
+
+      // Credit the referring admin if they arrived via a referral link
+      const refCode = urlRef || localStorage.getItem(REF_KEY) || "";
+      if (refCode && user) {
+        captureReferral(refCode, user.id);
+      }
+
       // If user came via project deep link, take them to that project
       if (projectSlug && groupData?.projects.length) {
         const matchedProject = groupData.projects.find(p => {
