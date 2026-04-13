@@ -58,9 +58,9 @@ export default function Groups() {
     const groupLink = refCode ? `${baseLink}?ref=${refCode}` : baseLink;
     const msg =
       `💰 Join our group on Kontrib!\n\n` +
-      `We use Kontrib to track all our contributions — Ajo, dues, everything. No more chasing people or confusion about who paid.\n\n` +
-      `👇 Tap to join ${group.name}:\n${groupLink}\n` +
-      `Sign up free in 30 seconds`;
+      `Let's use Kontrib to track all our contributions; Ajo, dues, project money, everything. No more confusion about who paid. We also have clean contribution and disbursement reports.\n\n` +
+      `${groupLink}\n` +
+      `Sign up takes only 30 seconds. See you there! 🙏🏾`;
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   };
 
