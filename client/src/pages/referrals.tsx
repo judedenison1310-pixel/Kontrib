@@ -59,7 +59,7 @@ export default function Referrals() {
     ? `${window.location.origin}/ref/${data.code}`
     : "";
 
-  const whatsappMessage = `Hey! I use Kontrib to manage our group contributions — it's super clean and easy. Join me here: ${referralLink} 🤝`;
+  const whatsappMessage = `💰 Want to manage your Ajo/Osusu properly?\n\nKontrib is a free app that tracks every group contribution — who paid, who hasn't, and how much is left. No more spreadsheets or forgotten payments!\n\nJoin me here 👇\n${referralLink}\n\n✅ Takes 30 seconds to sign up\n✅ Works for any group savings\n✅ Everyone can see the records in real time`;
 
   const copyLink = () => {
     if (!referralLink) return;

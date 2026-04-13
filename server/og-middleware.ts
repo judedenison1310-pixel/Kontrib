@@ -101,6 +101,24 @@ export async function handleDynamicOGTags(
     return false;
   }
 
+  // Handle referral link paths — serve compelling OG tags to drive signups
+  const refMatch = urlPath.match(/^\/ref\/([^\/]+)/);
+  if (refMatch) {
+    const host = req.get('host');
+    const protocol = host.includes('localhost') ? 'http' : 'https';
+    const baseUrl = `${protocol}://${host}`;
+
+    const html = generateOGHtml({
+      title: '💰 Your friend invited you to Kontrib!',
+      description: 'Track every group contribution — Ajo, Osusu, dues, anything. See who paid, who hasn\'t, and how much is left. Free & takes 30 seconds to join.',
+      imageUrl: `${baseUrl}/hero.jpg`,
+      url: `${baseUrl}${urlPath}`,
+      baseHtml,
+    });
+    res.status(200).set({ 'Content-Type': 'text/html' }).send(html);
+    return true;
+  }
+
   // Handle root and login paths — serve Kontrib branding OG tags
   if (urlPath === '/' || urlPath === '/login' || urlPath === '') {
     const host = req.get('host');
