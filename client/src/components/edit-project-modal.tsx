@@ -32,6 +32,7 @@ export function EditProjectModal({ open, onOpenChange, project }: EditProjectMod
 
   const [name, setName] = useState(project.name);
   const [description, setDescription] = useState(project.description || "");
+  const [projectType, setProjectType] = useState(project.projectType || "target");
   const [targetAmount, setTargetAmount] = useState(
     project.targetAmount ? String(parseFloat(project.targetAmount)) : ""
   );
@@ -44,15 +45,15 @@ export function EditProjectModal({ open, onOpenChange, project }: EditProjectMod
     if (open) {
       setName(project.name);
       setDescription(project.description || "");
+      setProjectType(project.projectType || "target");
       setTargetAmount(project.targetAmount ? String(parseFloat(project.targetAmount)) : "");
       setDeadline(project.deadline ? new Date(project.deadline).toISOString().split("T")[0] : "");
       setStatus(project.status || "active");
     }
   }, [open, project]);
 
-  const hasTarget =
-    project.projectType === "target" ||
-    (!!project.targetAmount && parseFloat(project.targetAmount) > 0);
+  const requiresTarget =
+    projectType === "target" || projectType === "event" || projectType === "emergency";
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -60,10 +61,14 @@ export function EditProjectModal({ open, onOpenChange, project }: EditProjectMod
         name: name.trim(),
         description: description.trim() || null,
         status,
+        projectType,
       };
 
-      if (hasTarget && targetAmount) {
-        updates.targetAmount = targetAmount;
+      if (requiresTarget) {
+        updates.targetAmount = targetAmount || "0";
+      } else {
+        // Non-target type: clear out any existing target so progress bars stop tracking it
+        updates.targetAmount = "0";
       }
 
       if (deadline) {
@@ -92,9 +97,11 @@ export function EditProjectModal({ open, onOpenChange, project }: EditProjectMod
       toast({ title: "Project name is required", variant: "destructive" });
       return;
     }
-    if (hasTarget && targetAmount && isNaN(parseFloat(targetAmount))) {
-      toast({ title: "Enter a valid target amount", variant: "destructive" });
-      return;
+    if (requiresTarget) {
+      if (!targetAmount || isNaN(parseFloat(targetAmount)) || parseFloat(targetAmount) <= 0) {
+        toast({ title: "Enter a valid target amount", variant: "destructive" });
+        return;
+      }
     }
     mutation.mutate();
   };
@@ -129,7 +136,28 @@ export function EditProjectModal({ open, onOpenChange, project }: EditProjectMod
             />
           </div>
 
-          {hasTarget && (
+          <div className="space-y-2">
+            <Label htmlFor="proj-type">Project Type</Label>
+            <Select value={projectType} onValueChange={setProjectType}>
+              <SelectTrigger id="proj-type" data-testid="select-project-type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="target">Target-based collection</SelectItem>
+                <SelectItem value="event">Event collection</SelectItem>
+                <SelectItem value="emergency">Emergency fund</SelectItem>
+                <SelectItem value="monthly">Monthly contributions / dues</SelectItem>
+                <SelectItem value="yearly">Yearly dues / levies</SelectItem>
+              </SelectContent>
+            </Select>
+            {!requiresTarget && (
+              <p className="text-xs text-gray-500">
+                No target amount needed for this type — contributions are open-ended.
+              </p>
+            )}
+          </div>
+
+          {requiresTarget && (
             <div className="space-y-2">
               <Label htmlFor="proj-target">Target Amount (₦)</Label>
               <Input
