@@ -93,12 +93,19 @@ export function usePushNotifications(userId: string | undefined) {
 
   const requestAndSubscribe = useCallback(async (): Promise<boolean> => {
     if (!isSupported) return false;
-    const result = await Notification.requestPermission();
-    setPermission(result as PushPermission);
-    if (result === "granted") {
-      return subscribe();
+    setIsLoading(true);
+    try {
+      // Make sure the service worker is registered before asking for permission
+      try {
+        await navigator.serviceWorker.register(SW_PATH);
+      } catch {}
+      const result = await Notification.requestPermission();
+      setPermission(result as PushPermission);
+      if (result !== "granted") return false;
+    } finally {
+      setIsLoading(false);
     }
-    return false;
+    return subscribe();
   }, [isSupported, subscribe]);
 
   return { isSupported, isSubscribed, permission, isLoading, subscribe, unsubscribe, requestAndSubscribe };

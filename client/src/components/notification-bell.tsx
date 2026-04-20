@@ -315,7 +315,24 @@ export function NotificationBell({ userId, onContributionClick }: NotificationBe
           </div>
         </ScrollArea>
 
-        {/* Push notification opt-in */}
+        {/* Push notification opt-in / status */}
+        {isSupported && isSubscribed && (
+          <div className="border-t px-4 py-3 bg-green-50">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
+              <p className="text-xs text-green-800 font-medium" data-testid="text-push-enabled">
+                Push notifications enabled
+              </p>
+            </div>
+          </div>
+        )}
+        {isSupported && !isSubscribed && permission === "denied" && (
+          <div className="border-t px-4 py-3 bg-amber-50">
+            <p className="text-xs text-amber-800">
+              Push notifications are blocked. Enable them in your browser site settings, then reopen this menu.
+            </p>
+          </div>
+        )}
         {isSupported && !isSubscribed && permission !== "denied" && (
           <div className="border-t px-4 py-3 bg-gray-50">
             <div className="flex items-center justify-between gap-3">
@@ -327,11 +344,28 @@ export function NotificationBell({ userId, onContributionClick }: NotificationBe
                 size="sm"
                 variant="outline"
                 className="text-xs border-green-600 text-green-700 hover:bg-green-50 shrink-0"
-                onClick={requestAndSubscribe}
+                onClick={async () => {
+                  const ok = await requestAndSubscribe();
+                  if (ok) {
+                    toast({
+                      title: "Push notifications enabled",
+                      description: "You'll get instant alerts even when the app is closed.",
+                    });
+                  } else {
+                    toast({
+                      title: "Couldn't enable push notifications",
+                      description:
+                        Notification.permission === "denied"
+                          ? "Permission was blocked. Allow notifications in your browser settings and try again."
+                          : "Something went wrong setting up push. Please try again.",
+                      variant: "destructive",
+                    });
+                  }
+                }}
                 disabled={pushLoading}
                 data-testid="button-enable-push"
               >
-                {pushLoading ? "..." : "Enable"}
+                {pushLoading ? "Enabling..." : "Enable"}
               </Button>
             </div>
           </div>
