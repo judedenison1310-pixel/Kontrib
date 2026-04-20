@@ -117,9 +117,18 @@ export function NotificationBell({ userId, onContributionClick }: NotificationBe
     }
 
     // Disbursement received → open confirm receipt dialog
-    if (notification.type === "disbursement_received" && notification.disbursementId) {
-      setDisbursementToConfirm(notification);
-      setOpen(false);
+    if (notification.type === "disbursement_received") {
+      if (notification.disbursementId) {
+        setOpen(false);
+        // Defer opening the dialog one tick so the popover finishes closing first
+        setTimeout(() => setDisbursementToConfirm(notification), 50);
+      } else {
+        toast({
+          title: "Can't open this notification",
+          description:
+            "This is an older disbursement notification. Ask your admin to record a new disbursement so you can confirm receipt here.",
+        });
+      }
       return;
     }
 
