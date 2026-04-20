@@ -6,16 +6,28 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { 
-  Bell, 
-  DollarSign, 
-  CheckCircle, 
-  XCircle, 
+import { useToast } from "@/hooks/use-toast";
+import {
+  Bell,
+  DollarSign,
+  CheckCircle,
+  XCircle,
   Clock,
-  X
+  Wallet,
+  X,
 } from "lucide-react";
 import { formatNaira } from "@/lib/currency";
 import { apiRequest } from "@/lib/queryClient";
@@ -30,10 +42,28 @@ interface NotificationBellProps {
 
 export function NotificationBell({ userId, onContributionClick }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
+  const [disbursementToConfirm, setDisbursementToConfirm] = useState<Notification | null>(null);
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const { hasNewNotification, clearNewNotification } = useNotificationsWebSocket(userId);
   const { isSupported, isSubscribed, permission, isLoading: pushLoading, requestAndSubscribe } = usePushNotifications(userId);
+
+  const confirmDisbursementMutation = useMutation({
+    mutationFn: async (disbursementId: string) => {
+      const response = await apiRequest("POST", `/api/disbursements/${disbursementId}/confirm`, { userId });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications", userId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/disbursements"] });
+      toast({ title: "Receipt confirmed", description: "Thanks — your group admin has been notified." });
+      setDisbursementToConfirm(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Couldn't confirm", description: error?.message || "Please try again", variant: "destructive" });
+    },
+  });
 
   const { data: notifications = [] } = useQuery<Notification[]>({
     queryKey: ["/api/notifications", userId],
@@ -86,6 +116,13 @@ export function NotificationBell({ userId, onContributionClick }: NotificationBe
       markReadMutation.mutate(notification.id);
     }
 
+    // Disbursement received → open confirm receipt dialog
+    if (notification.type === "disbursement_received" && notification.disbursementId) {
+      setDisbursementToConfirm(notification);
+      setOpen(false);
+      return;
+    }
+
     // If this is a payment notification and we have a contribution handler, open the contribution
     if (notification.contributionId && onContributionClick) {
       const contribution = contributions.find(c => c.id === notification.contributionId);
@@ -104,6 +141,8 @@ export function NotificationBell({ userId, onContributionClick }: NotificationBe
         return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 'payment_rejected':
         return <XCircle className="h-4 w-4 text-red-600" />;
+      case 'disbursement_received':
+        return <Wallet className="h-4 w-4 text-green-600" />;
       default:
         return <Bell className="h-4 w-4 text-gray-600" />;
     }
@@ -126,7 +165,14 @@ export function NotificationBell({ userId, onContributionClick }: NotificationBe
     }
   };
 
+  // Parse amount out of the disbursement message for the confirm dialog
+  const disbursementAmountText =
+    disbursementToConfirm?.message.match(/disbursement of ([0-9,.]+)/i)?.[1] || "";
+  const disbursementGroupText =
+    disbursementToConfirm?.message.match(/from "([^"]+)"/)?.[1] || "your group";
+
   return (
+    <>
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
@@ -292,5 +338,46 @@ export function NotificationBell({ userId, onContributionClick }: NotificationBe
         )}
       </PopoverContent>
     </Popover>
+
+    <AlertDialog
+      open={!!disbursementToConfirm}
+      onOpenChange={(o) => !o && setDisbursementToConfirm(null)}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <Wallet className="h-5 w-5 text-green-600" />
+            Confirm Receipt
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            Did you receive{" "}
+            <span className="font-semibold text-gray-900">
+              {disbursementAmountText
+                ? formatNaira(Number(disbursementAmountText.replace(/,/g, "")))
+                : "the disbursement"}
+            </span>{" "}
+            from <span className="font-semibold text-gray-900">{disbursementGroupText}</span>?
+            <br />
+            <br />
+            Confirming lets your admin know the funds reached you.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel data-testid="button-cancel-confirm-receipt">Not yet</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() =>
+              disbursementToConfirm?.disbursementId &&
+              confirmDisbursementMutation.mutate(disbursementToConfirm.disbursementId)
+            }
+            disabled={confirmDisbursementMutation.isPending}
+            className="bg-green-600 hover:bg-green-700"
+            data-testid="button-confirm-receipt"
+          >
+            {confirmDisbursementMutation.isPending ? "Confirming..." : "Yes, I received it"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

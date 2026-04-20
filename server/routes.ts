@@ -1032,7 +1032,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             userId: req.body.recipientUserId,
             type: "disbursement_received",
             title: "Funds Disbursed to You",
-            message: `You have received a disbursement of ${req.body.amount} from "${group?.name ?? "your group"}". Please confirm receipt in the app.`,
+            message: `You have received a disbursement of ${req.body.amount} from "${group?.name ?? "your group"}". Tap to confirm receipt.`,
+            disbursementId: disbursement.id,
+            projectId,
           });
           broadcastNotification(req.body.recipientUserId, notification);
         } catch (notifErr) {

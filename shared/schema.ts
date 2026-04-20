@@ -224,6 +224,7 @@ export const notifications = pgTable("notifications", {
   message: text("message").notNull(),
   contributionId: varchar("contribution_id").references(() => contributions.id),
   projectId: varchar("project_id").references(() => projects.id),
+  disbursementId: varchar("disbursement_id").references(() => disbursements.id),
   read: boolean("read").notNull().default(false),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
