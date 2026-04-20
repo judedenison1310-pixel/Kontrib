@@ -6,3 +6,9 @@ id = "cn_FBeLgHInE7QB3Hu4YZ"
 uri = "file://kontrib_users.csv"
 type = "table"
 title = "Kontrib Signed-Up Users"
+
+[[outputs]]
+id = "g45Hy9juvOwgUCUFrIrUN"
+uri = "file://attached_assets/Kontrib_Sales_Guide.md"
+type = "text"
+title = "Kontrib — One-Page Sales Guide"
