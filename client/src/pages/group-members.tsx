@@ -218,12 +218,12 @@ export default function GroupMembers() {
               const isCoAdmin = coAdmins.includes(member.userId);
               const initials = (member.user?.fullName || "M").split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
               return (
-                <div key={member.id} className="flex items-center justify-between px-4 py-3" data-testid={`member-card-${member.id}`}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                <div key={member.id} className="flex items-center gap-2 px-4 py-3" data-testid={`member-card-${member.id}`}>
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="w-12 h-12 shrink-0 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
                       {initials}
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-medium text-gray-900 truncate" data-testid={`text-member-name-${member.id}`}>
                           {member.user?.fullName || "Member"}
@@ -246,12 +246,12 @@ export default function GroupMembers() {
                   </div>
 
                   {isAdmin && (
-                    <div className="flex items-center gap-1 flex-shrink-0">
+                    <div className="flex items-center gap-0.5 shrink-0">
                       <Button
                         variant="ghost"
-                        size="sm"
+                        size="icon"
                         title="View contributions"
-                        className="text-primary hover:text-primary hover:bg-primary/10"
+                        className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
                         onClick={() => setSelectedMember(member)}
                         data-testid={`button-view-payments-${member.id}`}
                       >
@@ -263,9 +263,9 @@ export default function GroupMembers() {
                           {isCoAdmin ? (
                             <Button
                               variant="ghost"
-                              size="sm"
+                              size="icon"
                               title="Remove co-admin"
-                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                               onClick={() => setCoAdminAction({ member, action: "remove" })}
                               disabled={coAdminMutation.isPending}
                               data-testid={`button-remove-co-admin-${member.id}`}
@@ -275,9 +275,9 @@ export default function GroupMembers() {
                           ) : (
                             <Button
                               variant="ghost"
-                              size="sm"
+                              size="icon"
                               title={canAddMoreCoAdmins ? "Make co-admin" : "Co-admin limit reached (max 2)"}
-                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 disabled:opacity-40"
+                              className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 disabled:opacity-40"
                               onClick={() => setCoAdminAction({ member, action: "add" })}
                               disabled={!canAddMoreCoAdmins || coAdminMutation.isPending}
                               data-testid={`button-add-co-admin-${member.id}`}
@@ -288,9 +288,9 @@ export default function GroupMembers() {
 
                           <Button
                             variant="ghost"
-                            size="sm"
+                            size="icon"
                             title="Remove member"
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
                             onClick={() => setMemberToDelete(member)}
                             data-testid={`button-delete-member-${member.id}`}
                           >
