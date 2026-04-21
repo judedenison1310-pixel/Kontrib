@@ -40,6 +40,7 @@ export const groups = pgTable("groups", {
   verifiedAt: timestamp("verified_at"),
   verificationExpiresAt: timestamp("verification_expires_at"), // 12 months after verifiedAt
   publiclyListed: boolean("publicly_listed").notNull().default(true), // Default-on after verification, admin can opt out
+  publicListingDecisionAt: timestamp("public_listing_decision_at"), // When admin acknowledged the post-approval public-listing prompt
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
@@ -139,7 +140,8 @@ export type VerificationApplicationDetailed = VerificationApplication & {
 };
 export type VerificationStatus = {
   group: { id: string; name: string; state: string | null; lga: string | null;
-    verifiedAt: Date | null; verificationExpiresAt: Date | null; publiclyListed: boolean };
+    verifiedAt: Date | null; verificationExpiresAt: Date | null; publiclyListed: boolean;
+    publicListingDecisionAt: Date | null };
   eligibility: {
     eligible: boolean;
     ageDays: number;

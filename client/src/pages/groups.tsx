@@ -8,6 +8,7 @@ import { Navigation } from "@/components/navigation";
 import { CreateGroupModal } from "@/components/create-group-modal";
 import { EditNameModal } from "@/components/edit-name-modal";
 import { VerificationInbox } from "@/components/verification-inbox";
+import { VerifiedBadge } from "@/components/verified-badge";
 import { SiWhatsapp } from "react-icons/si";
 import { 
   Users, 
@@ -230,6 +231,7 @@ export default function Groups() {
                         <h3 className="font-bold text-gray-900 truncate" data-testid={`text-group-name-${group.id}`}>
                           {group.name}
                         </h3>
+                        <VerifiedBadge verifiedAt={group.verifiedAt} expiresAt={group.verificationExpiresAt} />
                         {isGroupAdmin(group) && (
                           <>
                             <span className="shrink-0 flex items-center gap-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">

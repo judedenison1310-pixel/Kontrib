@@ -6,6 +6,9 @@ import { CreateProjectModal } from "@/components/create-project-modal";
 import { PaymentModal } from "@/components/payment-modal";
 import { EditProjectModal } from "@/components/edit-project-modal";
 import { VerificationBanner } from "@/components/verification-banner";
+import { VerifiedBadge } from "@/components/verified-badge";
+import { VerifiedListingPrompt } from "@/components/verified-listing-prompt";
+import type { VerificationStatus } from "@shared/schema";
 import type { User as UserType } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -81,6 +84,11 @@ export default function GroupProjects() {
 
   const { data: members = [] } = useQuery<Array<{ id: string; groupId: string; userId: string; status: string; user: UserType }>>({
     queryKey: ["/api/groups", groupId, "members"],
+    enabled: !!groupId,
+  });
+
+  const { data: verificationStatus } = useQuery<VerificationStatus>({
+    queryKey: ["/api/groups", groupId, "verification"],
     enabled: !!groupId,
   });
 
@@ -177,12 +185,20 @@ export default function GroupProjects() {
         </Button>
 
         {group && (
-          <VerificationBanner
-            groupId={group.id}
-            isAdmin={isAdmin}
-            adminId={group.adminId}
-            members={members}
-          />
+          <>
+            <VerificationBanner
+              groupId={group.id}
+              isAdmin={isAdmin}
+              adminId={group.adminId}
+              members={members}
+            />
+            <VerifiedListingPrompt
+              groupId={group.id}
+              isAdmin={isAdmin}
+              adminId={group.adminId}
+              status={verificationStatus}
+            />
+          </>
         )}
 
         <div className="flex items-center justify-between">
@@ -190,7 +206,10 @@ export default function GroupProjects() {
             <h1 className="text-2xl font-bold text-gray-900" data-testid="text-page-title">
               Projects
             </h1>
-            <p className="text-gray-500">{group.name}</p>
+            <p className="text-gray-500 inline-flex items-center gap-1.5">
+              {group.name}
+              <VerifiedBadge verifiedAt={verificationStatus?.group.verifiedAt} expiresAt={verificationStatus?.group.verificationExpiresAt} />
+            </p>
           </div>
           <div className="flex items-center gap-2">
             {isAdmin && (

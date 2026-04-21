@@ -2284,6 +2284,7 @@ DbStorage.prototype.getVerificationStatus = async function (groupId: string) {
       verifiedAt: groupRow.verifiedAt ?? null,
       verificationExpiresAt: groupRow.verificationExpiresAt ?? null,
       publiclyListed: groupRow.publiclyListed ?? true,
+      publicListingDecisionAt: groupRow.publicListingDecisionAt ?? null,
     },
     eligibility: {
       eligible,

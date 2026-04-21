@@ -21,6 +21,7 @@ import { useState } from "react";
 import { CreateProjectModal } from "@/components/create-project-modal";
 import { EditNameModal } from "@/components/edit-name-modal";
 import { VerificationBanner } from "@/components/verification-banner";
+import { VerifiedBadge } from "@/components/verified-badge";
 
 interface GroupMemberWithUser {
   id: string;
@@ -172,8 +173,9 @@ export default function GroupDetails() {
           isAdmin ? 'bg-gradient-to-r from-green-600 to-green-700' : 'bg-gradient-to-r from-blue-600 to-blue-700'
         }`}>
           <div className="flex items-center gap-2 mb-2">
-            <h1 className="text-2xl font-bold" data-testid="text-group-name">
+            <h1 className="text-2xl font-bold inline-flex items-center gap-2" data-testid="text-group-name">
               {group.name}
+              <VerifiedBadge verifiedAt={group.verifiedAt} expiresAt={group.verificationExpiresAt} className="text-white" />
             </h1>
             {isAdmin && (
               <button

@@ -510,6 +510,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Verified Ajo — admin sets the public-listing preference (one-time prompt after approval)
+  app.patch("/api/groups/:groupId/public-listing", async (req, res) => {
+    try {
+      const { userId, publiclyListed } = req.body || {};
+      if (!userId || typeof publiclyListed !== "boolean") {
+        return res.status(400).json({ message: "userId and publiclyListed required" });
+      }
+      const group = await storage.getGroup(req.params.groupId);
+      if (!group) return res.status(404).json({ message: "Group not found" });
+      if (group.adminId !== userId) return res.status(403).json({ message: "Only the admin can change this" });
+      await storage.updateGroup(req.params.groupId, {
+        publiclyListed,
+        publicListingDecisionAt: new Date(),
+      } as any);
+      res.json({ ok: true });
+    } catch (error: any) {
+      console.error("Public listing update error:", error);
+      res.status(400).json({ message: error?.message || "Failed to update" });
+    }
+  });
+
   // Verified Ajo — admin submits an application
   app.post("/api/groups/:groupId/verification", async (req, res) => {
     try {
