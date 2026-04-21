@@ -13,6 +13,12 @@ export const users = pgTable("users", {
   profileCompletedAt: timestamp("profile_completed_at"), // When user added their name
   referralCode: text("referral_code").unique(), // Unique code for sharing referral links
   referredBy: varchar("referred_by"), // userId of the person who referred them
+  // Verified Ajo locality (used to match users to nearby verified groups on home page)
+  state: text("state"),
+  lga: text("lga"),
+  // Verified Ajo identity (only collected when user is officer/attester/verified-group joiner)
+  legalName: text("legal_name"),
+  selfieUrl: text("selfie_url"), // Stored under .private/verifications/ in object storage
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
@@ -27,8 +33,58 @@ export const groups = pgTable("groups", {
   privacyMode: text("privacy_mode").notNull().default("standard"), // "standard" or "private" (Ajo mode)
   adminId: varchar("admin_id").notNull().references(() => users.id),
   coAdmins: text("co_admins").array().default(sql`'{}'::text[]`), // Up to 2 co-admin user IDs
+  // Verified Ajo locality (set during application)
+  state: text("state"),
+  lga: text("lga"),
+  // Verified Ajo status (granted by Kontrib team review)
+  verifiedAt: timestamp("verified_at"),
+  verificationExpiresAt: timestamp("verification_expires_at"), // 12 months after verifiedAt
+  publiclyListed: boolean("publicly_listed").notNull().default(true), // Default-on after verification, admin can opt out
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
+
+// Verification application — one row per group's apply attempt
+export const verificationApplications = pgTable("verification_applications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  groupId: varchar("group_id").notNull().references(() => groups.id),
+  submittedBy: varchar("submitted_by").notNull().references(() => users.id), // Admin who applied
+  status: text("status").notNull().default("draft"), // "draft" | "submitted" | "under_review" | "info_requested" | "approved" | "rejected"
+  // Snapshot of the locality at submission
+  state: text("state"),
+  lga: text("lga"),
+  reviewerId: varchar("reviewer_id").references(() => users.id),
+  reviewerNotes: text("reviewer_notes"),
+  submittedAt: timestamp("submitted_at"),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+// 3 officers per application (admin + 2 nominees)
+export const verificationOfficers = pgTable("verification_officers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  applicationId: varchar("application_id").notNull().references(() => verificationApplications.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  role: text("role").notNull(), // "admin" | "officer"
+  status: text("status").notNull().default("pending"), // "pending" | "accepted" | "declined"
+  legalName: text("legal_name"), // Captured at acceptance time
+  selfieUrl: text("selfie_url"), // Captured at acceptance time
+  respondedAt: timestamp("responded_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+// Up to N peer attesters per application
+export const verificationAttestations = pgTable("verification_attestations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  applicationId: varchar("application_id").notNull().references(() => verificationApplications.id),
+  attesterId: varchar("attester_id").notNull().references(() => users.id),
+  status: text("status").notNull().default("pending"), // "pending" | "vouched" | "declined"
+  respondedAt: timestamp("responded_at"),
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export type VerificationApplication = typeof verificationApplications.$inferSelect;
+export type VerificationOfficer = typeof verificationOfficers.$inferSelect;
+export type VerificationAttestation = typeof verificationAttestations.$inferSelect;
 
 export const groupMembers = pgTable("group_members", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
