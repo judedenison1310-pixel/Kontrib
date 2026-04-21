@@ -7,7 +7,8 @@ import { sendPushToSubscription, vapidPublicKey, type PushPayload } from "./push
 import { 
   insertUserSchema, insertGroupSchema, insertGroupMemberSchema,
   insertProjectSchema, insertAccountabilityPartnerSchema, insertContributionSchema,
-  insertNotificationSchema, insertOtpVerificationSchema, insertPushSubscriptionSchema
+  insertNotificationSchema, insertOtpVerificationSchema, insertPushSubscriptionSchema,
+  submitVerificationSchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -480,6 +481,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Get group by ID error:", error);
       res.status(500).json({ message: "Failed to fetch group" });
+    }
+  });
+
+  // Look up a user by phone number (used by the verification attester picker).
+  // Returns only the safe public fields.
+  app.get("/api/users/by-phone/:phone", async (req, res) => {
+    try {
+      const phone = decodeURIComponent(req.params.phone);
+      const user = await storage.getUserByPhoneNumber(phone);
+      if (!user) return res.status(404).json({ message: "No user found" });
+      res.json({ id: user.id, fullName: user.fullName, phoneNumber: user.phoneNumber });
+    } catch (error) {
+      console.error("Lookup user by phone error:", error);
+      res.status(500).json({ message: "Lookup failed" });
+    }
+  });
+
+  // Verified Ajo — status (eligibility + active application) for the group detail banner
+  app.get("/api/groups/:groupId/verification", async (req, res) => {
+    try {
+      const status = await storage.getVerificationStatus(req.params.groupId);
+      if (!status) return res.status(404).json({ message: "Group not found" });
+      res.json(status);
+    } catch (error) {
+      console.error("Get verification status error:", error);
+      res.status(500).json({ message: "Failed to fetch verification status" });
+    }
+  });
+
+  // Verified Ajo — admin submits an application
+  app.post("/api/groups/:groupId/verification", async (req, res) => {
+    try {
+      const payload = submitVerificationSchema.parse(req.body);
+      const status = await storage.applyForVerification(req.params.groupId, payload);
+      res.status(201).json(status);
+    } catch (error: any) {
+      if (error?.issues) {
+        return res.status(400).json({ message: "Invalid application", errors: error.issues });
+      }
+      console.error("Submit verification error:", error);
+      res.status(400).json({ message: error?.message || "Failed to submit verification" });
     }
   });
 

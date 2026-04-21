@@ -20,6 +20,7 @@ import { Group, Project, User as UserType, ContributionWithDetails } from "@shar
 import { useState } from "react";
 import { CreateProjectModal } from "@/components/create-project-modal";
 import { EditNameModal } from "@/components/edit-name-modal";
+import { VerificationBanner } from "@/components/verification-banner";
 
 interface GroupMemberWithUser {
   id: string;
@@ -159,6 +160,13 @@ export default function GroupDetails() {
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Groups
         </Button>
+
+        <VerificationBanner
+          groupId={group.id}
+          isAdmin={isAdmin}
+          adminId={group.adminId}
+          members={members}
+        />
 
         <div className={`rounded-2xl p-6 text-white ${
           isAdmin ? 'bg-gradient-to-r from-green-600 to-green-700' : 'bg-gradient-to-r from-blue-600 to-blue-700'

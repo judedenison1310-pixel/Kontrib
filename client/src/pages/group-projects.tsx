@@ -5,6 +5,8 @@ import { Navigation } from "@/components/navigation";
 import { CreateProjectModal } from "@/components/create-project-modal";
 import { PaymentModal } from "@/components/payment-modal";
 import { EditProjectModal } from "@/components/edit-project-modal";
+import { VerificationBanner } from "@/components/verification-banner";
+import type { User as UserType } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -74,6 +76,11 @@ export default function GroupProjects() {
 
   const { data: projects = [], isLoading: projectsLoading } = useQuery<Project[]>({
     queryKey: ["/api/groups", groupId, "projects"],
+    enabled: !!groupId,
+  });
+
+  const { data: members = [] } = useQuery<Array<{ id: string; groupId: string; userId: string; status: string; user: UserType }>>({
+    queryKey: ["/api/groups", groupId, "members"],
     enabled: !!groupId,
   });
 
@@ -168,6 +175,15 @@ export default function GroupProjects() {
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Group
         </Button>
+
+        {group && (
+          <VerificationBanner
+            groupId={group.id}
+            isAdmin={isAdmin}
+            adminId={group.adminId}
+            members={members}
+          />
+        )}
 
         <div className="flex items-center justify-between">
           <div>

@@ -86,6 +86,36 @@ export type VerificationApplication = typeof verificationApplications.$inferSele
 export type VerificationOfficer = typeof verificationOfficers.$inferSelect;
 export type VerificationAttestation = typeof verificationAttestations.$inferSelect;
 
+// Payload for an admin submitting a verification application
+export const submitVerificationSchema = z.object({
+  submittedBy: z.string().min(1),
+  state: z.string().min(2, "State is required"),
+  lga: z.string().min(2, "LGA is required"),
+  officerNominees: z.array(z.string().min(1)).length(2, "Nominate exactly 2 co-officers"),
+  attesters: z.array(z.string().min(1)).min(5, "Pick at least 5 Kontrib member attesters"),
+});
+export type SubmitVerificationPayload = z.infer<typeof submitVerificationSchema>;
+
+// Verification status returned to the group detail banner
+export type VerificationOfficerWithUser = VerificationOfficer & { user: User };
+export type VerificationAttestationWithUser = VerificationAttestation & { attester: User };
+export type VerificationApplicationDetailed = VerificationApplication & {
+  officers: VerificationOfficerWithUser[];
+  attestations: VerificationAttestationWithUser[];
+};
+export type VerificationStatus = {
+  group: { id: string; name: string; state: string | null; lga: string | null;
+    verifiedAt: Date | null; verificationExpiresAt: Date | null; publiclyListed: boolean };
+  eligibility: {
+    eligible: boolean;
+    ageDays: number;
+    activeMemberCount: number;
+    completedCycleCount: number;
+    requirements: { ageOk: boolean; membersOk: boolean; cycleOk: boolean };
+  };
+  application: VerificationApplicationDetailed | null;
+};
+
 export const groupMembers = pgTable("group_members", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   groupId: varchar("group_id").notNull().references(() => groups.id),

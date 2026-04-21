@@ -27,7 +27,9 @@ import {
   type MemberWithContributions,
   type ContributionWithDetails,
   type ProjectWithStats,
-  type AccountabilityPartnerWithDetails
+  type AccountabilityPartnerWithDetails,
+  type VerificationStatus,
+  type SubmitVerificationPayload,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -135,6 +137,10 @@ export interface IStorage {
   savePushSubscription(sub: InsertPushSubscription): Promise<PushSubscription>;
   getUserPushSubscriptions(userId: string): Promise<PushSubscription[]>;
   deletePushSubscription(endpoint: string): Promise<void>;
+
+  // Verified Ajo
+  getVerificationStatus(groupId: string): Promise<VerificationStatus | null>;
+  applyForVerification(groupId: string, payload: SubmitVerificationPayload): Promise<VerificationStatus>;
 }
 
 export class MemStorage implements IStorage {
@@ -2165,5 +2171,193 @@ export class DbStorage implements IStorage {
       .where(eq(pushSubscriptionsTable.endpoint, endpoint));
   }
 }
+
+// Verified Ajo — DbStorage augmentation
+import {
+  verificationApplications as verificationApplicationsTable,
+  verificationOfficers as verificationOfficersTable,
+  verificationAttestations as verificationAttestationsTable,
+} from "@shared/schema";
+
+// Declaration merging so TS knows the prototype-added methods exist.
+export interface DbStorage {
+  getVerificationStatus(groupId: string): Promise<VerificationStatus | null>;
+  applyForVerification(groupId: string, payload: SubmitVerificationPayload): Promise<VerificationStatus>;
+}
+export interface MemStorage {
+  getVerificationStatus(groupId: string): Promise<VerificationStatus | null>;
+  applyForVerification(groupId: string, payload: SubmitVerificationPayload): Promise<VerificationStatus>;
+}
+
+const VERIFICATION_MIN_AGE_DAYS = 30;
+const VERIFICATION_MIN_MEMBERS = 10;
+
+DbStorage.prototype.getVerificationStatus = async function (groupId: string) {
+  const [groupRow] = await db.select().from(groupsTable).where(eq(groupsTable.id, groupId)).limit(1);
+  if (!groupRow) return null;
+
+  const memberRows = await db.select().from(groupMembersTable).where(eq(groupMembersTable.groupId, groupId));
+  const activeMemberCount = memberRows.filter(m => m.status === "active").length;
+
+  const projectRows = await db.select().from(projectsTable).where(eq(projectsTable.groupId, groupId));
+  const completedCycleCount = projectRows.filter(p => {
+    if (p.status === "completed") return true;
+    const target = parseFloat(p.targetAmount || "0");
+    const collected = parseFloat(p.collectedAmount || "0");
+    return target > 0 && collected >= target;
+  }).length;
+
+  const ageDays = Math.floor((Date.now() - new Date(groupRow.createdAt).getTime()) / 86400000);
+  const ageOk = ageDays >= VERIFICATION_MIN_AGE_DAYS;
+  const membersOk = activeMemberCount >= VERIFICATION_MIN_MEMBERS;
+  const cycleOk = completedCycleCount >= 1;
+  const eligible = ageOk && membersOk && cycleOk;
+
+  // Latest application (any status) for this group
+  const [appRow] = await db.select().from(verificationApplicationsTable)
+    .where(eq(verificationApplicationsTable.groupId, groupId))
+    .orderBy(desc(verificationApplicationsTable.createdAt))
+    .limit(1);
+
+  let application = null as any;
+  if (appRow) {
+    const officerRows = await db
+      .select({ officer: verificationOfficersTable, user: usersTable })
+      .from(verificationOfficersTable)
+      .innerJoin(usersTable, eq(verificationOfficersTable.userId, usersTable.id))
+      .where(eq(verificationOfficersTable.applicationId, appRow.id));
+    const attestationRows = await db
+      .select({ att: verificationAttestationsTable, user: usersTable })
+      .from(verificationAttestationsTable)
+      .innerJoin(usersTable, eq(verificationAttestationsTable.attesterId, usersTable.id))
+      .where(eq(verificationAttestationsTable.applicationId, appRow.id));
+    application = {
+      ...appRow,
+      officers: officerRows.map(r => ({ ...r.officer, user: r.user })),
+      attestations: attestationRows.map(r => ({ ...r.att, attester: r.user })),
+    };
+  }
+
+  return {
+    group: {
+      id: groupRow.id,
+      name: groupRow.name,
+      state: groupRow.state ?? null,
+      lga: groupRow.lga ?? null,
+      verifiedAt: groupRow.verifiedAt ?? null,
+      verificationExpiresAt: groupRow.verificationExpiresAt ?? null,
+      publiclyListed: groupRow.publiclyListed ?? true,
+    },
+    eligibility: {
+      eligible,
+      ageDays,
+      activeMemberCount,
+      completedCycleCount,
+      requirements: { ageOk, membersOk, cycleOk },
+    },
+    application,
+  };
+};
+
+DbStorage.prototype.applyForVerification = async function (groupId: string, payload: SubmitVerificationPayload) {
+  const [groupRow] = await db.select().from(groupsTable).where(eq(groupsTable.id, groupId)).limit(1);
+  if (!groupRow) throw new Error("Group not found");
+  if (groupRow.adminId !== payload.submittedBy) {
+    throw new Error("Only the group admin can apply for verification");
+  }
+
+  // Block re-apply if there's an open or approved application
+  const [openApp] = await db.select().from(verificationApplicationsTable)
+    .where(and(
+      eq(verificationApplicationsTable.groupId, groupId),
+      inArray(verificationApplicationsTable.status, ["submitted", "under_review", "info_requested", "approved"]),
+    ))
+    .limit(1);
+  if (openApp) throw new Error("This group already has an active verification application");
+
+  // Validate officer nominees are members of this group
+  const memberRows = await db.select().from(groupMembersTable).where(eq(groupMembersTable.groupId, groupId));
+  const memberIds = new Set(memberRows.map(m => m.userId));
+  for (const uid of payload.officerNominees) {
+    if (uid === payload.submittedBy) throw new Error("Officer nominees must be different people from the admin");
+    if (!memberIds.has(uid)) throw new Error("Officer nominees must be existing group members");
+  }
+  if (new Set(payload.officerNominees).size !== payload.officerNominees.length) {
+    throw new Error("Officer nominees must be unique");
+  }
+
+  // Validate attesters exist and aren't duplicated
+  if (new Set(payload.attesters).size !== payload.attesters.length) {
+    throw new Error("Attester list must be unique");
+  }
+  const attesterUsers = await db.select().from(usersTable).where(inArray(usersTable.id, payload.attesters));
+  if (attesterUsers.length !== payload.attesters.length) {
+    throw new Error("One or more attesters could not be found");
+  }
+
+  // Persist locality on the group too (so listing works once approved)
+  await db.update(groupsTable).set({ state: payload.state, lga: payload.lga }).where(eq(groupsTable.id, groupId));
+
+  // Insert application
+  const [app] = await db.insert(verificationApplicationsTable).values({
+    groupId,
+    submittedBy: payload.submittedBy,
+    status: "submitted",
+    state: payload.state,
+    lga: payload.lga,
+    submittedAt: new Date(),
+  }).returning();
+
+  // Officers: admin + 2 nominees
+  await db.insert(verificationOfficersTable).values([
+    { applicationId: app.id, userId: payload.submittedBy, role: "admin", status: "pending" },
+    ...payload.officerNominees.map(uid => ({ applicationId: app.id, userId: uid, role: "officer", status: "pending" })),
+  ]);
+
+  // Attestations
+  await db.insert(verificationAttestationsTable).values(
+    payload.attesters.map(uid => ({ applicationId: app.id, attesterId: uid, status: "pending" }))
+  );
+
+  // Notify nominees + attesters
+  const allInvitedUsers = [...payload.officerNominees, ...payload.attesters];
+  for (const uid of allInvitedUsers) {
+    const isOfficer = payload.officerNominees.includes(uid);
+    await db.insert(notificationsTable).values({
+      userId: uid,
+      type: isOfficer ? "verification_officer_invite" : "verification_attester_invite",
+      title: isOfficer ? `You've been nominated as a co-officer for ${groupRow.name}` : `${groupRow.name} is asking you to vouch`,
+      message: isOfficer
+        ? "Open the group and confirm your name + selfie to support their Verified Ajo application."
+        : "Tap to vouch (or decline) that you trust this group's admin and members.",
+      read: false,
+    });
+  }
+
+  // Ops alert
+  notifyOpsAboutVerification(groupRow.name, payload.state, payload.lga).catch(() => {});
+
+  return (await this.getVerificationStatus(groupId))!;
+};
+
+async function notifyOpsAboutVerification(groupName: string, state: string, lga: string) {
+  const teamNumber = process.env.TEAM_WHATSAPP_NUMBER;
+  if (!teamNumber) return;
+  try {
+    const { whatsappService } = await import("./whatsapp-service");
+    await whatsappService.sendMessage(
+      teamNumber,
+      `🛡️ *New Verified Ajo application*\nGroup: ${groupName}\nLocation: ${lga}, ${state}\nReview in the Ops dashboard.`
+    );
+  } catch {}
+}
+
+// MemStorage stubs (DbStorage is the active store; MemStorage kept only for type-safety)
+MemStorage.prototype.getVerificationStatus = async function () {
+  throw new Error("Verified Ajo not supported on MemStorage");
+};
+MemStorage.prototype.applyForVerification = async function () {
+  throw new Error("Verified Ajo not supported on MemStorage");
+};
 
 export const storage = new DbStorage();
