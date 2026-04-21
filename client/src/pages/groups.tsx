@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Navigation } from "@/components/navigation";
 import { CreateGroupModal } from "@/components/create-group-modal";
 import { EditNameModal } from "@/components/edit-name-modal";
+import { VerificationInbox } from "@/components/verification-inbox";
 import { SiWhatsapp } from "react-icons/si";
 import { 
   Users, 
@@ -98,6 +99,7 @@ export default function Groups() {
       <Navigation />
 
       <main className="max-w-lg mx-auto px-4 py-6 space-y-6">
+        {user?.id && <VerificationInbox userId={user.id} />}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900" data-testid="text-page-title">

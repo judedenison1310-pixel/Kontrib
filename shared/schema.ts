@@ -96,6 +96,40 @@ export const submitVerificationSchema = z.object({
 });
 export type SubmitVerificationPayload = z.infer<typeof submitVerificationSchema>;
 
+// Officer accept/decline payload
+export const officerResponseSchema = z.discriminatedUnion("action", [
+  z.object({
+    userId: z.string().min(1),
+    action: z.literal("accept"),
+    legalName: z.string().min(2, "Enter your legal name"),
+    selfie: z.string().min(20, "Selfie is required"), // data: URL or stored URL
+  }),
+  z.object({
+    userId: z.string().min(1),
+    action: z.literal("decline"),
+  }),
+]);
+export type OfficerResponsePayload = z.infer<typeof officerResponseSchema>;
+
+// Attester vouch/decline payload
+export const attesterResponseSchema = z.object({
+  userId: z.string().min(1),
+  action: z.enum(["vouch", "decline"]),
+});
+export type AttesterResponsePayload = z.infer<typeof attesterResponseSchema>;
+
+// Pending verification invites returned to a logged-in user
+export type PendingOfficerInvite = {
+  applicationId: string; group: { id: string; name: string }; role: "admin" | "officer"; createdAt: Date;
+};
+export type PendingAttesterInvite = {
+  applicationId: string; group: { id: string; name: string }; admin: { id: string; fullName: string | null }; createdAt: Date;
+};
+export type VerificationInbox = {
+  officerInvites: PendingOfficerInvite[];
+  attesterInvites: PendingAttesterInvite[];
+};
+
 // Verification status returned to the group detail banner
 export type VerificationOfficerWithUser = VerificationOfficer & { user: User };
 export type VerificationAttestationWithUser = VerificationAttestation & { attester: User };

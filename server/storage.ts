@@ -30,6 +30,9 @@ import {
   type AccountabilityPartnerWithDetails,
   type VerificationStatus,
   type SubmitVerificationPayload,
+  type VerificationInbox,
+  type OfficerResponsePayload,
+  type AttesterResponsePayload,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -141,6 +144,9 @@ export interface IStorage {
   // Verified Ajo
   getVerificationStatus(groupId: string): Promise<VerificationStatus | null>;
   applyForVerification(groupId: string, payload: SubmitVerificationPayload): Promise<VerificationStatus>;
+  getVerificationInbox(userId: string): Promise<VerificationInbox>;
+  respondAsOfficer(applicationId: string, payload: OfficerResponsePayload): Promise<void>;
+  respondAsAttester(applicationId: string, payload: AttesterResponsePayload): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -2183,11 +2189,19 @@ import {
 export interface DbStorage {
   getVerificationStatus(groupId: string): Promise<VerificationStatus | null>;
   applyForVerification(groupId: string, payload: SubmitVerificationPayload): Promise<VerificationStatus>;
+  getVerificationInbox(userId: string): Promise<VerificationInbox>;
+  respondAsOfficer(applicationId: string, payload: OfficerResponsePayload): Promise<void>;
+  respondAsAttester(applicationId: string, payload: AttesterResponsePayload): Promise<void>;
 }
 export interface MemStorage {
   getVerificationStatus(groupId: string): Promise<VerificationStatus | null>;
   applyForVerification(groupId: string, payload: SubmitVerificationPayload): Promise<VerificationStatus>;
+  getVerificationInbox(userId: string): Promise<VerificationInbox>;
+  respondAsOfficer(applicationId: string, payload: OfficerResponsePayload): Promise<void>;
+  respondAsAttester(applicationId: string, payload: AttesterResponsePayload): Promise<void>;
 }
+
+const VERIFICATION_MIN_VOUCHES = 5;
 
 const VERIFICATION_MIN_AGE_DAYS = 30;
 const VERIFICATION_MIN_MEMBERS = 10;
@@ -2353,6 +2367,147 @@ async function notifyOpsAboutVerification(groupName: string, state: string, lga:
 }
 
 // MemStorage stubs (DbStorage is the active store; MemStorage kept only for type-safety)
+DbStorage.prototype.getVerificationInbox = async function (userId: string): Promise<VerificationInbox> {
+  // Pending officer invites for this user, joined with the application + group
+  const officerRows = await db
+    .select({ officer: verificationOfficersTable, app: verificationApplicationsTable, group: groupsTable })
+    .from(verificationOfficersTable)
+    .innerJoin(verificationApplicationsTable, eq(verificationOfficersTable.applicationId, verificationApplicationsTable.id))
+    .innerJoin(groupsTable, eq(verificationApplicationsTable.groupId, groupsTable.id))
+    .where(and(
+      eq(verificationOfficersTable.userId, userId),
+      eq(verificationOfficersTable.status, "pending"),
+      inArray(verificationApplicationsTable.status, ["submitted", "under_review", "info_requested"]),
+    ));
+
+  const officerInvites = officerRows.map(r => ({
+    applicationId: r.app.id,
+    group: { id: r.group.id, name: r.group.name },
+    role: r.officer.role as "admin" | "officer",
+    createdAt: r.officer.createdAt,
+  }));
+
+  const attesterRows = await db
+    .select({ att: verificationAttestationsTable, app: verificationApplicationsTable, group: groupsTable, admin: usersTable })
+    .from(verificationAttestationsTable)
+    .innerJoin(verificationApplicationsTable, eq(verificationAttestationsTable.applicationId, verificationApplicationsTable.id))
+    .innerJoin(groupsTable, eq(verificationApplicationsTable.groupId, groupsTable.id))
+    .innerJoin(usersTable, eq(groupsTable.adminId, usersTable.id))
+    .where(and(
+      eq(verificationAttestationsTable.attesterId, userId),
+      eq(verificationAttestationsTable.status, "pending"),
+      inArray(verificationApplicationsTable.status, ["submitted", "under_review", "info_requested"]),
+    ));
+
+  const attesterInvites = attesterRows.map(r => ({
+    applicationId: r.app.id,
+    group: { id: r.group.id, name: r.group.name },
+    admin: { id: r.admin.id, fullName: r.admin.fullName },
+    createdAt: r.att.createdAt,
+  }));
+
+  return { officerInvites, attesterInvites };
+};
+
+// Try to advance the application from "submitted" → "under_review" once all
+// officers have accepted and we have ≥ MIN_VOUCHES vouches. Idempotent.
+async function maybeAdvanceVerificationStatus(applicationId: string) {
+  const [appRow] = await db.select().from(verificationApplicationsTable).where(eq(verificationApplicationsTable.id, applicationId)).limit(1);
+  if (!appRow || appRow.status !== "submitted") return;
+
+  const officerRows = await db.select().from(verificationOfficersTable).where(eq(verificationOfficersTable.applicationId, applicationId));
+  const allOfficersAccepted = officerRows.length > 0 && officerRows.every(o => o.status === "accepted");
+  const anyOfficerDeclined = officerRows.some(o => o.status === "declined");
+
+  if (anyOfficerDeclined) return; // Wait — admin will need to handle this; reviewer can also see it
+
+  const attestationRows = await db.select().from(verificationAttestationsTable).where(eq(verificationAttestationsTable.applicationId, applicationId));
+  const vouchedCount = attestationRows.filter(a => a.status === "vouched").length;
+
+  if (allOfficersAccepted && vouchedCount >= VERIFICATION_MIN_VOUCHES) {
+    await db.update(verificationApplicationsTable).set({ status: "under_review" }).where(eq(verificationApplicationsTable.id, applicationId));
+
+    const [groupRow] = await db.select().from(groupsTable).where(eq(groupsTable.id, appRow.groupId)).limit(1);
+    if (groupRow) {
+      await db.insert(notificationsTable).values({
+        userId: appRow.submittedBy,
+        type: "verification_under_review",
+        title: `${groupRow.name}: Verification application is now under review`,
+        message: "All officers confirmed and enough vouches received. Our team is reviewing your application.",
+        read: false,
+      });
+    }
+  }
+}
+
+DbStorage.prototype.respondAsOfficer = async function (applicationId: string, payload: OfficerResponsePayload) {
+  const [officerRow] = await db.select().from(verificationOfficersTable)
+    .where(and(
+      eq(verificationOfficersTable.applicationId, applicationId),
+      eq(verificationOfficersTable.userId, payload.userId),
+    )).limit(1);
+  if (!officerRow) throw new Error("You are not a nominated officer for this application");
+  if (officerRow.status !== "pending") throw new Error("You've already responded to this invite");
+
+  if (payload.action === "decline") {
+    await db.update(verificationOfficersTable).set({
+      status: "declined", respondedAt: new Date(),
+    }).where(eq(verificationOfficersTable.id, officerRow.id));
+
+    // Notify the admin so they can re-nominate
+    const [appRow] = await db.select().from(verificationApplicationsTable).where(eq(verificationApplicationsTable.id, applicationId)).limit(1);
+    if (appRow) {
+      const [groupRow] = await db.select().from(groupsTable).where(eq(groupsTable.id, appRow.groupId)).limit(1);
+      await db.insert(notificationsTable).values({
+        userId: appRow.submittedBy,
+        type: "verification_officer_declined",
+        title: `An officer declined your verification request for ${groupRow?.name ?? "your group"}`,
+        message: "Reach out to a different group member and we'll let you nominate a replacement soon.",
+        read: false,
+      });
+    }
+    return;
+  }
+
+  // Accept — capture legal name + selfie on the officer row AND on the user profile
+  await db.update(verificationOfficersTable).set({
+    status: "accepted",
+    legalName: payload.legalName,
+    selfieUrl: payload.selfie,
+    respondedAt: new Date(),
+  }).where(eq(verificationOfficersTable.id, officerRow.id));
+
+  await db.update(usersTable).set({
+    legalName: payload.legalName,
+    selfieUrl: payload.selfie,
+  }).where(eq(usersTable.id, payload.userId));
+
+  await maybeAdvanceVerificationStatus(applicationId);
+};
+
+DbStorage.prototype.respondAsAttester = async function (applicationId: string, payload: AttesterResponsePayload) {
+  const [attRow] = await db.select().from(verificationAttestationsTable)
+    .where(and(
+      eq(verificationAttestationsTable.applicationId, applicationId),
+      eq(verificationAttestationsTable.attesterId, payload.userId),
+    )).limit(1);
+  if (!attRow) throw new Error("You are not an attester for this application");
+  if (attRow.status !== "pending") throw new Error("You've already responded to this invite");
+
+  await db.update(verificationAttestationsTable).set({
+    status: payload.action === "vouch" ? "vouched" : "declined",
+    respondedAt: new Date(),
+  }).where(eq(verificationAttestationsTable.id, attRow.id));
+
+  if (payload.action === "vouch") {
+    await maybeAdvanceVerificationStatus(applicationId);
+  }
+};
+
+MemStorage.prototype.getVerificationInbox = async function () { return { officerInvites: [], attesterInvites: [] }; };
+MemStorage.prototype.respondAsOfficer = async function () { throw new Error("Verified Ajo not supported on MemStorage"); };
+MemStorage.prototype.respondAsAttester = async function () { throw new Error("Verified Ajo not supported on MemStorage"); };
+
 MemStorage.prototype.getVerificationStatus = async function () {
   throw new Error("Verified Ajo not supported on MemStorage");
 };

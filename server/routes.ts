@@ -8,7 +8,7 @@ import {
   insertUserSchema, insertGroupSchema, insertGroupMemberSchema,
   insertProjectSchema, insertAccountabilityPartnerSchema, insertContributionSchema,
   insertNotificationSchema, insertOtpVerificationSchema, insertPushSubscriptionSchema,
-  submitVerificationSchema
+  submitVerificationSchema, officerResponseSchema, attesterResponseSchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -522,6 +522,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Submit verification error:", error);
       res.status(400).json({ message: error?.message || "Failed to submit verification" });
+    }
+  });
+
+  // Verified Ajo — pending invites for the logged-in user
+  app.get("/api/users/:userId/verification-inbox", async (req, res) => {
+    try {
+      const inbox = await storage.getVerificationInbox(req.params.userId);
+      res.json(inbox);
+    } catch (error) {
+      console.error("Get verification inbox error:", error);
+      res.status(500).json({ message: "Failed to fetch verification inbox" });
+    }
+  });
+
+  // Verified Ajo — officer accept/decline
+  app.post("/api/verification-applications/:appId/officer-response", async (req, res) => {
+    try {
+      const payload = officerResponseSchema.parse(req.body);
+      await storage.respondAsOfficer(req.params.appId, payload);
+      res.json({ ok: true });
+    } catch (error: any) {
+      if (error?.issues) return res.status(400).json({ message: "Invalid response", errors: error.issues });
+      console.error("Officer response error:", error);
+      res.status(400).json({ message: error?.message || "Failed to record response" });
+    }
+  });
+
+  // Verified Ajo — attester vouch/decline
+  app.post("/api/verification-applications/:appId/attester-response", async (req, res) => {
+    try {
+      const payload = attesterResponseSchema.parse(req.body);
+      await storage.respondAsAttester(req.params.appId, payload);
+      res.json({ ok: true });
+    } catch (error: any) {
+      if (error?.issues) return res.status(400).json({ message: "Invalid response", errors: error.issues });
+      console.error("Attester response error:", error);
+      res.status(400).json({ message: error?.message || "Failed to record response" });
     }
   });
 
