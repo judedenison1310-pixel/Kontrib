@@ -1174,6 +1174,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Ops — Verified Ajo review queue
+  app.get("/api/ops/verifications", async (req, res) => {
+    try {
+      const password = req.query.password as string;
+      const opsPassword = process.env.OPS_PASSWORD;
+      if (!opsPassword || password !== opsPassword) {
+        return res.status(401).json({ message: "Unauthorised" });
+      }
+      const apps = await storage.getVerificationsForReview();
+      res.json({ applications: apps });
+    } catch (error) {
+      console.error("Ops verifications error:", error);
+      res.status(500).json({ message: "Failed to load verifications" });
+    }
+  });
+
+  app.post("/api/ops/verifications/:appId/decide", async (req, res) => {
+    try {
+      const password = req.query.password as string;
+      const opsPassword = process.env.OPS_PASSWORD;
+      if (!opsPassword || password !== opsPassword) {
+        return res.status(401).json({ message: "Unauthorised" });
+      }
+      const schema = z.object({
+        decision: z.enum(["approve", "reject", "request_info"]),
+        notes: z.string().max(2000).optional(),
+      });
+      const payload = schema.parse(req.body);
+      await storage.decideVerification(req.params.appId, payload.decision, payload.notes);
+      res.json({ ok: true });
+    } catch (error: any) {
+      if (error?.issues) return res.status(400).json({ message: "Invalid payload", errors: error.issues });
+      console.error("Ops decide verification error:", error);
+      res.status(400).json({ message: error?.message || "Failed to decide verification" });
+    }
+  });
+
   // Referral routes
   app.get("/api/referrals/me", async (req, res) => {
     try {

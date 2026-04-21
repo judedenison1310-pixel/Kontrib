@@ -2185,6 +2185,25 @@ import {
   verificationAttestations as verificationAttestationsTable,
 } from "@shared/schema";
 
+export type OpsVerificationOfficer = {
+  userId: string; fullName: string | null; phoneNumber: string;
+  role: "admin" | "officer"; status: string;
+  legalName: string | null; selfieUrl: string | null; respondedAt: Date | null;
+};
+export type OpsVerificationAttestation = {
+  userId: string; fullName: string | null; phoneNumber: string;
+  status: string; respondedAt: Date | null;
+};
+export type OpsVerificationApplication = {
+  id: string; status: string; state: string; lga: string;
+  notes: string | null; submittedAt: Date; decidedAt: Date | null;
+  group: { id: string; name: string; createdAt: Date; memberCount: number; completedCycleCount: number };
+  admin: { id: string; fullName: string | null; phoneNumber: string };
+  officers: OpsVerificationOfficer[];
+  attestations: OpsVerificationAttestation[];
+};
+export type VerificationDecision = "approve" | "reject" | "request_info";
+
 // Declaration merging so TS knows the prototype-added methods exist.
 export interface DbStorage {
   getVerificationStatus(groupId: string): Promise<VerificationStatus | null>;
@@ -2192,6 +2211,8 @@ export interface DbStorage {
   getVerificationInbox(userId: string): Promise<VerificationInbox>;
   respondAsOfficer(applicationId: string, payload: OfficerResponsePayload): Promise<void>;
   respondAsAttester(applicationId: string, payload: AttesterResponsePayload): Promise<void>;
+  getVerificationsForReview(): Promise<OpsVerificationApplication[]>;
+  decideVerification(appId: string, decision: VerificationDecision, notes?: string): Promise<void>;
 }
 export interface MemStorage {
   getVerificationStatus(groupId: string): Promise<VerificationStatus | null>;
@@ -2199,6 +2220,8 @@ export interface MemStorage {
   getVerificationInbox(userId: string): Promise<VerificationInbox>;
   respondAsOfficer(applicationId: string, payload: OfficerResponsePayload): Promise<void>;
   respondAsAttester(applicationId: string, payload: AttesterResponsePayload): Promise<void>;
+  getVerificationsForReview(): Promise<OpsVerificationApplication[]>;
+  decideVerification(appId: string, decision: VerificationDecision, notes?: string): Promise<void>;
 }
 
 const VERIFICATION_MIN_VOUCHES = 5;
@@ -2507,6 +2530,168 @@ DbStorage.prototype.respondAsAttester = async function (applicationId: string, p
 MemStorage.prototype.getVerificationInbox = async function () { return { officerInvites: [], attesterInvites: [] }; };
 MemStorage.prototype.respondAsOfficer = async function () { throw new Error("Verified Ajo not supported on MemStorage"); };
 MemStorage.prototype.respondAsAttester = async function () { throw new Error("Verified Ajo not supported on MemStorage"); };
+MemStorage.prototype.getVerificationsForReview = async function () { return []; };
+MemStorage.prototype.decideVerification = async function () { throw new Error("Verified Ajo not supported on MemStorage"); };
+
+DbStorage.prototype.getVerificationsForReview = async function (): Promise<OpsVerificationApplication[]> {
+  // Pull every application that's not still a draft so reviewers can see the full pipeline
+  const apps = await db.select().from(verificationApplicationsTable)
+    .where(inArray(verificationApplicationsTable.status, ["submitted", "under_review", "info_requested", "approved", "rejected"]))
+    .orderBy(desc(verificationApplicationsTable.createdAt));
+
+  if (apps.length === 0) return [];
+
+  const groupIds = Array.from(new Set(apps.map(a => a.groupId)));
+  const submitterIds = Array.from(new Set(apps.map(a => a.submittedBy)));
+
+  const [groupRows, submitterRows] = await Promise.all([
+    db.select().from(groupsTable).where(inArray(groupsTable.id, groupIds)),
+    db.select().from(usersTable).where(inArray(usersTable.id, submitterIds)),
+  ]);
+  const groupById = new Map(groupRows.map(g => [g.id, g]));
+  const userById = new Map(submitterRows.map(u => [u.id, u]));
+
+  // Pull officers + attestations for every application in two queries, plus their user records
+  const appIds = apps.map(a => a.id);
+  const [officerRows, attestationRows] = await Promise.all([
+    db.select().from(verificationOfficersTable).where(inArray(verificationOfficersTable.applicationId, appIds)),
+    db.select().from(verificationAttestationsTable).where(inArray(verificationAttestationsTable.applicationId, appIds)),
+  ]);
+
+  const peopleIds = Array.from(new Set([
+    ...officerRows.map(o => o.userId),
+    ...attestationRows.map(a => a.attesterId),
+  ]));
+  const peopleRows = peopleIds.length
+    ? await db.select().from(usersTable).where(inArray(usersTable.id, peopleIds))
+    : [];
+  const peopleById = new Map(peopleRows.map(u => [u.id, u]));
+
+  // Member counts + completed-cycle counts per group
+  const [memberCountRows, completedProjectRows] = await Promise.all([
+    db.select({
+      groupId: groupMembersTable.groupId,
+      count: sql<number>`cast(count(*) as int)`,
+    }).from(groupMembersTable)
+      .where(inArray(groupMembersTable.groupId, groupIds))
+      .groupBy(groupMembersTable.groupId),
+    db.select({
+      groupId: projectsTable.groupId,
+      count: sql<number>`cast(count(*) as int)`,
+    }).from(projectsTable)
+      .where(and(inArray(projectsTable.groupId, groupIds), eq(projectsTable.status, "completed")))
+      .groupBy(projectsTable.groupId),
+  ]);
+  const memberCountByGroup = new Map(memberCountRows.map(r => [r.groupId, r.count]));
+  const completedByGroup = new Map(completedProjectRows.map(r => [r.groupId, r.count]));
+
+  return apps.map(app => {
+    const group = groupById.get(app.groupId);
+    const submitter = userById.get(app.submittedBy);
+    const officers: OpsVerificationOfficer[] = officerRows
+      .filter(o => o.applicationId === app.id)
+      .map(o => {
+        const u = peopleById.get(o.userId);
+        return {
+          userId: o.userId,
+          fullName: u?.fullName ?? null,
+          phoneNumber: u?.phoneNumber ?? "",
+          role: o.role as "admin" | "officer",
+          status: o.status,
+          legalName: o.legalName ?? null,
+          selfieUrl: o.selfieUrl ?? null,
+          respondedAt: o.respondedAt ?? null,
+        };
+      });
+    const attestations: OpsVerificationAttestation[] = attestationRows
+      .filter(a => a.applicationId === app.id)
+      .map(a => {
+        const u = peopleById.get(a.attesterId);
+        return {
+          userId: a.attesterId,
+          fullName: u?.fullName ?? null,
+          phoneNumber: u?.phoneNumber ?? "",
+          status: a.status,
+          respondedAt: a.respondedAt ?? null,
+        };
+      });
+    return {
+      id: app.id,
+      status: app.status,
+      state: app.state,
+      lga: app.lga,
+      notes: app.notes ?? null,
+      submittedAt: app.createdAt,
+      decidedAt: app.decidedAt ?? null,
+      group: {
+        id: group?.id ?? app.groupId,
+        name: group?.name ?? "(missing group)",
+        createdAt: group?.createdAt ?? app.createdAt,
+        memberCount: memberCountByGroup.get(app.groupId) ?? 0,
+        completedCycleCount: completedByGroup.get(app.groupId) ?? 0,
+      },
+      admin: {
+        id: submitter?.id ?? app.submittedBy,
+        fullName: submitter?.fullName ?? null,
+        phoneNumber: submitter?.phoneNumber ?? "",
+      },
+      officers,
+      attestations,
+    };
+  });
+};
+
+DbStorage.prototype.decideVerification = async function (appId: string, decision: VerificationDecision, notes?: string) {
+  const [app] = await db.select().from(verificationApplicationsTable).where(eq(verificationApplicationsTable.id, appId)).limit(1);
+  if (!app) throw new Error("Verification application not found");
+  if (app.status === "approved" || app.status === "rejected") {
+    throw new Error("This application has already been decided");
+  }
+
+  const newStatus = decision === "approve" ? "approved" : decision === "reject" ? "rejected" : "info_requested";
+  const now = new Date();
+  await db.update(verificationApplicationsTable).set({
+    status: newStatus,
+    notes: notes ?? app.notes ?? null,
+    decidedAt: decision === "request_info" ? null : now,
+  }).where(eq(verificationApplicationsTable.id, appId));
+
+  if (decision === "approve") {
+    const expires = new Date(now);
+    expires.setMonth(expires.getMonth() + 12);
+    await db.update(groupsTable).set({
+      verifiedAt: now,
+      verificationExpiresAt: expires,
+    }).where(eq(groupsTable.id, app.groupId));
+  }
+
+  // Notify the admin
+  const [groupRow] = await db.select().from(groupsTable).where(eq(groupsTable.id, app.groupId)).limit(1);
+  const groupName = groupRow?.name ?? "your group";
+  const titleByDecision: Record<VerificationDecision, string> = {
+    approve: `🎉 ${groupName} is now a Verified Ajo group`,
+    reject: `${groupName}: Verification application not approved`,
+    request_info: `${groupName}: Reviewer needs more information`,
+  };
+  const typeByDecision: Record<VerificationDecision, string> = {
+    approve: "verification_approved",
+    reject: "verification_rejected",
+    request_info: "verification_info_requested",
+  };
+  await db.insert(notificationsTable).values({
+    userId: app.submittedBy,
+    type: typeByDecision[decision],
+    title: titleByDecision[decision],
+    message: notes && notes.trim().length > 0 ? notes.trim() : (
+      decision === "approve"
+        ? "Your group now displays the Verified Ajo badge. It is valid for 12 months."
+        : decision === "reject"
+        ? "Reach out to support if you'd like to know what to improve."
+        : "Please update your application with the requested details and let us know."
+    ),
+    read: false,
+  });
+};
 
 MemStorage.prototype.getVerificationStatus = async function () {
   throw new Error("Verified Ajo not supported on MemStorage");

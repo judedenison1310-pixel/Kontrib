@@ -1,8 +1,11 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 import {
   Users,
   Gift,
@@ -15,6 +18,10 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronUp,
+  ShieldCheck,
+  MapPin,
+  X,
+  HelpCircle,
 } from "lucide-react";
 import kontribLogo from "@assets/8_1764455185903.png";
 
@@ -28,6 +35,24 @@ function fmtDate(d: string | null) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
+
+type OpsVerificationData = {
+  applications: Array<{
+    id: string; status: string; state: string; lga: string;
+    notes: string | null; submittedAt: string; decidedAt: string | null;
+    group: { id: string; name: string; createdAt: string; memberCount: number; completedCycleCount: number };
+    admin: { id: string; fullName: string | null; phoneNumber: string };
+    officers: Array<{
+      userId: string; fullName: string | null; phoneNumber: string;
+      role: "admin" | "officer"; status: string;
+      legalName: string | null; selfieUrl: string | null; respondedAt: string | null;
+    }>;
+    attestations: Array<{
+      userId: string; fullName: string | null; phoneNumber: string;
+      status: string; respondedAt: string | null;
+    }>;
+  }>;
+};
 
 type OpsData = {
   stats: {
@@ -59,12 +84,249 @@ type OpsData = {
   }>;
 };
 
+function statusBadge(status: string) {
+  const map: Record<string, { cls: string; label: string }> = {
+    submitted: { cls: "bg-amber-500/20 text-amber-300", label: "Awaiting officers" },
+    under_review: { cls: "bg-blue-500/20 text-blue-300", label: "Under review" },
+    info_requested: { cls: "bg-purple-500/20 text-purple-300", label: "Info requested" },
+    approved: { cls: "bg-green-500/20 text-green-300", label: "Approved" },
+    rejected: { cls: "bg-red-500/20 text-red-300", label: "Rejected" },
+  };
+  const m = map[status] || { cls: "bg-gray-500/20 text-gray-300", label: status };
+  return <Badge className={`${m.cls} border-0 text-xs`}>{m.label}</Badge>;
+}
+
+function daysSince(d: string) {
+  const now = Date.now(); const then = new Date(d).getTime();
+  return Math.max(0, Math.floor((now - then) / (1000 * 60 * 60 * 24)));
+}
+
+function VerificationsPanel({
+  password, data, isLoading, onChanged,
+}: {
+  password: string;
+  data: OpsVerificationData | undefined;
+  isLoading: boolean;
+  onChanged: () => void;
+}) {
+  const { toast } = useToast();
+  const [filter, setFilter] = useState<"pending" | "all" | "approved" | "rejected">("pending");
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [notesByApp, setNotesByApp] = useState<Record<string, string>>({});
+
+  const decideMutation = useMutation({
+    mutationFn: async ({ appId, decision, notes }: { appId: string; decision: "approve" | "reject" | "request_info"; notes?: string }) => {
+      const res = await fetch(`/api/ops/verifications/${appId}/decide?password=${encodeURIComponent(password)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision, notes }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Failed" }));
+        throw new Error(err.message || "Failed");
+      }
+      return res.json();
+    },
+    onSuccess: (_d, vars) => {
+      toast({
+        title:
+          vars.decision === "approve" ? "Application approved" :
+          vars.decision === "reject" ? "Application rejected" :
+          "Info requested from admin",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/ops/verifications"] });
+      onChanged();
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed", description: err?.message || "Could not save decision", variant: "destructive" });
+    },
+  });
+
+  if (isLoading) return <div className="grid grid-cols-1 gap-3">{[1,2,3].map(i => <div key={i} className="h-24 bg-gray-800 rounded-xl animate-pulse" />)}</div>;
+  const apps = data?.applications || [];
+  const filtered = apps.filter(a => {
+    if (filter === "all") return true;
+    if (filter === "pending") return a.status === "submitted" || a.status === "under_review" || a.status === "info_requested";
+    return a.status === filter;
+  });
+  const counts = {
+    pending: apps.filter(a => a.status === "submitted" || a.status === "under_review" || a.status === "info_requested").length,
+    all: apps.length,
+    approved: apps.filter(a => a.status === "approved").length,
+    rejected: apps.filter(a => a.status === "rejected").length,
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-2 overflow-x-auto">
+        {(["pending", "all", "approved", "rejected"] as const).map(f => (
+          <button key={f} onClick={() => setFilter(f)}
+            className={`text-xs px-3 py-1 rounded-full capitalize whitespace-nowrap transition-colors ${filter === f ? "bg-primary text-white" : "bg-gray-800 text-gray-400 hover:text-white"}`}
+            data-testid={`filter-verif-${f}`}>
+            {f} ({counts[f]})
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="text-center py-10 text-gray-500">No applications</div>
+      ) : filtered.map(app => {
+        const isOpen = openId === app.id;
+        const ageDays = daysSince(app.group.createdAt);
+        const officersAccepted = app.officers.filter(o => o.status === "accepted").length;
+        const officersTotal = app.officers.length;
+        const vouches = app.attestations.filter(a => a.status === "vouched").length;
+        const declines = app.attestations.filter(a => a.status === "declined").length;
+        const meetsFloor = ageDays >= 30 && app.group.memberCount >= 10 && app.group.completedCycleCount >= 1;
+        const decided = app.status === "approved" || app.status === "rejected";
+
+        return (
+          <Card key={app.id} className="bg-gray-900 border-gray-800" data-testid={`verification-card-${app.id}`}>
+            <CardContent className="p-4 space-y-3">
+              <button onClick={() => setOpenId(isOpen ? null : app.id)} className="w-full text-left">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold text-sm truncate">{app.group.name}</p>
+                      {statusBadge(app.status)}
+                    </div>
+                    <p className="text-gray-400 text-xs mt-1 flex items-center gap-1">
+                      <MapPin className="h-3 w-3" /> {app.lga}, {app.state}
+                      <span className="text-gray-600 mx-1">·</span>
+                      Submitted {fmtDate(app.submittedAt)} by {app.admin.fullName || app.admin.phoneNumber}
+                    </p>
+                  </div>
+                  {isOpen ? <ChevronUp className="h-4 w-4 text-gray-400 shrink-0" /> : <ChevronDown className="h-4 w-4 text-gray-400 shrink-0" />}
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 mt-3 text-xs">
+                  <div className={`rounded-md px-2 py-1.5 ${ageDays >= 30 ? "bg-green-500/10 text-green-300" : "bg-red-500/10 text-red-300"}`}>
+                    Age: {ageDays}d {ageDays >= 30 ? "✓" : "✗"}
+                  </div>
+                  <div className={`rounded-md px-2 py-1.5 ${app.group.memberCount >= 10 ? "bg-green-500/10 text-green-300" : "bg-red-500/10 text-red-300"}`}>
+                    Members: {app.group.memberCount} {app.group.memberCount >= 10 ? "✓" : "✗"}
+                  </div>
+                  <div className={`rounded-md px-2 py-1.5 ${app.group.completedCycleCount >= 1 ? "bg-green-500/10 text-green-300" : "bg-red-500/10 text-red-300"}`}>
+                    Cycles: {app.group.completedCycleCount} {app.group.completedCycleCount >= 1 ? "✓" : "✗"}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
+                  <div className={`rounded-md px-2 py-1.5 ${officersAccepted === officersTotal && officersTotal > 0 ? "bg-green-500/10 text-green-300" : "bg-amber-500/10 text-amber-300"}`}>
+                    Officers: {officersAccepted}/{officersTotal} accepted
+                  </div>
+                  <div className={`rounded-md px-2 py-1.5 ${vouches >= 5 ? "bg-green-500/10 text-green-300" : "bg-amber-500/10 text-amber-300"}`}>
+                    Vouches: {vouches}{declines > 0 ? ` · ${declines} declined` : ""}
+                  </div>
+                </div>
+                {!meetsFloor && (
+                  <p className="text-amber-400 text-xs mt-2 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" /> Group does not yet meet baseline floor
+                  </p>
+                )}
+              </button>
+
+              {isOpen && (
+                <div className="border-t border-gray-800 pt-3 space-y-4">
+                  <div>
+                    <p className="text-xs uppercase text-gray-500 font-medium mb-2">Officers ({officersTotal})</p>
+                    <div className="space-y-2">
+                      {app.officers.map(o => (
+                        <div key={o.userId} className="flex items-center gap-3 bg-gray-950 rounded-md p-2">
+                          {o.selfieUrl ? (
+                            <a href={o.selfieUrl} target="_blank" rel="noreferrer">
+                              <img src={o.selfieUrl} alt="Selfie" className="h-12 w-12 rounded-md object-cover border border-gray-800" />
+                            </a>
+                          ) : (
+                            <div className="h-12 w-12 rounded-md bg-gray-800 flex items-center justify-center text-gray-600 text-xs">No selfie</div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-medium truncate">{o.legalName || o.fullName || "—"}</p>
+                              <Badge className="bg-gray-800 text-gray-300 border-0 text-[10px] uppercase">{o.role}</Badge>
+                            </div>
+                            <p className="text-gray-500 text-xs">{o.phoneNumber} · {o.fullName ? `Profile: ${o.fullName}` : "no profile name"}</p>
+                          </div>
+                          <Badge className={`text-xs border-0 ${o.status === "accepted" ? "bg-green-500/20 text-green-300" : o.status === "declined" ? "bg-red-500/20 text-red-300" : "bg-amber-500/20 text-amber-300"}`}>
+                            {o.status}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-xs uppercase text-gray-500 font-medium mb-2">Attesters ({app.attestations.length})</p>
+                    <div className="space-y-1">
+                      {app.attestations.map(a => (
+                        <div key={a.userId} className="flex items-center justify-between text-sm bg-gray-950 rounded-md px-3 py-1.5">
+                          <span className="truncate">{a.fullName || a.phoneNumber}</span>
+                          <Badge className={`text-xs border-0 ${a.status === "vouched" ? "bg-green-500/20 text-green-300" : a.status === "declined" ? "bg-red-500/20 text-red-300" : "bg-amber-500/20 text-amber-300"}`}>
+                            {a.status}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {app.notes && (
+                    <div className="bg-gray-950 rounded-md p-2 text-xs text-gray-400 whitespace-pre-wrap">
+                      <span className="text-gray-500 font-medium">Last notes: </span>{app.notes}
+                    </div>
+                  )}
+
+                  {!decided && (
+                    <div className="space-y-2">
+                      <Textarea
+                        placeholder="Notes for the admin (sent with rejection / info request, optional on approval)"
+                        value={notesByApp[app.id] || ""}
+                        onChange={e => setNotesByApp(s => ({ ...s, [app.id]: e.target.value }))}
+                        className="bg-gray-950 border-gray-800 text-white text-xs min-h-[60px]"
+                        data-testid={`textarea-notes-${app.id}`}
+                      />
+                      <div className="flex gap-2 flex-wrap">
+                        <button
+                          onClick={() => decideMutation.mutate({ appId: app.id, decision: "approve", notes: notesByApp[app.id] })}
+                          disabled={decideMutation.isPending}
+                          className="bg-green-600 hover:bg-green-500 text-white text-xs font-medium px-3 py-1.5 rounded-md flex items-center gap-1 disabled:opacity-50"
+                          data-testid={`button-approve-${app.id}`}>
+                          <ShieldCheck className="h-3.5 w-3.5" /> Approve
+                        </button>
+                        <button
+                          onClick={() => decideMutation.mutate({ appId: app.id, decision: "request_info", notes: notesByApp[app.id] })}
+                          disabled={decideMutation.isPending}
+                          className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium px-3 py-1.5 rounded-md flex items-center gap-1 disabled:opacity-50"
+                          data-testid={`button-request-info-${app.id}`}>
+                          <HelpCircle className="h-3.5 w-3.5" /> Request info
+                        </button>
+                        <button
+                          onClick={() => decideMutation.mutate({ appId: app.id, decision: "reject", notes: notesByApp[app.id] })}
+                          disabled={decideMutation.isPending}
+                          className="bg-red-600 hover:bg-red-500 text-white text-xs font-medium px-3 py-1.5 rounded-md flex items-center gap-1 disabled:opacity-50"
+                          data-testid={`button-reject-${app.id}`}>
+                          <X className="h-3.5 w-3.5" /> Reject
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {decided && app.decidedAt && (
+                    <p className="text-xs text-gray-500">Decided {fmtDate(app.decidedAt)}</p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function Ops() {
   const [password, setPassword] = useState(() => sessionStorage.getItem(OPS_PASS_KEY) || "");
   const [inputPassword, setInputPassword] = useState("");
   const [nonce, setNonce] = useState(0);
   const [authError, setAuthError] = useState(false);
-  const [activeTab, setActiveTab] = useState<"referrals" | "payments">("payments");
+  const [activeTab, setActiveTab] = useState<"referrals" | "payments" | "verifications">("payments");
   const [refFilter, setRefFilter] = useState<"all" | "complete" | "pending">("all");
 
   const { data, isLoading, isError, error, refetch } = useQuery<OpsData>({
@@ -75,6 +337,17 @@ export default function Ops() {
         const err = await res.json().catch(() => ({ message: "Failed" }));
         throw new Error(err.message || "Failed");
       }
+      return res.json();
+    },
+    enabled: !!password,
+    retry: false,
+  });
+
+  const verifications = useQuery<OpsVerificationData>({
+    queryKey: ["/api/ops/verifications", password, nonce],
+    queryFn: async () => {
+      const res = await fetch(`/api/ops/verifications?password=${encodeURIComponent(password)}`);
+      if (!res.ok) throw new Error("Failed");
       return res.json();
     },
     enabled: !!password,
@@ -210,21 +483,40 @@ export default function Ops() {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-2 border-b border-gray-800 pb-0">
-              {(["payments", "referrals"] as const).map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize ${
-                    activeTab === tab
-                      ? "border-primary text-primary"
-                      : "border-transparent text-gray-400 hover:text-white"
-                  }`}
-                >
-                  {tab === "payments" ? `Payments (${data.stats.totalPaymentProofs})` : `Referrals (${data.stats.totalReferrals})`}
-                </button>
-              ))}
+            <div className="flex gap-2 border-b border-gray-800 pb-0 overflow-x-auto">
+              {(["payments", "referrals", "verifications"] as const).map(tab => {
+                const pendingVerifs = (verifications.data?.applications || []).filter(
+                  a => a.status === "submitted" || a.status === "under_review" || a.status === "info_requested"
+                ).length;
+                const label =
+                  tab === "payments" ? `Payments (${data.stats.totalPaymentProofs})`
+                  : tab === "referrals" ? `Referrals (${data.stats.totalReferrals})`
+                  : `Verifications (${pendingVerifs})`;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                      activeTab === tab
+                        ? "border-primary text-primary"
+                        : "border-transparent text-gray-400 hover:text-white"
+                    }`}
+                    data-testid={`tab-${tab}`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
+
+            {activeTab === "verifications" && (
+              <VerificationsPanel
+                password={password}
+                data={verifications.data}
+                isLoading={verifications.isLoading}
+                onChanged={() => verifications.refetch()}
+              />
+            )}
 
             {/* Payment Proofs tab */}
             {activeTab === "payments" && (
