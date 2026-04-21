@@ -2204,6 +2204,15 @@ export type OpsVerificationApplication = {
 };
 export type VerificationDecision = "approve" | "reject" | "request_info";
 
+export type DiscoveryVerifiedGroup = {
+  id: string; name: string;
+  state: string | null; lga: string | null;
+  verifiedAt: Date; verificationExpiresAt: Date | null;
+  memberCount: number;
+  registrationLink: string; customSlug: string | null;
+  match: "lga" | "state" | "other";
+};
+
 // Declaration merging so TS knows the prototype-added methods exist.
 export interface DbStorage {
   getVerificationStatus(groupId: string): Promise<VerificationStatus | null>;
@@ -2213,6 +2222,7 @@ export interface DbStorage {
   respondAsAttester(applicationId: string, payload: AttesterResponsePayload): Promise<void>;
   getVerificationsForReview(): Promise<OpsVerificationApplication[]>;
   decideVerification(appId: string, decision: VerificationDecision, notes?: string): Promise<void>;
+  getDiscoveryVerifiedGroups(opts: { state?: string | null; lga?: string | null; excludeUserId?: string | null; limit?: number }): Promise<DiscoveryVerifiedGroup[]>;
 }
 export interface MemStorage {
   getVerificationStatus(groupId: string): Promise<VerificationStatus | null>;
@@ -2222,6 +2232,7 @@ export interface MemStorage {
   respondAsAttester(applicationId: string, payload: AttesterResponsePayload): Promise<void>;
   getVerificationsForReview(): Promise<OpsVerificationApplication[]>;
   decideVerification(appId: string, decision: VerificationDecision, notes?: string): Promise<void>;
+  getDiscoveryVerifiedGroups(opts: { state?: string | null; lga?: string | null; excludeUserId?: string | null; limit?: number }): Promise<DiscoveryVerifiedGroup[]>;
 }
 
 const VERIFICATION_MIN_VOUCHES = 5;
@@ -2533,6 +2544,75 @@ MemStorage.prototype.respondAsOfficer = async function () { throw new Error("Ver
 MemStorage.prototype.respondAsAttester = async function () { throw new Error("Verified Ajo not supported on MemStorage"); };
 MemStorage.prototype.getVerificationsForReview = async function () { return []; };
 MemStorage.prototype.decideVerification = async function () { throw new Error("Verified Ajo not supported on MemStorage"); };
+MemStorage.prototype.getDiscoveryVerifiedGroups = async function () { return []; };
+
+DbStorage.prototype.getDiscoveryVerifiedGroups = async function (opts): Promise<DiscoveryVerifiedGroup[]> {
+  const limit = Math.max(1, Math.min(50, opts.limit ?? 12));
+  const now = new Date();
+
+  // Pull all currently-verified, publicly-listed groups (and not expired)
+  const rows = await db.select().from(groupsTable).where(and(
+    eq(groupsTable.publiclyListed, true),
+    drizzleSql`${groupsTable.verifiedAt} IS NOT NULL`,
+  ));
+
+  const liveRows = rows.filter(g =>
+    g.verifiedAt !== null &&
+    (g.verificationExpiresAt === null || g.verificationExpiresAt > now)
+  );
+
+  if (liveRows.length === 0) return [];
+
+  // Optionally exclude groups the user is already a member of (or admin of)
+  let excludedIds = new Set<string>();
+  if (opts.excludeUserId) {
+    const memberships = await db.select({ gid: groupMembersTable.groupId })
+      .from(groupMembersTable)
+      .where(eq(groupMembersTable.userId, opts.excludeUserId));
+    memberships.forEach(m => excludedIds.add(m.gid));
+    liveRows.forEach(g => { if (g.adminId === opts.excludeUserId) excludedIds.add(g.id); });
+  }
+  const candidateRows = liveRows.filter(g => !excludedIds.has(g.id));
+  if (candidateRows.length === 0) return [];
+
+  // Member counts in one batch
+  const candidateIds = candidateRows.map(g => g.id);
+  const memberCountRows = await db.select({
+    groupId: groupMembersTable.groupId,
+    count: drizzleSql<number>`cast(count(*) as int)`,
+  }).from(groupMembersTable)
+    .where(inArray(groupMembersTable.groupId, candidateIds))
+    .groupBy(groupMembersTable.groupId);
+  const memberCountByGroup = new Map(memberCountRows.map(r => [r.groupId, r.count]));
+
+  const enriched: DiscoveryVerifiedGroup[] = candidateRows.map(g => {
+    const sameLga = !!opts.lga && !!g.lga && opts.lga.toLowerCase() === g.lga.toLowerCase();
+    const sameState = !!opts.state && !!g.state && opts.state.toLowerCase() === g.state.toLowerCase();
+    const match: DiscoveryVerifiedGroup["match"] = sameLga ? "lga" : sameState ? "state" : "other";
+    return {
+      id: g.id,
+      name: g.name,
+      state: g.state ?? null,
+      lga: g.lga ?? null,
+      verifiedAt: g.verifiedAt!,
+      verificationExpiresAt: g.verificationExpiresAt ?? null,
+      memberCount: memberCountByGroup.get(g.id) ?? 0,
+      registrationLink: g.registrationLink,
+      customSlug: g.customSlug ?? null,
+      match,
+    };
+  });
+
+  // Rank: same LGA first, then same state, then others; within each bucket, newest verified first
+  const rank = { lga: 0, state: 1, other: 2 } as const;
+  enriched.sort((a, b) => {
+    const r = rank[a.match] - rank[b.match];
+    if (r !== 0) return r;
+    return (b.verifiedAt?.getTime() ?? 0) - (a.verifiedAt?.getTime() ?? 0);
+  });
+
+  return enriched.slice(0, limit);
+};
 
 DbStorage.prototype.getVerificationsForReview = async function (): Promise<OpsVerificationApplication[]> {
   // Pull every application that's not still a draft so reviewers can see the full pipeline
@@ -2572,13 +2652,13 @@ DbStorage.prototype.getVerificationsForReview = async function (): Promise<OpsVe
   const [memberCountRows, completedProjectRows] = await Promise.all([
     db.select({
       groupId: groupMembersTable.groupId,
-      count: sql<number>`cast(count(*) as int)`,
+      count: drizzleSql<number>`cast(count(*) as int)`,
     }).from(groupMembersTable)
       .where(inArray(groupMembersTable.groupId, groupIds))
       .groupBy(groupMembersTable.groupId),
     db.select({
       groupId: projectsTable.groupId,
-      count: sql<number>`cast(count(*) as int)`,
+      count: drizzleSql<number>`cast(count(*) as int)`,
     }).from(projectsTable)
       .where(and(inArray(projectsTable.groupId, groupIds), eq(projectsTable.status, "completed")))
       .groupBy(projectsTable.groupId),

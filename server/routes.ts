@@ -510,6 +510,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Verified Ajo — public discovery strip (verified, publicly-listed groups, ranked by locality)
+  app.get("/api/discovery/verified-groups", async (req, res) => {
+    try {
+      const userId = (req.query.userId as string) || null;
+      const state = (req.query.state as string) || null;
+      const lga = (req.query.lga as string) || null;
+      const limitRaw = parseInt((req.query.limit as string) || "12", 10);
+      const limit = Number.isFinite(limitRaw) ? limitRaw : 12;
+      const groups = await storage.getDiscoveryVerifiedGroups({ state, lga, excludeUserId: userId, limit });
+      res.json({ groups });
+    } catch (error) {
+      console.error("Discovery verified-groups error:", error);
+      res.status(500).json({ message: "Failed to load discovery groups" });
+    }
+  });
+
   // Verified Ajo — admin sets the public-listing preference (one-time prompt after approval)
   app.patch("/api/groups/:groupId/public-listing", async (req, res) => {
     try {
