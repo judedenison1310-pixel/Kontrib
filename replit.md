@@ -52,3 +52,10 @@ The frontend uses React 18 with TypeScript and Vite, leveraging Shadcn/UI (based
 - **Vite**: Build tool and development server.
 - **Tailwind CSS**: Utility-first CSS framework.
 - **canvas**: Node.js Canvas API for dynamic image generation.
+## Verified Ajo (Phase 1) — Stress-tested April 2026
+
+End-to-end stress test of all 7 shipped steps passed after one bug fix:
+
+- **Bug found & fixed**: the apply flow was creating a `verification_officers` row for the admin themselves with `status='pending'`, but no UX existed for the admin to ever "accept" themselves. As a result, `maybeAdvanceVerificationStatus` could never see all-officers-accepted, and applications were stuck in `submitted` forever even after 5+ vouches.
+- **Fix**: `submitVerificationSchema` now requires `adminLegalName` + `adminSelfie`. The apply storage call writes the admin officer row directly as `accepted` with those values and mirrors them onto the user profile. The apply modal collects them on step 2 (legal name input + selfie file upload with preview).
+- **Verified end-to-end**: eligibility floor, apply gating, officer accept/decline (with auth + selfie validation), attester vouch/decline, auto-advance to `under_review` at 5 vouches, ops queue auth, ops approve → group becomes verified-active with 12-month expiry + public listing default-on, admin-only listing toggle, locality-ranked discovery (same-LGA > other state), discovery hides on listing-off and on expiry, identity-light join gate (legal name + data: image selfie required for verified groups, NOT required for unverified groups, persisted on `group_members.joiner_legal_name` / `joiner_selfie_data_url`).

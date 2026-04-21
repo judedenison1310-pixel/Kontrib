@@ -2357,11 +2357,24 @@ DbStorage.prototype.applyForVerification = async function (groupId: string, payl
     submittedAt: new Date(),
   }).returning();
 
-  // Officers: admin + 2 nominees
+  // Officers: admin (auto-accepted with their legal name + selfie) + 2 nominees (pending)
   await db.insert(verificationOfficersTable).values([
-    { applicationId: app.id, userId: payload.submittedBy, role: "admin", status: "pending" },
-    ...payload.officerNominees.map(uid => ({ applicationId: app.id, userId: uid, role: "officer", status: "pending" })),
+    {
+      applicationId: app.id,
+      userId: payload.submittedBy,
+      role: "admin",
+      status: "accepted",
+      legalName: payload.adminLegalName,
+      selfieUrl: payload.adminSelfie,
+      respondedAt: new Date(),
+    },
+    ...payload.officerNominees.map(uid => ({ applicationId: app.id, userId: uid, role: "officer" as const, status: "pending" as const })),
   ]);
+  // Mirror the admin's identity onto their user profile so they don't need to re-enter it later
+  await db.update(usersTable).set({
+    legalName: payload.adminLegalName,
+    selfieUrl: payload.adminSelfie,
+  }).where(eq(usersTable.id, payload.submittedBy));
 
   // Attestations
   await db.insert(verificationAttestationsTable).values(

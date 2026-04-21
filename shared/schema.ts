@@ -92,6 +92,8 @@ export const submitVerificationSchema = z.object({
   submittedBy: z.string().min(1),
   state: z.string().min(2, "State is required"),
   lga: z.string().min(2, "LGA is required"),
+  adminLegalName: z.string().min(2, "Your legal name is required"),
+  adminSelfie: z.string().min(20, "A selfie is required"),
   officerNominees: z.array(z.string().min(1)).length(2, "Nominate exactly 2 co-officers"),
   attesters: z.array(z.string().min(1)).min(5, "Pick at least 5 Kontrib member attesters"),
 });

@@ -37,6 +37,9 @@ export function VerificationApplyModal({ open, onOpenChange, groupId, adminId, m
   const [step, setStep] = useState(1);
   const [state, setState] = useState("");
   const [lga, setLga] = useState("");
+  const [adminLegalName, setAdminLegalName] = useState("");
+  const [adminSelfie, setAdminSelfie] = useState("");
+  const [selfieError, setSelfieError] = useState<string | null>(null);
   const [officerNominees, setOfficerNominees] = useState<string[]>([]);
   const [attesterMap, setAttesterMap] = useState<Record<string, UserType>>({});
   const attesters = useMemo(() => Object.keys(attesterMap), [attesterMap]);
@@ -52,13 +55,25 @@ export function VerificationApplyModal({ open, onOpenChange, groupId, adminId, m
 
   function reset() {
     setStep(1); setState(""); setLga(""); setOfficerNominees([]);
+    setAdminLegalName(""); setAdminSelfie(""); setSelfieError(null);
     setAttesterMap({}); setAttesterPhone(""); setAttesterLookup(null); setLookupError(null);
+  }
+
+  function handleSelfieFile(file: File | null) {
+    setSelfieError(null);
+    if (!file) { setAdminSelfie(""); return; }
+    if (file.size > 4 * 1024 * 1024) { setSelfieError("Selfie must be smaller than 4MB."); return; }
+    const reader = new FileReader();
+    reader.onload = () => setAdminSelfie(typeof reader.result === "string" ? reader.result : "");
+    reader.onerror = () => setSelfieError("Could not read that image.");
+    reader.readAsDataURL(file);
   }
 
   const submit = useMutation({
     mutationFn: async () => {
       return apiRequest("POST", `/api/groups/${groupId}/verification`, {
         submittedBy: adminId, state, lga,
+        adminLegalName, adminSelfie,
         officerNominees, attesters,
       });
     },
@@ -107,7 +122,7 @@ export function VerificationApplyModal({ open, onOpenChange, groupId, adminId, m
 
   const canNext =
     (step === 1 && state && lga.trim().length >= 2) ||
-    (step === 2 && officerNominees.length === 2) ||
+    (step === 2 && officerNominees.length === 2 && adminLegalName.trim().length >= 2 && adminSelfie.length >= 20) ||
     (step === 3 && attesters.length >= 5) ||
     step === 4;
 
@@ -147,7 +162,23 @@ export function VerificationApplyModal({ open, onOpenChange, groupId, adminId, m
 
         {step === 2 && (
           <div className="space-y-4">
-            <p className="text-sm text-gray-600">Pick <strong>2 co-officers</strong> from your group. They'll confirm their full name and a selfie. You're automatically the 3rd officer.</p>
+            <p className="text-sm text-gray-600">You're the 3rd officer. Confirm your full legal name and add a clear selfie so reviewers can match it to your phone number.</p>
+            <div>
+              <Label>Your full legal name</Label>
+              <Input value={adminLegalName} onChange={e => setAdminLegalName(e.target.value)}
+                placeholder="As it appears on your ID" data-testid="input-admin-legal-name" />
+            </div>
+            <div>
+              <Label>Your selfie</Label>
+              <Input type="file" accept="image/*" onChange={e => handleSelfieFile(e.target.files?.[0] ?? null)}
+                data-testid="input-admin-selfie" />
+              {selfieError && <p className="text-xs text-red-600 mt-1">{selfieError}</p>}
+              {adminSelfie && (
+                <img src={adminSelfie} alt="Your selfie preview" className="mt-2 h-24 w-24 rounded object-cover border" />
+              )}
+            </div>
+            <div className="border-t pt-4" />
+            <p className="text-sm text-gray-600">Now pick <strong>2 co-officers</strong> from your group. They'll be asked to confirm their own legal name and selfie.</p>
             {eligibleOfficers.length < 2 ? (
               <p className="text-sm text-orange-600">You need at least 2 other active members to nominate officers.</p>
             ) : (
