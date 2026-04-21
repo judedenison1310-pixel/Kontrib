@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRoute, useLocation, useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +22,8 @@ import {
   Phone,
   MessageSquare,
   ArrowLeft,
+  ShieldCheck,
+  Camera,
 } from "lucide-react";
 import { formatNaira, calculateProgress } from "@/lib/currency";
 import { getCurrentUser } from "@/lib/auth";
@@ -49,6 +51,7 @@ const registrationFormSchema = z.object({
       /^\+?[1-9]\d{1,14}$/,
       "Please enter a valid phone number with country code (e.g., +234, +1, +44)",
     ),
+  legalName: z.string().optional(),
 });
 
 const otpFormSchema = z.object({
@@ -74,6 +77,9 @@ export default function GroupRegistration() {
     expiresAt: string;
   } | null>(null);
   const [newUser, setNewUser] = useState<User | null>(null);
+  const [selfie, setSelfie] = useState<string | null>(null);
+  const [existingUserLegalName, setExistingUserLegalName] = useState("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const {
     data: groupData,
@@ -85,6 +91,20 @@ export default function GroupRegistration() {
   });
 
   const group = groupData?.group;
+  const isVerifiedActive = !!group?.verifiedAt &&
+    (!group?.verificationExpiresAt || new Date(group.verificationExpiresAt) > new Date());
+
+  const onSelfieFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "Photo too large", description: "Please use a photo under 5 MB.", variant: "destructive" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => setSelfie(typeof ev.target?.result === "string" ? ev.target.result : null);
+    reader.readAsDataURL(file);
+  };
 
   const { data: purses = [] } = useQuery({
     queryKey: ["/api/groups", group?.id, "purses"],
@@ -147,10 +167,22 @@ export default function GroupRegistration() {
     mutationFn: async (data: RegistrationFormData & { otp: string }) => {
       if (!group) throw new Error("Group not found");
 
+      const payload: any = { ...data };
+      if (isVerifiedActive) {
+        if (!data.legalName || data.legalName.trim().length < 2) {
+          throw new Error("Legal name is required to join a Verified Ajo group");
+        }
+        if (!selfie) {
+          throw new Error("A selfie is required to join a Verified Ajo group");
+        }
+        payload.legalName = data.legalName.trim();
+        payload.selfieDataUrl = selfie;
+      }
+
       const response = await apiRequest(
         "POST",
         `/api/groups/${group.id}/register-with-otp`,
-        data,
+        payload,
       );
       return response.json();
     },
@@ -175,12 +207,19 @@ export default function GroupRegistration() {
     mutationFn: async () => {
       if (!group || !user) throw new Error("Missing group or user data");
 
+      const body: any = { userId: user.id };
+      if (isVerifiedActive) {
+        if (!existingUserLegalName.trim() || !selfie) {
+          throw new Error("Legal name and selfie are required to join a Verified Ajo group");
+        }
+        body.legalName = existingUserLegalName.trim();
+        body.selfieDataUrl = selfie;
+      }
+
       const response = await apiRequest(
         "POST",
         `/api/groups/${group.id}/join`,
-        {
-          userId: user.id,
-        },
+        body,
       );
       return response.json();
     },
@@ -208,7 +247,16 @@ export default function GroupRegistration() {
       setStep("registration");
       return;
     }
-
+    if (isVerifiedActive) {
+      if (!existingUserLegalName.trim()) {
+        toast({ title: "Legal name required", description: "Please enter your legal name to join this Verified Ajo group.", variant: "destructive" });
+        return;
+      }
+      if (!selfie) {
+        toast({ title: "Selfie required", description: "Please add a selfie to join this Verified Ajo group.", variant: "destructive" });
+        return;
+      }
+    }
     joinGroupMutation.mutate();
   };
 
@@ -341,15 +389,51 @@ export default function GroupRegistration() {
         </div>
       )}
 
+      {/* Verified Ajo identity gate (shown for existing logged-in users; new users get the same fields inside the registration form) */}
+      {isVerifiedActive && user && (
+        <Card className="border-green-300 bg-green-50/40">
+          <CardHeader>
+            <CardTitle className="text-base inline-flex items-center gap-2 text-green-800">
+              <ShieldCheck className="w-4 h-4" /> Verify your identity to join
+            </CardTitle>
+            <p className="text-xs text-gray-600">
+              This is a <strong>Verified Ajo Group</strong>. To keep it trustworthy, new joiners share their legal name and a quick selfie.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <Label className="text-xs">Your legal name</Label>
+              <Input
+                value={existingUserLegalName}
+                onChange={(e) => setExistingUserLegalName(e.target.value)}
+                placeholder="As it appears on your ID"
+                data-testid="input-joiner-legal-name"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Selfie</Label>
+              <div className="flex items-center gap-3 mt-1">
+                <input ref={fileInputRef} type="file" accept="image/*" capture="user" onChange={onSelfieFile} className="hidden" />
+                <Button type="button" size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} data-testid="button-joiner-selfie">
+                  <Camera className="w-4 h-4 mr-1" /> {selfie ? "Retake selfie" : "Take selfie"}
+                </Button>
+                {selfie && <img src={selfie} alt="Selfie" className="h-12 w-12 object-cover rounded-md border" data-testid="img-joiner-selfie" />}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Action Buttons */}
       <div className="space-y-3">
         <Button
           onClick={handleJoinGroup}
+          disabled={joinGroupMutation.isPending}
           className="w-full bg-green-600 hover:bg-green-700 text-white"
           data-testid="join-group"
         >
           <Users className="h-4 w-4 mr-2" />
-          Join Group
+          {joinGroupMutation.isPending ? "Joining..." : "Join Group"}
         </Button>
         {user && (
           <Button
@@ -385,6 +469,17 @@ export default function GroupRegistration() {
         </p>
       </div>
 
+      {isVerifiedActive && (
+        <Card className="border-green-300 bg-green-50/40">
+          <CardContent className="py-3 inline-flex items-start gap-2">
+            <ShieldCheck className="w-4 h-4 text-green-700 mt-0.5 shrink-0" />
+            <p className="text-xs text-green-900">
+              <strong>Verified Ajo Group.</strong> You'll need to share your legal name and a quick selfie to join. This keeps the group trustworthy for everyone.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Your Information</CardTitle>
@@ -412,6 +507,41 @@ export default function GroupRegistration() {
                   </FormItem>
                 )}
               />
+
+              {isVerifiedActive && (
+                <>
+                  <FormField
+                    control={registrationForm.control}
+                    name="legalName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Legal Name (as on your ID)</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g., Adebayo Olamide Johnson"
+                            {...field}
+                            value={field.value ?? ""}
+                            data-testid="input-legal-name"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                        <p className="text-xs text-gray-500">Used only for verified-group identity checks.</p>
+                      </FormItem>
+                    )}
+                  />
+                  <div>
+                    <Label className="text-sm">Selfie</Label>
+                    <div className="flex items-center gap-3 mt-1">
+                      <input ref={fileInputRef} type="file" accept="image/*" capture="user" onChange={onSelfieFile} className="hidden" />
+                      <Button type="button" size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} data-testid="button-new-joiner-selfie">
+                        <Camera className="w-4 h-4 mr-1" /> {selfie ? "Retake selfie" : "Take selfie"}
+                      </Button>
+                      {selfie && <img src={selfie} alt="Selfie" className="h-12 w-12 object-cover rounded-md border" data-testid="img-new-joiner-selfie" />}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Front camera works best.</p>
+                  </div>
+                </>
+              )}
 
               <FormField
                 control={registrationForm.control}

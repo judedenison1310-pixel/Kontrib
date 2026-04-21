@@ -159,6 +159,9 @@ export const groupMembers = pgTable("group_members", {
   contributedAmount: decimal("contributed_amount", { precision: 15, scale: 2 }).notNull().default("0"),
   status: text("status").notNull().default("active"), // "active", "pending", "inactive"
   joinedAt: timestamp("joined_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  // Verified Ajo: identity-light info captured at join time when the group is verified
+  joinerLegalName: text("joiner_legal_name"),
+  joinerSelfieDataUrl: text("joiner_selfie_data_url"),
 });
 
 export const projects = pgTable("projects", {

@@ -106,6 +106,15 @@ function SharedLinkRedirect({ user }: { user: User | null }) {
     }
   }
   
+  // Verified Ajo: if the user isn't a member, route through the registration page
+  // so the identity-light gate (legal name + selfie) is enforced.
+  const isVerifiedActive = !!data.group?.verifiedAt &&
+    (!data.group?.verificationExpiresAt || new Date(data.group.verificationExpiresAt) > new Date());
+  if (isVerifiedActive && data.isMember === false && data.group?.registrationLink) {
+    navigate(`/register/${data.group.registrationLink}`);
+    return null;
+  }
+
   // Default: redirect to group details
   navigate(`/group/${data.group.id}`);
   return null;

@@ -200,13 +200,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get member count
       const members = await storage.getGroupMembers(group.id);
       
-      // Check if current user is already a member, auto-add if not
+      // Check if current user is already a member, auto-add if not.
+      // Verified Ajo groups never auto-add — joiners must go through the identity gate.
+      const isVerifiedActive = !!group.verifiedAt && (!group.verificationExpiresAt || group.verificationExpiresAt > new Date());
       let isMember = false;
       if (userId && typeof userId === 'string') {
         const membership = await storage.getGroupMember(group.id, userId);
         isMember = !!membership;
 
-        if (!isMember) {
+        if (!isMember && !isVerifiedActive) {
           try {
             await storage.addGroupMember({ groupId: group.id, userId });
             isMember = true;
@@ -269,13 +271,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get member count
       const members = await storage.getGroupMembers(group.id);
       
-      // Check if current user is already a member, auto-add if not
+      // Check if current user is already a member, auto-add if not.
+      // Verified Ajo groups never auto-add — joiners must go through the identity gate.
+      const isVerifiedActive = !!group.verifiedAt && (!group.verificationExpiresAt || group.verificationExpiresAt > new Date());
       let isMember = false;
       if (userId && typeof userId === 'string') {
         const membership = await storage.getGroupMember(group.id, userId);
         isMember = !!membership;
 
-        if (!isMember) {
+        if (!isMember && !isVerifiedActive) {
           try {
             await storage.addGroupMember({ groupId: group.id, userId });
             isMember = true;
@@ -431,7 +435,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/groups/:groupId/join", async (req, res) => {
     try {
       const { groupId } = req.params;
-      const { userId } = req.body;
+      const { userId, legalName, selfieDataUrl } = req.body;
       
       if (!userId) {
         return res.status(400).json({ message: "User ID is required" });
@@ -443,7 +447,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "User is already a member of this group" });
       }
       
-      const membership = await storage.addGroupMember({ groupId, userId });
+      // Verified Ajo: identity-light gate before joining
+      const groupForGate = await storage.getGroup(groupId);
+      if (!groupForGate) return res.status(404).json({ message: "Group not found" });
+      const isVerifiedActive = !!groupForGate.verifiedAt && (!groupForGate.verificationExpiresAt || groupForGate.verificationExpiresAt > new Date());
+      let joinerLegalName: string | undefined;
+      let joinerSelfieDataUrl: string | undefined;
+      if (isVerifiedActive) {
+        if (!legalName || typeof legalName !== "string" || legalName.trim().length < 2) {
+          return res.status(400).json({ message: "Legal name is required to join a Verified Ajo group" });
+        }
+        if (!selfieDataUrl || typeof selfieDataUrl !== "string" || !selfieDataUrl.startsWith("data:image/")) {
+          return res.status(400).json({ message: "A selfie is required to join a Verified Ajo group" });
+        }
+        joinerLegalName = legalName.trim();
+        joinerSelfieDataUrl = selfieDataUrl;
+      }
+
+      const membership = await storage.addGroupMember({ groupId, userId, joinerLegalName, joinerSelfieDataUrl });
       
       // Get group and new member details for notification
       const group = await storage.getGroup(groupId);
@@ -1487,7 +1508,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/groups/:groupId/register-with-otp", async (req, res) => {
     try {
       const { groupId } = req.params;
-      const { username, fullName, phoneNumber, otp } = req.body;
+      const { username, fullName, phoneNumber, otp, legalName, selfieDataUrl } = req.body;
       
       if (!username || !fullName || !phoneNumber || !otp) {
         return res.status(400).json({ message: "All fields are required" });
@@ -1511,6 +1532,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Group not found" });
       }
       
+      // Verified Ajo: identity-light gate before joining
+      const isVerifiedActive = !!group.verifiedAt && (!group.verificationExpiresAt || group.verificationExpiresAt > new Date());
+      let joinerLegalName: string | undefined;
+      let joinerSelfieDataUrl: string | undefined;
+      if (isVerifiedActive) {
+        if (!legalName || typeof legalName !== "string" || legalName.trim().length < 2) {
+          return res.status(400).json({ message: "Legal name is required to join a Verified Ajo group" });
+        }
+        if (!selfieDataUrl || typeof selfieDataUrl !== "string" || !selfieDataUrl.startsWith("data:image/")) {
+          return res.status(400).json({ message: "A selfie is required to join a Verified Ajo group" });
+        }
+        joinerLegalName = legalName.trim();
+        joinerSelfieDataUrl = selfieDataUrl;
+      }
+      
       // Create user without password (OTP-based auth)
       const user = await storage.createUser({
         username,
@@ -1523,7 +1559,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Add user to group
       await storage.addGroupMember({
         groupId,
-        userId: user.id
+        userId: user.id,
+        joinerLegalName,
+        joinerSelfieDataUrl,
       });
       
       res.json({ 
