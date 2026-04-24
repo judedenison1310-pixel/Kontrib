@@ -5,7 +5,6 @@ import { Navigation } from "@/components/navigation";
 import { CreateProjectModal } from "@/components/create-project-modal";
 import { PaymentModal } from "@/components/payment-modal";
 import { EditProjectModal } from "@/components/edit-project-modal";
-import { VerificationBanner } from "@/components/verification-banner";
 import { VerifiedBadge } from "@/components/verified-badge";
 import { VerifiedListingPrompt } from "@/components/verified-listing-prompt";
 import type { VerificationStatus } from "@shared/schema";
@@ -204,12 +203,6 @@ export default function GroupProjects() {
 
         {group && (
           <>
-            <VerificationBanner
-              groupId={group.id}
-              isAdmin={isAdmin}
-              adminId={group.adminId}
-              members={members}
-            />
             <VerifiedListingPrompt
               groupId={group.id}
               isAdmin={isAdmin}
