@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,13 +7,23 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ChevronRight, Trophy, CheckCircle2, Clock, ArrowRight } from "lucide-react";
+import {
+  ChevronRight, Trophy, CheckCircle2, Clock, ArrowRight,
+  UserX, MessageCircle, Send, ListOrdered,
+} from "lucide-react";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentUser } from "@/lib/auth";
 import { formatNaira } from "@/lib/currency";
-import type { AjoStatus, User } from "@shared/schema";
+import {
+  generateIndividualReminderMessage,
+  generateBulkReminderMessage,
+  generateWhatsAppLink,
+  generateWhatsAppShareLink,
+} from "@/lib/reminders";
+import { AjoReorderModal } from "@/components/ajo-reorder-modal";
+import type { AjoStatus, ContributionWithDetails, Group, User } from "@shared/schema";
 
 interface MemberRow { userId: string; user: User }
 
@@ -54,6 +64,7 @@ export function AjoCycleStatus({ groupId, status, members, isAdmin }: AjoCycleSt
   const qc = useQueryClient();
   const actor = getCurrentUser();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [reorderOpen, setReorderOpen] = useState(false);
 
   const { settings, currentCycle, paidCount, expectedCount } = status;
   const cycleNumber = settings.currentCycleNumber;
@@ -62,8 +73,27 @@ export function AjoCycleStatus({ groupId, status, members, isAdmin }: AjoCycleSt
 
   // Build a name lookup so we can render the upcoming queue.
   const nameById = new Map<string, string>();
-  members.forEach(m => nameById.set(m.userId, memberLabel(m.user)));
+  const userById = new Map<string, User>();
+  members.forEach(m => {
+    nameById.set(m.userId, memberLabel(m.user));
+    userById.set(m.userId, m.user);
+  });
   const order = settings.payoutOrder ?? [];
+
+  // Group context (for reminder messages). Available only for admins so the
+  // unpaid panel renders.
+  const { data: group } = useQuery<Group>({
+    queryKey: ["/api/groups", groupId],
+    enabled: !!groupId && isAdmin,
+  });
+
+  // Pull contributions for the active cycle so we can list members who
+  // haven't paid yet and let the admin nudge them via WhatsApp.
+  const cycleProjectId = currentCycle?.id;
+  const { data: cycleContributions = [] } = useQuery<ContributionWithDetails[]>({
+    queryKey: [`/api/contributions/project/${cycleProjectId}`],
+    enabled: !!cycleProjectId && isAdmin,
+  });
 
   const advanceMutation = useMutation({
     mutationFn: async () => {
@@ -130,6 +160,49 @@ export function AjoCycleStatus({ groupId, status, members, isAdmin }: AjoCycleSt
 
   // Upcoming = the rest of the order after the current recipient.
   const upcoming = order.slice(cycleNumber).slice(0, 4);
+
+  // Compute unpaid members for this cycle (admin view only). A member is
+  // "paid" once they have at least one confirmed contribution against the
+  // cycle project. The recipient is omitted because they receive the pot.
+  const paidUserIds = new Set(
+    cycleContributions.filter(c => c.status === "confirmed").map(c => c.userId),
+  );
+  const recipientId = recipient?.id;
+  const unpaidMembers = isAdmin
+    ? members.filter(m => m.userId !== recipientId && !paidUserIds.has(m.userId))
+    : [];
+
+  // Reminder helpers reuse the existing project-unpaid wording so members get
+  // a consistent message. Build the project shape from the cycle.
+  const reminderProject = currentCycle
+    ? {
+        name: currentCycle.name,
+        targetAmount: currentCycle.targetAmount,
+        deadline: currentCycle.deadline,
+        currency: currentCycle.currency,
+      }
+    : { name: "", targetAmount: null, deadline: null, currency: null };
+  const reminderGroup = group
+    ? {
+        name: group.name,
+        customSlug: group.customSlug ?? null,
+        registrationLink: group.registrationLink ?? null,
+      }
+    : { name: "", customSlug: null, registrationLink: null };
+
+  const unpaidWithPhones = unpaidMembers.filter(m => !!m.user.phoneNumber);
+  const bulkLink = unpaidWithPhones.length > 0
+    ? generateWhatsAppShareLink(
+        generateBulkReminderMessage(
+          unpaidWithPhones.map(m => ({
+            fullName: m.user.fullName ?? "",
+            phoneNumber: m.user.phoneNumber ?? "",
+          })),
+          reminderProject,
+          reminderGroup,
+        ),
+      )
+    : null;
 
   return (
     <div className="space-y-4">
@@ -203,6 +276,79 @@ export function AjoCycleStatus({ groupId, status, members, isAdmin }: AjoCycleSt
         </CardContent>
       </Card>
 
+      {/* Unpaid this cycle (admin-only) */}
+      {isAdmin && unpaidMembers.length > 0 && (
+        <Card className="bg-white rounded-2xl border-gray-100" data-testid="card-unpaid">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center">
+                  <UserX className="h-4 w-4 text-amber-600" />
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900 text-sm">Unpaid this cycle</p>
+                  <p className="text-xs text-gray-500">
+                    {unpaidMembers.length} of {expectedCount} {unpaidMembers.length === 1 ? "member hasn't" : "members haven't"} paid yet
+                  </p>
+                </div>
+              </div>
+              {bulkLink && (
+                <a
+                  href={bulkLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800 px-3 py-1.5 rounded-full border border-emerald-200 bg-emerald-50"
+                  data-testid="button-remind-all"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  Remind all
+                </a>
+              )}
+            </div>
+            <ul className="space-y-1">
+              {unpaidMembers.map(m => {
+                const phone = m.user.phoneNumber || "";
+                const link = phone
+                  ? generateWhatsAppLink(
+                      phone,
+                      generateIndividualReminderMessage(
+                        { fullName: m.user.fullName ?? "", phoneNumber: phone },
+                        reminderProject,
+                        reminderGroup,
+                      ),
+                    )
+                  : null;
+                return (
+                  <li
+                    key={m.userId}
+                    className="flex items-center justify-between gap-3 py-2 border-t border-gray-100 first:border-t-0"
+                    data-testid={`row-unpaid-${m.userId}`}
+                  >
+                    <span className="flex-1 truncate text-sm text-gray-800">
+                      {memberLabel(m.user)}
+                    </span>
+                    {link ? (
+                      <a
+                        href={link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 hover:text-emerald-800 px-2.5 py-1 rounded-full hover:bg-emerald-50"
+                        data-testid={`button-remind-${m.userId}`}
+                      >
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        Remind
+                      </a>
+                    ) : (
+                      <span className="text-[11px] text-gray-400">No phone</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Upcoming */}
       {upcoming.length > 0 && (
         <Card className="bg-white rounded-2xl border-gray-100">
@@ -222,10 +368,10 @@ export function AjoCycleStatus({ groupId, status, members, isAdmin }: AjoCycleSt
         </Card>
       )}
 
-      {/* Admin: advance */}
+      {/* Admin: advance + reorder */}
       {isAdmin && (
         <Card className="bg-white rounded-2xl border-gray-100">
-          <CardContent className="p-4 space-y-2">
+          <CardContent className="p-4 space-y-3">
             <div className="flex items-start gap-3">
               <div className="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
                 <CheckCircle2 className="h-5 w-5 text-emerald-600" />
@@ -249,8 +395,29 @@ export function AjoCycleStatus({ groupId, status, members, isAdmin }: AjoCycleSt
               {cycleNumber === totalRounds ? "Close round" : "Advance to next cycle"}
               <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
+            {cycleNumber < totalRounds && (
+              <button
+                type="button"
+                onClick={() => setReorderOpen(true)}
+                className="w-full inline-flex items-center justify-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 py-2"
+                data-testid="button-open-reorder"
+              >
+                <ListOrdered className="h-4 w-4" />
+                Reorder upcoming members
+              </button>
+            )}
           </CardContent>
         </Card>
+      )}
+
+      {isAdmin && (
+        <AjoReorderModal
+          open={reorderOpen}
+          onOpenChange={setReorderOpen}
+          groupId={groupId}
+          settings={settings}
+          members={members}
+        />
       )}
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>

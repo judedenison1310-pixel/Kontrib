@@ -1293,6 +1293,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Only the recipient member can confirm this disbursement" });
       }
       const updated = await storage.confirmDisbursement(id);
+
+      // If this disbursement belongs to an Ajo cycle and that cycle is the
+      // current open round, auto-advance the rotation. Wrapped in try/catch so
+      // a confirm never fails because of an advance edge case.
+      try {
+        const project = disbursement.projectId
+          ? await storage.getProject(disbursement.projectId)
+          : null;
+        if (
+          project &&
+          project.projectType === "ajo_cycle" &&
+          project.cycleNumber != null
+        ) {
+          const settings = await storage.getAjoSettings(disbursement.groupId);
+          if (
+            settings &&
+            settings.status === "active" &&
+            settings.currentCycleNumber === project.cycleNumber
+          ) {
+            const newStatus = await storage.advanceAjoCycle(disbursement.groupId);
+
+            // Notify the new recipient (if a fresh cycle was created and it
+            // isn't the same person who just confirmed).
+            const nextRecipientId = newStatus.currentCycle?.recipientUserId ?? null;
+            if (
+              newStatus.settings.status === "active" &&
+              nextRecipientId &&
+              nextRecipientId !== userId
+            ) {
+              const notification = await storage.createNotification({
+                userId: nextRecipientId,
+                type: "ajo_cycle_started",
+                title: "Your Ajo turn is up",
+                message: `You're the recipient for Cycle ${newStatus.settings.currentCycleNumber} — members can start contributing.`,
+                projectId: newStatus.currentCycle?.id ?? null,
+              });
+              broadcastNotification(nextRecipientId, notification);
+            }
+          }
+        }
+      } catch (advanceErr) {
+        console.error("Auto-advance after disbursement confirm failed:", advanceErr);
+      }
+
       res.json(updated);
     } catch (error) {
       console.error("Confirm disbursement error:", error);
