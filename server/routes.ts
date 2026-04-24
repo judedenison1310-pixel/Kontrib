@@ -11,6 +11,8 @@ import {
   submitVerificationSchema, officerResponseSchema, attesterResponseSchema,
   createAjoSettingsSchema,
   createAssociationSettingsSchema, createAssociationLevySchema,
+  submitAdminKycSchema, reviewAdminKycSchema,
+  setGroupTermsSchema, setGroupLogoSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -453,7 +455,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/groups/:groupId/join", async (req, res) => {
     try {
       const { groupId } = req.params;
-      const { userId, legalName, selfieDataUrl } = req.body;
+      const { userId, legalName, selfieDataUrl, acceptedTerms } = req.body;
       
       if (!userId) {
         return res.status(400).json({ message: "User ID is required" });
@@ -468,6 +470,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Verified Ajo: identity-light gate before joining
       const groupForGate = await storage.getGroup(groupId);
       if (!groupForGate) return res.status(404).json({ message: "Group not found" });
+
+      // Phase 3B: if group has T&C set, joiner must explicitly accept them.
+      if ((groupForGate as any).tcMode && acceptedTerms !== true) {
+        return res.status(400).json({ message: "You must accept the group terms before joining" });
+      }
       const isVerifiedActive = !!groupForGate.verifiedAt && (!groupForGate.verificationExpiresAt || groupForGate.verificationExpiresAt > new Date());
       let joinerLegalName: string | undefined;
       let joinerSelfieDataUrl: string | undefined;
@@ -483,6 +490,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const membership = await storage.addGroupMember({ groupId, userId, joinerLegalName, joinerSelfieDataUrl });
+
+      // Phase 3B: snapshot the active T&C onto the new membership row.
+      if ((groupForGate as any).tcMode) {
+        try {
+          await storage.recordMemberTcAcceptance(groupId, userId);
+        } catch (e) {
+          console.error("recordMemberTcAcceptance failed (non-fatal):", e);
+        }
+      }
       
       // Get group and new member details for notification
       const group = await storage.getGroup(groupId);
@@ -664,6 +680,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (group.adminId !== actorId) {
         return res.status(403).json({ message: "Only the group admin can set up the cycle" });
+      }
+      // Phase 3B: defence-in-depth — admin KYC must be approved and group T&C set.
+      const adminKyc = await storage.getAdminKyc(actorId);
+      if (adminKyc.status !== "approved") {
+        return res.status(403).json({ message: "Admin identity must be verified by the Kontrib team before starting an Ajo cycle" });
+      }
+      if (!(group as any).tcMode) {
+        return res.status(400).json({ message: "Group terms must be set before starting an Ajo cycle" });
       }
       const payload = createAjoSettingsSchema.parse(payloadInput);
       const status = await storage.createAjoSettingsAndStartCycle(groupId, payload);
@@ -2271,6 +2295,179 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Report error:", error);
       res.status(500).json({ message: "Failed to generate report" });
+    }
+  });
+
+  // ===================================================================
+  // Phase 3B — Object upload helper, Admin KYC, Group T&C, Group logo
+  // ===================================================================
+
+  // Get a signed PUT URL for any client-side upload (KYC photo/ID/selfie,
+  // T&C PDF, group logo). Uppy/AwsS3 calls this from <ObjectUploader>.
+  app.post("/api/objects/upload-url", async (_req, res) => {
+    try {
+      const { ObjectStorageService } = await import("./objectStorage");
+      const svc = new ObjectStorageService();
+      const url = await svc.getObjectEntityUploadURL();
+      res.json({ method: "PUT", url });
+    } catch (error: any) {
+      console.error("upload-url error:", error);
+      res.status(500).json({ message: error?.message || "Failed to get upload URL" });
+    }
+  });
+
+  // Normalize the raw GCS URL returned by Uppy into our /objects/<id> path.
+  app.post("/api/objects/normalize", async (req, res) => {
+    try {
+      const rawUrl = String(req.body?.rawUrl ?? "");
+      if (!rawUrl) return res.status(400).json({ message: "rawUrl required" });
+      const { ObjectStorageService } = await import("./objectStorage");
+      const svc = new ObjectStorageService();
+      const path = svc.normalizeObjectEntityPath(rawUrl);
+      res.json({ path });
+    } catch (error: any) {
+      console.error("normalize error:", error);
+      res.status(500).json({ message: error?.message || "Failed to normalize" });
+    }
+  });
+
+  // ---- Admin KYC -------------------------------------------------------
+
+  // Submit own KYC (self-only). Body matches submitAdminKycSchema; userId comes
+  // from URL. Sets adminKycStatus → 'pending'.
+  app.post("/api/users/:userId/admin-kyc", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const actorId = req.body?.actorId;
+      if (!actorId || actorId !== userId) {
+        return res.status(403).json({ message: "You can only submit your own KYC" });
+      }
+      const { actorId: _, ...rest } = req.body;
+      const payload = submitAdminKycSchema.parse(rest);
+      const view = await storage.submitAdminKyc(userId, payload);
+      res.json(view);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ errors: error.errors });
+      console.error("submitAdminKyc error:", error);
+      res.status(500).json({ message: error?.message || "Failed to submit KYC" });
+    }
+  });
+
+  // View own KYC status.
+  app.get("/api/users/:userId/admin-kyc", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      // No actor check on read — a user can always read their own status; we'll
+      // gate this loosely (UI only calls it for the logged-in user). For
+      // production, replace with proper session middleware.
+      const view = await storage.getAdminKyc(userId);
+      res.json(view);
+    } catch (error: any) {
+      res.status(500).json({ message: error?.message || "Failed to fetch KYC" });
+    }
+  });
+
+  // Kontrib super-admin only: list pending KYC submissions.
+  app.get("/api/admin-kyc/pending", async (req, res) => {
+    try {
+      const actorId = String(req.query.actorId ?? "");
+      const superId = process.env.KONTRIB_SUPERADMIN_USER_ID || "";
+      if (!superId || actorId !== superId) {
+        return res.status(403).json({ message: "Kontrib team only" });
+      }
+      const pending = await storage.listPendingAdminKyc();
+      res.json(pending);
+    } catch (error: any) {
+      res.status(500).json({ message: error?.message || "Failed to list pending KYC" });
+    }
+  });
+
+  // Kontrib super-admin only: approve / reject a KYC submission.
+  app.post("/api/admin-kyc/:userId/review", async (req, res) => {
+    try {
+      const actorId = req.body?.actorId;
+      const superId = process.env.KONTRIB_SUPERADMIN_USER_ID || "";
+      if (!superId || actorId !== superId) {
+        return res.status(403).json({ message: "Kontrib team only" });
+      }
+      const { actorId: _, ...rest } = req.body;
+      const payload = reviewAdminKycSchema.parse(rest);
+      const view = await storage.reviewAdminKyc(req.params.userId, payload, actorId);
+      res.json(view);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ errors: error.errors });
+      console.error("reviewAdminKyc error:", error);
+      res.status(500).json({ message: error?.message || "Failed to review KYC" });
+    }
+  });
+
+  // ---- Group T&C and Logo ---------------------------------------------
+
+  // Public — used by the join page to know what T&C the user must accept.
+  app.get("/api/groups/:groupId/terms", async (req, res) => {
+    try {
+      const viewerUserId = req.query.viewerUserId ? String(req.query.viewerUserId) : undefined;
+      const view = await storage.getGroupTerms(req.params.groupId, viewerUserId);
+      if (!view) return res.status(404).json({ message: "Group not found" });
+      res.json(view);
+    } catch (error: any) {
+      res.status(500).json({ message: error?.message || "Failed to fetch terms" });
+    }
+  });
+
+  // Group admin only — set T&C config (kontrib generic OR custom PDF + indemnity).
+  app.post("/api/groups/:groupId/terms", async (req, res) => {
+    try {
+      const { groupId } = req.params;
+      const actorId = req.body?.actorId;
+      const group = await storage.getGroup(groupId);
+      if (!group) return res.status(404).json({ message: "Group not found" });
+      if (!actorId || group.adminId !== actorId) {
+        return res.status(403).json({ message: "Only the group admin can set terms" });
+      }
+      const { actorId: _, ...rest } = req.body;
+      const payload = setGroupTermsSchema.parse(rest);
+      const updated = await storage.setGroupTerms(groupId, payload);
+      res.json(updated);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ errors: error.errors });
+      console.error("setGroupTerms error:", error);
+      res.status(500).json({ message: error?.message || "Failed to set terms" });
+    }
+  });
+
+  // Group admin only — set logo URL.
+  app.post("/api/groups/:groupId/logo", async (req, res) => {
+    try {
+      const { groupId } = req.params;
+      const actorId = req.body?.actorId;
+      const group = await storage.getGroup(groupId);
+      if (!group) return res.status(404).json({ message: "Group not found" });
+      if (!actorId || group.adminId !== actorId) {
+        return res.status(403).json({ message: "Only the group admin can set the logo" });
+      }
+      const { actorId: _, ...rest } = req.body;
+      const payload = setGroupLogoSchema.parse(rest);
+      const updated = await storage.setGroupLogo(groupId, payload.logoUrl);
+      res.json(updated);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ errors: error.errors });
+      console.error("setGroupLogo error:", error);
+      res.status(500).json({ message: error?.message || "Failed to set logo" });
+    }
+  });
+
+  // Member acceptance — idempotent.
+  app.post("/api/groups/:groupId/accept-terms", async (req, res) => {
+    try {
+      const { groupId } = req.params;
+      const actorId = req.body?.actorId;
+      if (!actorId) return res.status(403).json({ message: "Login required" });
+      await storage.recordMemberTcAcceptance(groupId, actorId);
+      res.json({ ok: true });
+    } catch (error: any) {
+      console.error("acceptTerms error:", error);
+      res.status(500).json({ message: error?.message || "Failed to accept terms" });
     }
   });
 

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Sheet, SheetContent, SheetHeader } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,7 +8,8 @@ import { ArrowLeft, Repeat, Calendar, Wallet } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentUser } from "@/lib/auth";
-import { ASSOCIATION_FREQUENCIES, type AssociationFrequency } from "@shared/schema";
+import { KycFileField } from "@/components/kyc-file-field";
+import { ASSOCIATION_FREQUENCIES, type AssociationFrequency, type Group } from "@shared/schema";
 
 interface AssociationSetupModalProps {
   open: boolean;
@@ -42,9 +43,27 @@ export function AssociationSetupModal({ open, onOpenChange, groupId, groupName, 
     d.setDate(d.getDate() + 1);
     return d.toISOString().slice(0, 10);
   });
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  // Preload existing logo (admin can upload during setup or replace later).
+  const { data: group } = useQuery<Group>({
+    queryKey: ["/api/groups", groupId],
+    enabled: open && !!groupId,
+  });
+
+  useEffect(() => {
+    if (open && group?.logoUrl) {
+      setLogoUrl(group.logoUrl);
+    }
+  }, [open, group?.logoUrl]);
 
   const setupMutation = useMutation({
     mutationFn: async () => {
+      // Save logo first (if changed) so the dues setup completes with the
+      // updated branding visible everywhere.
+      if (logoUrl && logoUrl !== (group?.logoUrl ?? null)) {
+        await apiRequest("POST", `/api/groups/${groupId}/logo`, { logoUrl });
+      }
       const payload = {
         actorId: actor?.id,
         duesAmount: amount,
@@ -100,6 +119,16 @@ export function AssociationSetupModal({ open, onOpenChange, groupId, groupName, 
                 its own collection so you can track who's paid up.
               </p>
             </div>
+
+            {/* Group logo (optional) */}
+            <KycFileField
+              label="Group logo (optional)"
+              helper="Adds a small picture next to your group name on members' screens. JPG or PNG works best."
+              value={logoUrl}
+              onChange={setLogoUrl}
+              buttonLabel="Upload group logo"
+              testId="association-logo"
+            />
 
             {/* Amount */}
             <div className="space-y-2">

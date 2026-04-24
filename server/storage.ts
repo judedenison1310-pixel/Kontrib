@@ -42,6 +42,12 @@ import {
   type AssociationFrequency,
   type CreateAssociationSettingsPayload,
   type CreateAssociationLevyPayload,
+  type SubmitAdminKycPayload,
+  type ReviewAdminKycPayload,
+  type SetGroupTermsPayload,
+  type AdminKycView,
+  type AdminKycPendingEntry,
+  type GroupTermsView,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -171,6 +177,16 @@ export interface IStorage {
   getVerificationInbox(userId: string): Promise<VerificationInbox>;
   respondAsOfficer(applicationId: string, payload: OfficerResponsePayload): Promise<void>;
   respondAsAttester(applicationId: string, payload: AttesterResponsePayload): Promise<void>;
+
+  // Phase 3B — Admin KYC + Group T&C/logo + Member acceptance
+  submitAdminKyc(userId: string, payload: SubmitAdminKycPayload): Promise<AdminKycView>;
+  getAdminKyc(userId: string): Promise<AdminKycView>;
+  listPendingAdminKyc(): Promise<AdminKycPendingEntry[]>;
+  reviewAdminKyc(userId: string, payload: ReviewAdminKycPayload, reviewerId: string): Promise<AdminKycView>;
+  setGroupTerms(groupId: string, payload: SetGroupTermsPayload): Promise<Group>;
+  setGroupLogo(groupId: string, logoUrl: string): Promise<Group>;
+  getGroupTerms(groupId: string, viewerUserId?: string): Promise<GroupTermsView | null>;
+  recordMemberTcAcceptance(groupId: string, userId: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -3256,3 +3272,186 @@ MemStorage.prototype.createAssociationLevy = async function () {
 };
 
 export const storage = new DbStorage();
+
+// =====================================================================
+// Phase 3B — Admin KYC + Group T&C/logo + Member acceptance
+// =====================================================================
+
+// Declaration merging so TS sees these prototype-attached methods.
+export interface DbStorage {
+  submitAdminKyc(userId: string, payload: SubmitAdminKycPayload): Promise<AdminKycView>;
+  getAdminKyc(userId: string): Promise<AdminKycView>;
+  listPendingAdminKyc(): Promise<AdminKycPendingEntry[]>;
+  reviewAdminKyc(userId: string, payload: ReviewAdminKycPayload, reviewerId: string): Promise<AdminKycView>;
+  setGroupTerms(groupId: string, payload: SetGroupTermsPayload): Promise<Group>;
+  setGroupLogo(groupId: string, logoUrl: string): Promise<Group>;
+  getGroupTerms(groupId: string, viewerUserId?: string): Promise<GroupTermsView | null>;
+  recordMemberTcAcceptance(groupId: string, userId: string): Promise<void>;
+}
+export interface MemStorage {
+  submitAdminKyc(userId: string, payload: SubmitAdminKycPayload): Promise<AdminKycView>;
+  getAdminKyc(userId: string): Promise<AdminKycView>;
+  listPendingAdminKyc(): Promise<AdminKycPendingEntry[]>;
+  reviewAdminKyc(userId: string, payload: ReviewAdminKycPayload, reviewerId: string): Promise<AdminKycView>;
+  setGroupTerms(groupId: string, payload: SetGroupTermsPayload): Promise<Group>;
+  setGroupLogo(groupId: string, logoUrl: string): Promise<Group>;
+  getGroupTerms(groupId: string, viewerUserId?: string): Promise<GroupTermsView | null>;
+  recordMemberTcAcceptance(groupId: string, userId: string): Promise<void>;
+}
+
+function userToAdminKycView(u: User): AdminKycView {
+  return {
+    userId: u.id,
+    govNameOnId: (u as any).govNameOnId ?? null,
+    profilePhotoUrl: (u as any).profilePhotoUrl ?? null,
+    idDocUrl: (u as any).idDocUrl ?? null,
+    kycSelfieUrl: (u as any).kycSelfieUrl ?? null,
+    status: (((u as any).adminKycStatus as AdminKycView["status"]) ?? "none"),
+    submittedAt: (u as any).adminKycSubmittedAt ?? null,
+    reviewedAt: (u as any).adminKycReviewedAt ?? null,
+    reviewerNotes: (u as any).adminKycReviewerNotes ?? null,
+  };
+}
+
+DbStorage.prototype.submitAdminKyc = async function (userId, payload) {
+  const [updated] = await db
+    .update(usersTable)
+    .set({
+      govNameOnId: payload.govNameOnId,
+      profilePhotoUrl: payload.profilePhotoUrl,
+      idDocUrl: payload.idDocUrl,
+      kycSelfieUrl: payload.kycSelfieUrl,
+      adminKycStatus: "pending",
+      adminKycSubmittedAt: new Date(),
+      adminKycReviewedAt: null,
+      adminKycReviewerNotes: null,
+    } as any)
+    .where(eq(usersTable.id, userId))
+    .returning();
+  if (!updated) throw new Error("User not found");
+  return userToAdminKycView(updated as User);
+};
+
+DbStorage.prototype.getAdminKyc = async function (userId) {
+  const [u] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  if (!u) throw new Error("User not found");
+  return userToAdminKycView(u as User);
+};
+
+DbStorage.prototype.listPendingAdminKyc = async function () {
+  const rows = await db
+    .select()
+    .from(usersTable)
+    .where(eq((usersTable as any).adminKycStatus, "pending"));
+  return rows.map((u: any) => ({
+    ...userToAdminKycView(u as User),
+    user: { id: u.id, fullName: u.fullName ?? null, phoneNumber: u.phoneNumber },
+  }));
+};
+
+DbStorage.prototype.reviewAdminKyc = async function (userId, payload, _reviewerId) {
+  const [updated] = await db
+    .update(usersTable)
+    .set({
+      adminKycStatus: payload.decision,
+      adminKycReviewedAt: new Date(),
+      adminKycReviewerNotes: payload.reviewerNotes ?? null,
+    } as any)
+    .where(eq(usersTable.id, userId))
+    .returning();
+  if (!updated) throw new Error("User not found");
+  return userToAdminKycView(updated as User);
+};
+
+DbStorage.prototype.setGroupTerms = async function (groupId, payload) {
+  const setData: any = { tcMode: payload.tcMode };
+  if (payload.tcMode === "custom") {
+    setData.customTcUrl = payload.customTcUrl;
+    setData.customTcIndemnityAcceptedAt = new Date();
+  } else {
+    setData.customTcUrl = null;
+    setData.customTcIndemnityAcceptedAt = null;
+  }
+  const [updated] = await db
+    .update(groupsTable)
+    .set(setData)
+    .where(eq(groupsTable.id, groupId))
+    .returning();
+  if (!updated) throw new Error("Group not found");
+  return updated as Group;
+};
+
+DbStorage.prototype.setGroupLogo = async function (groupId, logoUrl) {
+  const [updated] = await db
+    .update(groupsTable)
+    .set({ logoUrl } as any)
+    .where(eq(groupsTable.id, groupId))
+    .returning();
+  if (!updated) throw new Error("Group not found");
+  return updated as Group;
+};
+
+DbStorage.prototype.getGroupTerms = async function (groupId, viewerUserId) {
+  const [g] = await db.select().from(groupsTable).where(eq(groupsTable.id, groupId)).limit(1);
+  if (!g) return null;
+  let alreadyAccepted = false;
+  if (viewerUserId) {
+    const [m] = await db
+      .select()
+      .from(groupMembersTable)
+      .where(and(eq(groupMembersTable.groupId, groupId), eq(groupMembersTable.userId, viewerUserId)))
+      .limit(1);
+    if (m && (m as any).tcAcceptedAt) alreadyAccepted = true;
+  }
+  return {
+    groupId: g.id,
+    groupName: g.name,
+    tcMode: ((g as any).tcMode as any) ?? null,
+    customTcUrl: ((g as any).customTcUrl as string | null) ?? null,
+    alreadyAccepted,
+  };
+};
+
+DbStorage.prototype.recordMemberTcAcceptance = async function (groupId, userId) {
+  const [g] = await db.select().from(groupsTable).where(eq(groupsTable.id, groupId)).limit(1);
+  if (!g) throw new Error("Group not found");
+  const tcMode = (g as any).tcMode ?? null;
+  if (!tcMode) return; // No T&C configured — nothing to accept
+
+  const [member] = await db
+    .select()
+    .from(groupMembersTable)
+    .where(and(eq(groupMembersTable.groupId, groupId), eq(groupMembersTable.userId, userId)))
+    .limit(1);
+
+  const setData: any = {
+    tcAcceptedAt: new Date(),
+    tcModeAtAcceptance: tcMode,
+    tcUrlAtAcceptance: tcMode === "custom" ? (g as any).customTcUrl ?? null : null,
+  };
+
+  if (member) {
+    if ((member as any).tcAcceptedAt) return; // idempotent — already accepted
+    await db
+      .update(groupMembersTable)
+      .set(setData)
+      .where(eq(groupMembersTable.id, member.id));
+  } else {
+    // First-time joiner — create the member row with acceptance baked in.
+    await db.insert(groupMembersTable).values({
+      groupId,
+      userId,
+      ...setData,
+    } as any);
+  }
+};
+
+// MemStorage stubs — Admin KYC + group terms live only in the database.
+MemStorage.prototype.submitAdminKyc = async function () { throw new Error("Admin KYC requires database storage"); };
+MemStorage.prototype.getAdminKyc = async function () { throw new Error("Admin KYC requires database storage"); };
+MemStorage.prototype.listPendingAdminKyc = async function () { return []; };
+MemStorage.prototype.reviewAdminKyc = async function () { throw new Error("Admin KYC requires database storage"); };
+MemStorage.prototype.setGroupTerms = async function () { throw new Error("Group terms require database storage"); };
+MemStorage.prototype.setGroupLogo = async function () { throw new Error("Group logo requires database storage"); };
+MemStorage.prototype.getGroupTerms = async function () { return null; };
+MemStorage.prototype.recordMemberTcAcceptance = async function () { /* no-op */ };

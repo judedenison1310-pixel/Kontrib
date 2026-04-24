@@ -213,14 +213,24 @@ export default function GroupProjects() {
         )}
 
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900" data-testid="text-page-title">
-              {isAjoGroup ? "Cycle" : isAssociationGroup ? "Dues" : "Projects"}
-            </h1>
-            <p className="text-gray-500 inline-flex items-center gap-1.5">
-              {group.name}
-              <VerifiedBadge verifiedAt={verificationStatus?.group.verifiedAt} expiresAt={verificationStatus?.group.verificationExpiresAt} />
-            </p>
+          <div className="flex items-center gap-3 min-w-0">
+            {group.logoUrl ? (
+              <img
+                src={group.logoUrl}
+                alt=""
+                className="w-12 h-12 rounded-xl object-cover border border-gray-200 shrink-0"
+                data-testid="img-group-logo-header"
+              />
+            ) : null}
+            <div className="min-w-0">
+              <h1 className="text-2xl font-bold text-gray-900 truncate" data-testid="text-page-title">
+                {isAjoGroup ? "Cycle" : isAssociationGroup ? "Dues" : "Projects"}
+              </h1>
+              <p className="text-gray-500 inline-flex items-center gap-1.5">
+                {group.name}
+                <VerifiedBadge verifiedAt={verificationStatus?.group.verifiedAt} expiresAt={verificationStatus?.group.verificationExpiresAt} />
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {isAdmin && (

@@ -8,7 +8,10 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getCurrentUser } from "@/lib/auth";
 import { formatNaira } from "@/lib/currency";
-import { ArrowLeft, Users, Target, Clock, Link2, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, Users, Target, Clock, Link2, CheckCircle, AlertCircle, Loader2, FileText } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { KONTRIB_GENERIC_TC } from "@/lib/legal";
+import type { GroupTermsView } from "@shared/schema";
 
 const REDIRECT_KEY = "kontrib_redirectTo";
 
@@ -109,10 +112,25 @@ export default function JoinGroupPage() {
     enabled: !!extractedIdentifier,
   });
 
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+
+  const { data: terms } = useQuery<GroupTermsView>({
+    queryKey: ["/api/groups", groupPreview?.group.id, "terms"],
+    queryFn: async () => {
+      const r = await fetch(`/api/groups/${groupPreview?.group.id}/terms`);
+      if (!r.ok) throw new Error("Failed to fetch terms");
+      return r.json();
+    },
+    enabled: !!groupPreview?.group.id && !groupPreview?.isMember,
+  });
+
   const joinGroupMutation = useMutation({
     mutationFn: async () => {
       if (!extractedIdentifier || !user || !groupPreview) throw new Error("Missing data");
-      return apiRequest("POST", `/api/groups/${groupPreview.group.id}/join`, { userId: user.id });
+      return apiRequest("POST", `/api/groups/${groupPreview.group.id}/join`, {
+        userId: user.id,
+        acceptedTerms: terms?.tcMode ? acceptedTerms : undefined,
+      });
     },
     onSuccess: () => {
       toast({ title: "You're in!", description: `Welcome to ${groupPreview?.group.name}` });
@@ -276,14 +294,53 @@ export default function JoinGroupPage() {
                   </BigButton>
                 </div>
               ) : (
-                <BigButton
-                  onClick={() => joinGroupMutation.mutate()}
-                  loading={joinGroupMutation.isPending}
-                  icon={<CheckCircle className="h-5 w-5" />}
-                  data-testid="button-join-group"
-                >
-                  Join This Group
-                </BigButton>
+                <div className="space-y-3">
+                  {terms?.tcMode && (
+                    <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-emerald-600" />
+                        <h3 className="font-semibold text-gray-900 text-sm">Group terms</h3>
+                      </div>
+                      {terms.tcMode === "kontrib" ? (
+                        <div className="max-h-48 overflow-y-auto rounded-lg border border-gray-100 bg-gray-50 p-3">
+                          <pre className="whitespace-pre-wrap text-xs text-gray-700 font-sans leading-relaxed">
+                            {KONTRIB_GENERIC_TC}
+                          </pre>
+                        </div>
+                      ) : (
+                        <a
+                          href={terms.customTcUrl || "#"}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block text-sm text-emerald-700 underline"
+                          data-testid="link-custom-tc"
+                        >
+                          View the group's terms (PDF)
+                        </a>
+                      )}
+                      <label className="flex items-start gap-2 cursor-pointer">
+                        <Checkbox
+                          checked={acceptedTerms}
+                          onCheckedChange={(v) => setAcceptedTerms(v === true)}
+                          className="mt-0.5"
+                          data-testid="checkbox-accept-terms"
+                        />
+                        <span className="text-sm text-gray-700">
+                          I have read and accept the group terms.
+                        </span>
+                      </label>
+                    </div>
+                  )}
+                  <BigButton
+                    onClick={() => joinGroupMutation.mutate()}
+                    loading={joinGroupMutation.isPending}
+                    disabled={!!terms?.tcMode && !acceptedTerms}
+                    icon={<CheckCircle className="h-5 w-5" />}
+                    data-testid="button-join-group"
+                  >
+                    Join This Group
+                  </BigButton>
+                </div>
               )
             ) : (
               <div className="space-y-3">

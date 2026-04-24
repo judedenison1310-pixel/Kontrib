@@ -21,6 +21,18 @@ export const users = pgTable("users", {
   selfieUrl: text("selfie_url"), // Stored under .private/verifications/ in object storage
   // Onboarding: stamped when the user picks (or skips) a group-type on the post-signup card
   onboardingChoiceAt: timestamp("onboarding_choice_at"),
+  // Admin KYC (Phase 3B) — required before a user can run an Ajo group.
+  // Submitted by the admin, reviewed by the Kontrib team. profilePhotoUrl is
+  // shown publicly on the user's profile/group cards; idDocUrl + kycSelfieUrl
+  // are private and only seen by the Kontrib reviewer.
+  govNameOnId: text("gov_name_on_id"),
+  profilePhotoUrl: text("profile_photo_url"),
+  idDocUrl: text("id_doc_url"),
+  kycSelfieUrl: text("kyc_selfie_url"),
+  adminKycStatus: text("admin_kyc_status").notNull().default("none"), // "none" | "pending" | "approved" | "rejected"
+  adminKycSubmittedAt: timestamp("admin_kyc_submitted_at"),
+  adminKycReviewedAt: timestamp("admin_kyc_reviewed_at"),
+  adminKycReviewerNotes: text("admin_kyc_reviewer_notes"),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
@@ -52,6 +64,14 @@ export const groups = pgTable("groups", {
   verificationExpiresAt: timestamp("verification_expires_at"), // 12 months after verifiedAt
   publiclyListed: boolean("publicly_listed").notNull().default(true), // Default-on after verification, admin can opt out
   publicListingDecisionAt: timestamp("public_listing_decision_at"), // When admin acknowledged the post-approval public-listing prompt
+  // Phase 3B — group enrichment.
+  // Optional logo (mainly for associations) shown on group cards / status panels.
+  logoUrl: text("logo_url"),
+  // Group T&C config: 'kontrib' = use the platform's generic terms; 'custom' = admin uploaded their own PDF.
+  // null = not yet configured; for Ajo groups, must be set before activation.
+  tcMode: text("tc_mode"), // "kontrib" | "custom" | null
+  customTcUrl: text("custom_tc_url"), // PDF URL when tcMode='custom'
+  customTcIndemnityAcceptedAt: timestamp("custom_tc_indemnity_accepted_at"), // When admin accepted Kontrib's indemnity statement for custom T&C
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
@@ -175,6 +195,12 @@ export const groupMembers = pgTable("group_members", {
   // Verified Ajo: identity-light info captured at join time when the group is verified
   joinerLegalName: text("joiner_legal_name"),
   joinerSelfieDataUrl: text("joiner_selfie_data_url"),
+  // Phase 3B — T&C acceptance snapshot. Members who joined before T&C were
+  // configured will have null values here; they're grandfathered. Only NEW
+  // joiners after the group has tcMode set must accept.
+  tcAcceptedAt: timestamp("tc_accepted_at"),
+  tcModeAtAcceptance: text("tc_mode_at_acceptance"),  // "kontrib" | "custom"
+  tcUrlAtAcceptance: text("tc_url_at_acceptance"),    // Snapshot of customTcUrl when applicable
 });
 
 // One row per Ajo group. Holds the cycle config (amount, frequency, payout
@@ -354,6 +380,80 @@ export const insertGroupSchema = createInsertSchema(groups).omit({
 }).extend({
   groupType: z.enum(GROUP_TYPES).default("project"),
 });
+
+// ---- Phase 3B: Admin KYC + group T&C/logo + member acceptance -----------
+
+export const ADMIN_KYC_STATUSES = ["none", "pending", "approved", "rejected"] as const;
+export type AdminKycStatus = (typeof ADMIN_KYC_STATUSES)[number];
+
+export const TC_MODES = ["kontrib", "custom"] as const;
+export type TcMode = (typeof TC_MODES)[number];
+
+// Payload an admin POSTs from the AdminKycModal.
+export const submitAdminKycSchema = z.object({
+  govNameOnId: z.string().min(2, "Enter your name as it appears on your ID"),
+  profilePhotoUrl: z.string().min(1, "Profile photo is required"),
+  idDocUrl: z.string().min(1, "ID document is required"),
+  kycSelfieUrl: z.string().min(1, "Selfie is required"),
+});
+export type SubmitAdminKycPayload = z.infer<typeof submitAdminKycSchema>;
+
+// Payload a Kontrib super-admin POSTs to approve/reject.
+export const reviewAdminKycSchema = z.object({
+  decision: z.enum(["approved", "rejected"]),
+  reviewerNotes: z.string().optional().nullable(),
+});
+export type ReviewAdminKycPayload = z.infer<typeof reviewAdminKycSchema>;
+
+// Payload to set group T&C config.
+export const setGroupTermsSchema = z.discriminatedUnion("tcMode", [
+  z.object({ tcMode: z.literal("kontrib") }),
+  z.object({
+    tcMode: z.literal("custom"),
+    customTcUrl: z.string().min(1, "Upload your T&C PDF first"),
+    indemnityAccepted: z.literal(true, {
+      errorMap: () => ({ message: "You must accept the indemnity statement to use a custom T&C" }),
+    }),
+  }),
+]);
+export type SetGroupTermsPayload = z.infer<typeof setGroupTermsSchema>;
+
+// Payload to set group logo.
+export const setGroupLogoSchema = z.object({
+  logoUrl: z.string().min(1, "Logo URL is required"),
+});
+export type SetGroupLogoPayload = z.infer<typeof setGroupLogoSchema>;
+
+// Payload a member POSTs when accepting the group T&C before joining.
+export const acceptGroupTermsSchema = z.object({}); // userId comes from auth/header; group from URL
+export type AcceptGroupTermsPayload = z.infer<typeof acceptGroupTermsSchema>;
+
+// Public T&C view returned to the join page.
+export type GroupTermsView = {
+  groupId: string;
+  groupName: string;
+  tcMode: TcMode | null;
+  customTcUrl: string | null;
+  alreadyAccepted: boolean; // true if the requesting userId has accepted
+};
+
+// Admin-KYC summary returned to the user themselves.
+export type AdminKycView = {
+  userId: string;
+  govNameOnId: string | null;
+  profilePhotoUrl: string | null;
+  idDocUrl: string | null;
+  kycSelfieUrl: string | null;
+  status: AdminKycStatus;
+  submittedAt: Date | null;
+  reviewedAt: Date | null;
+  reviewerNotes: string | null;
+};
+
+// Admin-KYC entry returned to the Kontrib super-admin review page.
+export type AdminKycPendingEntry = AdminKycView & {
+  user: { id: string; fullName: string | null; phoneNumber: string };
+};
 
 export const insertGroupMemberSchema = createInsertSchema(groupMembers).omit({
   id: true,

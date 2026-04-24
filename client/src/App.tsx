@@ -34,6 +34,7 @@ import Referrals from "@/pages/referrals";
 import ProjectReport from "@/pages/project-report";
 import DisbursementReport from "@/pages/disbursement-report";
 import Ops from "@/pages/ops";
+import KontribKycReview from "@/pages/kontrib-kyc-review";
 
 const REF_KEY = "kontrib_referral_code";
 
@@ -215,6 +216,7 @@ function Router() {
       <Route path="/report/:projectId" component={ProjectReport} />
       <Route path="/disbursement-report/:projectId" component={DisbursementReport} />
       <Route path="/ops" component={Ops} />
+      <Route path="/kontrib/kyc-review">{user ? <KontribKycReview /> : <Landing />}</Route>
       
       {/* Short URL patterns - catches custom slugs like /groupname or /groupname/projectname */}
       <Route path="/:groupSlug/:projectSlug">

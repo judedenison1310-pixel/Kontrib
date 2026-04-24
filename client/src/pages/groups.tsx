@@ -275,6 +275,14 @@ export default function Groups() {
                     {/* Top row: name + badges (left) — amount (right) */}
                     <div className="flex items-start justify-between gap-2 mb-1.5">
                       <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                        {group.logoUrl ? (
+                          <img
+                            src={group.logoUrl}
+                            alt=""
+                            className="w-7 h-7 rounded-full object-cover border border-gray-200 shrink-0"
+                            data-testid={`img-group-logo-${group.id}`}
+                          />
+                        ) : null}
                         <h3 className="font-bold text-gray-900 truncate" data-testid={`text-group-name-${group.id}`}>
                           {group.name}
                         </h3>

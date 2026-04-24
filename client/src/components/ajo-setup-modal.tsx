@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Sheet, SheetContent, SheetHeader } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ChevronUp, ChevronDown, Repeat, Calendar, Users as UsersIcon, Wallet } from "lucide-react";
+import { ArrowLeft, ChevronUp, ChevronDown, Repeat, Calendar, Users as UsersIcon, Wallet, ShieldCheck, FileText, ChevronRight, CheckCircle2, Clock } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentUser } from "@/lib/auth";
-import { AJO_FREQUENCIES, type AjoFrequency, type User } from "@shared/schema";
+import { AJO_FREQUENCIES, type AjoFrequency, type User, type AdminKycView, type GroupTermsView } from "@shared/schema";
+import { AdminKycModal } from "@/components/admin-kyc-modal";
+import { GroupTermsModal } from "@/components/group-terms-modal";
 
 interface MemberRow {
   userId: string;
@@ -52,11 +54,38 @@ export function AjoSetupModal({ open, onOpenChange, groupId, groupName, members 
     return d.toISOString().slice(0, 10);
   });
   const [order, setOrder] = useState<MemberRow[]>([]);
+  const [kycModalOpen, setKycModalOpen] = useState(false);
+  const [termsModalOpen, setTermsModalOpen] = useState(false);
 
   // Seed the payout order from the member list whenever the sheet opens.
   useEffect(() => {
     if (open) setOrder(members);
   }, [open, members]);
+
+  // Phase 3B preconditions: admin KYC must be approved and group terms set.
+  const { data: kyc } = useQuery<AdminKycView>({
+    queryKey: ["/api/users", actor?.id, "admin-kyc"],
+    queryFn: async () => {
+      const r = await fetch(`/api/users/${actor?.id}/admin-kyc`);
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
+    },
+    enabled: !!actor?.id && open,
+  });
+
+  const { data: terms } = useQuery<GroupTermsView>({
+    queryKey: ["/api/groups", groupId, "terms"],
+    queryFn: async () => {
+      const r = await fetch(`/api/groups/${groupId}/terms`);
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
+    },
+    enabled: open,
+  });
+
+  const kycApproved = kyc?.status === "approved";
+  const termsSet = !!terms?.tcMode;
+  const preconditionsMet = kycApproved && termsSet;
 
   const move = (idx: number, delta: number) => {
     setOrder(prev => {
@@ -126,6 +155,72 @@ export function AjoSetupModal({ open, onOpenChange, groupId, groupName, members 
                 member receives the pot. Once you start, this is locked in.
               </p>
             </div>
+
+            {!preconditionsMet && (
+              <div className="space-y-3">
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                  Two quick steps before your first cycle can run:
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setKycModalOpen(true)}
+                  className="w-full flex items-center gap-3 rounded-xl border-2 border-gray-200 bg-white p-4 hover:border-emerald-500 transition-all text-left"
+                  data-testid="btn-open-kyc"
+                >
+                  <div className={`p-2 rounded-full ${kycApproved ? "bg-emerald-100" : kyc?.status === "pending" ? "bg-amber-100" : "bg-gray-100"}`}>
+                    {kycApproved ? (
+                      <CheckCircle2 className="h-5 w-5 text-emerald-700" />
+                    ) : kyc?.status === "pending" ? (
+                      <Clock className="h-5 w-5 text-amber-700" />
+                    ) : (
+                      <ShieldCheck className="h-5 w-5 text-gray-600" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900">Verify your identity</h3>
+                    <p className="text-xs text-gray-500">
+                      {kycApproved
+                        ? "Approved by Kontrib"
+                        : kyc?.status === "pending"
+                          ? "Awaiting Kontrib review"
+                          : kyc?.status === "rejected"
+                            ? "Rejected — tap to update"
+                            : "Submit ID + photo for review"}
+                    </p>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-gray-400" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTermsModalOpen(true)}
+                  className="w-full flex items-center gap-3 rounded-xl border-2 border-gray-200 bg-white p-4 hover:border-emerald-500 transition-all text-left"
+                  data-testid="btn-open-terms"
+                >
+                  <div className={`p-2 rounded-full ${termsSet ? "bg-emerald-100" : "bg-gray-100"}`}>
+                    {termsSet ? (
+                      <CheckCircle2 className="h-5 w-5 text-emerald-700" />
+                    ) : (
+                      <FileText className="h-5 w-5 text-gray-600" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900">Set group terms</h3>
+                    <p className="text-xs text-gray-500">
+                      {termsSet
+                        ? terms?.tcMode === "kontrib"
+                          ? "Using Kontrib generic T&C"
+                          : "Using your custom T&C"
+                        : "Pick generic or upload your own"}
+                    </p>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-gray-400" />
+                </button>
+              </div>
+            )}
+
+            <fieldset disabled={!preconditionsMet} className={!preconditionsMet ? "opacity-40 pointer-events-none space-y-7" : "contents"}>
 
             {/* Amount */}
             <div className="space-y-2">
@@ -246,12 +341,13 @@ export function AjoSetupModal({ open, onOpenChange, groupId, groupName, members 
                 </>
               )}
             </div>
+            </fieldset>
           </div>
 
           <div className="border-t border-gray-100 px-5 py-4 bg-white">
             <Button
               onClick={() => setupMutation.mutate()}
-              disabled={!canSubmit}
+              disabled={!canSubmit || !preconditionsMet}
               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-base h-12 rounded-full"
               data-testid="button-start-cycle"
             >
@@ -260,6 +356,13 @@ export function AjoSetupModal({ open, onOpenChange, groupId, groupName, members 
           </div>
         </div>
       </SheetContent>
+      <AdminKycModal open={kycModalOpen} onOpenChange={setKycModalOpen} />
+      <GroupTermsModal
+        open={termsModalOpen}
+        onOpenChange={setTermsModalOpen}
+        groupId={groupId}
+        groupName={groupName}
+      />
     </Sheet>
   );
 }
