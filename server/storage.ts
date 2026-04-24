@@ -33,6 +33,10 @@ import {
   type VerificationInbox,
   type OfficerResponsePayload,
   type AttesterResponsePayload,
+  type AjoSettings,
+  type AjoStatus,
+  type AjoFrequency,
+  type CreateAjoSettingsPayload,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -141,6 +145,13 @@ export interface IStorage {
   savePushSubscription(sub: InsertPushSubscription): Promise<PushSubscription>;
   getUserPushSubscriptions(userId: string): Promise<PushSubscription[]>;
   deletePushSubscription(endpoint: string): Promise<void>;
+
+  // Ajo cycle methods
+  getAjoSettings(groupId: string): Promise<AjoSettings | undefined>;
+  getAjoStatus(groupId: string): Promise<AjoStatus | null>;
+  createAjoSettingsAndStartCycle(groupId: string, payload: CreateAjoSettingsPayload): Promise<AjoStatus>;
+  updateAjoPayoutOrder(groupId: string, payoutOrder: string[]): Promise<AjoSettings | undefined>;
+  advanceAjoCycle(groupId: string): Promise<AjoStatus>;
 
   // Verified Ajo
   getVerificationStatus(groupId: string): Promise<VerificationStatus | null>;
@@ -2810,6 +2821,217 @@ MemStorage.prototype.getVerificationStatus = async function () {
 };
 MemStorage.prototype.applyForVerification = async function () {
   throw new Error("Verified Ajo not supported on MemStorage");
+};
+
+// ---- Ajo cycles (DbStorage) ----------------------------------------------
+import { ajoSettings as ajoSettingsTable } from "@shared/schema";
+
+// Compute the next cycle's due date by adding one frequency step from the
+// previous cycle's due date (or from start_date for cycle #1).
+function addFrequency(from: Date, frequency: AjoFrequency): Date {
+  const next = new Date(from);
+  if (frequency === "weekly") next.setDate(next.getDate() + 7);
+  else if (frequency === "biweekly") next.setDate(next.getDate() + 14);
+  else next.setMonth(next.getMonth() + 1); // monthly
+  return next;
+}
+
+// Builds the AjoStatus payload returned to the group page. Includes the
+// current cycle (a project row) hydrated with recipient info, plus a paid
+// roll-up so the UI can show "5 of 8 paid".
+async function buildAjoStatus(groupId: string): Promise<AjoStatus | null> {
+  const [settings] = await db.select().from(ajoSettingsTable)
+    .where(eq(ajoSettingsTable.groupId, groupId)).limit(1);
+  if (!settings) return null;
+
+  // Find the current cycle project (if any). It's the projects row for this
+  // group with cycle_number == settings.currentCycleNumber.
+  const [cycleProject] = await db.select().from(projectsTable)
+    .where(and(
+      eq(projectsTable.groupId, groupId),
+      eq(projectsTable.cycleNumber, settings.currentCycleNumber),
+    )).limit(1);
+
+  let currentCycle = null;
+  let paidCount = 0;
+  if (cycleProject) {
+    let recipient: User | null = null;
+    if (cycleProject.recipientUserId) {
+      const [u] = await db.select().from(usersTable).where(eq(usersTable.id, cycleProject.recipientUserId)).limit(1);
+      recipient = u ?? null;
+    }
+    currentCycle = { ...cycleProject, recipient };
+
+    // Count distinct confirmed contributors for this cycle's project.
+    const paidRows = await db
+      .selectDistinct({ userId: contributionsTable.userId })
+      .from(contributionsTable)
+      .where(and(
+        eq(contributionsTable.projectId, cycleProject.id),
+        eq(contributionsTable.status, "confirmed"),
+      ));
+    paidCount = paidRows.length;
+  }
+
+  return {
+    settings,
+    currentCycle,
+    paidCount,
+    expectedCount: (settings.payoutOrder ?? []).length,
+  };
+}
+
+// Create the cycle #1 project row given settings + recipient + due date.
+async function insertCycleProject(
+  groupId: string,
+  cycleNumber: number,
+  recipientUserId: string,
+  contributionAmount: string,
+  dueDate: Date,
+): Promise<Project> {
+  // Pull recipient name for a friendly project name.
+  const [recipientUser] = await db.select().from(usersTable).where(eq(usersTable.id, recipientUserId)).limit(1);
+  const recipientLabel = recipientUser?.fullName?.trim() || recipientUser?.phoneNumber || "Recipient";
+
+  // Reuse group's customSlug for project URL slug uniqueness.
+  const [group] = await db.select().from(groupsTable).where(eq(groupsTable.id, groupId)).limit(1);
+  const groupSlug = group?.customSlug || "group";
+  const projectSlug = `cycle-${cycleNumber}-${randomUUID().slice(0, 6)}`;
+
+  const [created] = await db.insert(projectsTable).values({
+    groupId,
+    name: `Cycle ${cycleNumber} — ${recipientLabel}`,
+    description: `Ajo cycle ${cycleNumber}. Recipient: ${recipientLabel}.`,
+    projectType: "ajo_cycle",
+    targetAmount: contributionAmount, // informational; per-member amount * members = expected pot
+    deadline: dueDate,
+    customSlug: `${groupSlug}/${projectSlug}`,
+    cycleNumber,
+    recipientUserId,
+  }).returning();
+  return created;
+}
+
+DbStorage.prototype.getAjoSettings = async function (groupId: string) {
+  const [row] = await db.select().from(ajoSettingsTable)
+    .where(eq(ajoSettingsTable.groupId, groupId)).limit(1);
+  return row;
+};
+
+DbStorage.prototype.getAjoStatus = async function (groupId: string) {
+  return buildAjoStatus(groupId);
+};
+
+DbStorage.prototype.createAjoSettingsAndStartCycle = async function (
+  groupId: string,
+  payload: CreateAjoSettingsPayload,
+) {
+  // Reject double-setup.
+  const existing = await this.getAjoSettings(groupId);
+  if (existing) throw new Error("Ajo cycle is already set up for this group");
+
+  // Validate that all userIds in payoutOrder are actually members of the group.
+  const memberRows = await db.select({ userId: groupMembersTable.userId })
+    .from(groupMembersTable).where(eq(groupMembersTable.groupId, groupId));
+  const memberSet = new Set(memberRows.map(m => m.userId));
+  for (const uid of payload.payoutOrder) {
+    if (!memberSet.has(uid)) throw new Error(`User ${uid} is not a member of this group`);
+  }
+
+  const startDate = new Date(payload.startDate);
+  if (Number.isNaN(startDate.getTime())) throw new Error("Invalid start date");
+
+  await db.insert(ajoSettingsTable).values({
+    groupId,
+    contributionAmount: payload.contributionAmount,
+    frequency: payload.frequency,
+    payoutOrder: payload.payoutOrder,
+    startDate,
+    totalRounds: payload.payoutOrder.length,
+    currentCycleNumber: 1,
+    status: "active",
+  });
+
+  // Create cycle #1 project, recipient = first in payoutOrder.
+  await insertCycleProject(groupId, 1, payload.payoutOrder[0], payload.contributionAmount, startDate);
+
+  return (await buildAjoStatus(groupId))!;
+};
+
+DbStorage.prototype.updateAjoPayoutOrder = async function (groupId: string, payoutOrder: string[]) {
+  const settings = await this.getAjoSettings(groupId);
+  if (!settings) throw new Error("Ajo not set up");
+  // Don't let admins reshuffle past or current recipients — only the tail
+  // (positions >= currentCycleNumber - 1) is editable. Simplest enforcement:
+  // payoutOrder must keep already-paid recipients (positions 0..currentCycle-2)
+  // in place, and the current recipient (position currentCycle-1) unchanged.
+  const lockedPrefix = settings.payoutOrder.slice(0, settings.currentCycleNumber);
+  const newPrefix = payoutOrder.slice(0, settings.currentCycleNumber);
+  if (lockedPrefix.length !== newPrefix.length || lockedPrefix.some((u, i) => u !== newPrefix[i])) {
+    throw new Error("Cannot reorder past or current recipients");
+  }
+  // Length must still equal totalRounds (no add/remove for now).
+  if (payoutOrder.length !== settings.totalRounds) {
+    throw new Error("Payout order length must match total rounds");
+  }
+  const [updated] = await db.update(ajoSettingsTable)
+    .set({ payoutOrder, updatedAt: new Date() })
+    .where(eq(ajoSettingsTable.groupId, groupId)).returning();
+  return updated;
+};
+
+DbStorage.prototype.advanceAjoCycle = async function (groupId: string) {
+  const settings = await this.getAjoSettings(groupId);
+  if (!settings) throw new Error("Ajo not set up");
+  if (settings.status === "completed") throw new Error("Ajo round already completed");
+
+  // Mark current cycle's project as completed and stamp payoutAt now.
+  const [currentCycleProject] = await db.select().from(projectsTable)
+    .where(and(
+      eq(projectsTable.groupId, groupId),
+      eq(projectsTable.cycleNumber, settings.currentCycleNumber),
+    )).limit(1);
+  if (currentCycleProject) {
+    await db.update(projectsTable)
+      .set({ status: "completed", payoutAt: new Date() })
+      .where(eq(projectsTable.id, currentCycleProject.id));
+  }
+
+  // If we just closed the final cycle, mark settings completed and stop.
+  if (settings.currentCycleNumber >= settings.totalRounds) {
+    await db.update(ajoSettingsTable)
+      .set({ status: "completed", updatedAt: new Date() })
+      .where(eq(ajoSettingsTable.groupId, groupId));
+    return (await buildAjoStatus(groupId))!;
+  }
+
+  // Otherwise create the next cycle project & advance the pointer.
+  const nextCycleNumber = settings.currentCycleNumber + 1;
+  const nextRecipientId = settings.payoutOrder[nextCycleNumber - 1];
+  if (!nextRecipientId) throw new Error("No recipient configured for next cycle");
+
+  const prevDue = currentCycleProject?.deadline ?? settings.startDate;
+  const nextDue = addFrequency(prevDue, settings.frequency as AjoFrequency);
+
+  await insertCycleProject(groupId, nextCycleNumber, nextRecipientId, settings.contributionAmount, nextDue);
+  await db.update(ajoSettingsTable)
+    .set({ currentCycleNumber: nextCycleNumber, updatedAt: new Date() })
+    .where(eq(ajoSettingsTable.groupId, groupId));
+
+  return (await buildAjoStatus(groupId))!;
+};
+
+// MemStorage stubs (Ajo lives only in the database)
+MemStorage.prototype.getAjoSettings = async function () { return undefined; };
+MemStorage.prototype.getAjoStatus = async function () { return null; };
+MemStorage.prototype.createAjoSettingsAndStartCycle = async function () {
+  throw new Error("Ajo cycles require database storage");
+};
+MemStorage.prototype.updateAjoPayoutOrder = async function () {
+  throw new Error("Ajo cycles require database storage");
+};
+MemStorage.prototype.advanceAjoCycle = async function () {
+  throw new Error("Ajo cycles require database storage");
 };
 
 export const storage = new DbStorage();

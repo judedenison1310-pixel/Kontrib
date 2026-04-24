@@ -8,7 +8,8 @@ import {
   insertUserSchema, insertGroupSchema, insertGroupMemberSchema,
   insertProjectSchema, insertAccountabilityPartnerSchema, insertContributionSchema,
   insertNotificationSchema, insertOtpVerificationSchema, insertPushSubscriptionSchema,
-  submitVerificationSchema, officerResponseSchema, attesterResponseSchema
+  submitVerificationSchema, officerResponseSchema, attesterResponseSchema,
+  createAjoSettingsSchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -633,6 +634,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error?.issues) return res.status(400).json({ message: "Invalid response", errors: error.issues });
       console.error("Attester response error:", error);
       res.status(400).json({ message: error?.message || "Failed to record response" });
+    }
+  });
+
+  // ---- Ajo cycles ---------------------------------------------------------
+  // Returns null when the group is Ajo-typed but has not yet been set up,
+  // so the UI can render the "Set up your cycle" CTA.
+  app.get("/api/groups/:groupId/ajo", async (req, res) => {
+    try {
+      const status = await storage.getAjoStatus(req.params.groupId);
+      res.json(status);
+    } catch (error: any) {
+      console.error("Get ajo status error:", error);
+      res.status(500).json({ message: error?.message || "Failed to load Ajo status" });
+    }
+  });
+
+  // Admin sets up the cycle: amount, frequency, payout order, start date.
+  // Creates ajo_settings + cycle #1 project in one shot.
+  app.post("/api/groups/:groupId/ajo", async (req, res) => {
+    try {
+      const { groupId } = req.params;
+      const { actorId, ...payloadInput } = req.body;
+      const group = await storage.getGroup(groupId);
+      if (!group) return res.status(404).json({ message: "Group not found" });
+      if (group.groupType !== "ajo") {
+        return res.status(400).json({ message: "Only Ajo groups can be set up as cycles" });
+      }
+      if (group.adminId !== actorId) {
+        return res.status(403).json({ message: "Only the group admin can set up the cycle" });
+      }
+      const payload = createAjoSettingsSchema.parse(payloadInput);
+      const status = await storage.createAjoSettingsAndStartCycle(groupId, payload);
+      res.json(status);
+    } catch (error: any) {
+      if (error?.issues) return res.status(400).json({ message: "Invalid setup", errors: error.issues });
+      console.error("Setup ajo error:", error);
+      res.status(400).json({ message: error?.message || "Failed to set up cycle" });
+    }
+  });
+
+  // Admin reorders the unfinished tail of the payout order. Past + current
+  // recipients are locked.
+  app.patch("/api/groups/:groupId/ajo/payout-order", async (req, res) => {
+    try {
+      const { groupId } = req.params;
+      const { actorId, payoutOrder } = req.body;
+      const group = await storage.getGroup(groupId);
+      if (!group) return res.status(404).json({ message: "Group not found" });
+      if (group.adminId !== actorId) {
+        return res.status(403).json({ message: "Only the group admin can reorder" });
+      }
+      if (!Array.isArray(payoutOrder)) {
+        return res.status(400).json({ message: "payoutOrder must be an array" });
+      }
+      const updated = await storage.updateAjoPayoutOrder(groupId, payoutOrder);
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Reorder ajo error:", error);
+      res.status(400).json({ message: error?.message || "Failed to update order" });
+    }
+  });
+
+  // Admin closes the current cycle (e.g. after disbursing the pot) and rolls
+  // forward to the next recipient. If this was the last cycle, marks the
+  // ajo_settings as completed.
+  app.post("/api/groups/:groupId/ajo/advance", async (req, res) => {
+    try {
+      const { groupId } = req.params;
+      const { actorId } = req.body;
+      const group = await storage.getGroup(groupId);
+      if (!group) return res.status(404).json({ message: "Group not found" });
+      if (group.adminId !== actorId) {
+        return res.status(403).json({ message: "Only the group admin can advance the cycle" });
+      }
+      const status = await storage.advanceAjoCycle(groupId);
+      res.json(status);
+    } catch (error: any) {
+      console.error("Advance ajo error:", error);
+      res.status(400).json({ message: error?.message || "Failed to advance cycle" });
     }
   });
 

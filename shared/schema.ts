@@ -177,18 +177,42 @@ export const groupMembers = pgTable("group_members", {
   joinerSelfieDataUrl: text("joiner_selfie_data_url"),
 });
 
+// One row per Ajo group. Holds the cycle config (amount, frequency, payout
+// order) and the running pointer to the active cycle. Created by the admin
+// once they're ready to start the rotation.
+export const AJO_FREQUENCIES = ["weekly", "biweekly", "monthly"] as const;
+export type AjoFrequency = (typeof AJO_FREQUENCIES)[number];
+
+export const ajoSettings = pgTable("ajo_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  groupId: varchar("group_id").notNull().unique().references(() => groups.id),
+  contributionAmount: decimal("contribution_amount", { precision: 15, scale: 2 }).notNull(),
+  frequency: text("frequency").notNull(), // weekly | biweekly | monthly
+  payoutOrder: text("payout_order").array().notNull().default(sql`'{}'::text[]`), // ordered userIds
+  startDate: timestamp("start_date").notNull(),
+  totalRounds: integer("total_rounds").notNull(),       // Equals payoutOrder.length when set up
+  currentCycleNumber: integer("current_cycle_number").notNull().default(1),
+  status: text("status").notNull().default("active"),   // "active" | "completed"
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
 export const projects = pgTable("projects", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   groupId: varchar("group_id").notNull().references(() => groups.id),
   name: text("name").notNull(),
   description: text("description"),
-  projectType: text("project_type").notNull().default("target"), // "target", "monthly", "yearly", "event", "emergency"
+  projectType: text("project_type").notNull().default("target"), // "target", "monthly", "yearly", "event", "emergency", "ajo_cycle"
   currency: text("currency").notNull().default("NGN"), // "NGN", "USD", "EUR"
   targetAmount: decimal("target_amount", { precision: 15, scale: 2 }), // Optional for monthly/yearly types
   collectedAmount: decimal("collected_amount", { precision: 15, scale: 2 }).notNull().default("0"),
   customSlug: text("custom_slug").unique(), // For kontrib.app/groupname/pursename URLs
   deadline: timestamp("deadline"),
   status: text("status").notNull().default("active"), // "active", "completed", "paused"
+  // Ajo cycle metadata — populated only when projectType === 'ajo_cycle'.
+  cycleNumber: integer("cycle_number"),                                  // 1-indexed within the round
+  recipientUserId: varchar("recipient_user_id").references(() => users.id), // Member who receives this cycle's pot
+  payoutAt: timestamp("payout_at"),                                      // When the admin marked the pot disbursed
   // Custom OG image for link previews (stored in object storage)
   ogImage: text("og_image"), // URL to custom OG image in object storage
   // Account details for contributions
@@ -444,4 +468,37 @@ export type GroupWithRole = GroupWithStats & {
   role: 'admin' | 'member' | 'both';
   pendingApprovals?: number;
   myPendingPayments?: number;
+};
+
+// ---- Ajo cycles -----------------------------------------------------------
+
+export type AjoSettings = typeof ajoSettings.$inferSelect;
+
+export const insertAjoSettingsSchema = createInsertSchema(ajoSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertAjoSettings = z.infer<typeof insertAjoSettingsSchema>;
+
+// Payload the admin POSTs from the setup wizard. We compute totalRounds and
+// startDate handling on the server, so the client just sends the essentials.
+export const createAjoSettingsSchema = z.object({
+  contributionAmount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Enter a valid amount"),
+  frequency: z.enum(AJO_FREQUENCIES),
+  payoutOrder: z.array(z.string().min(1)).min(2, "Need at least 2 members in the payout order"),
+  startDate: z.string().min(1, "Pick a start date"), // ISO date
+});
+export type CreateAjoSettingsPayload = z.infer<typeof createAjoSettingsSchema>;
+
+// Detailed view returned to the group page — settings + the active cycle
+// project (if any) + a payment roll-up for that cycle.
+export type AjoCycleProject = Project & {
+  recipient: User | null;
+};
+export type AjoStatus = {
+  settings: AjoSettings;
+  currentCycle: AjoCycleProject | null;
+  paidCount: number;     // Members who've contributed to the current cycle (confirmed)
+  expectedCount: number; // payoutOrder.length
 };

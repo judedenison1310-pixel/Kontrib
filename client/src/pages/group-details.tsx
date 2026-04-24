@@ -16,12 +16,15 @@ import {
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { formatNaira } from "@/lib/currency";
-import { Group, Project, User as UserType, ContributionWithDetails } from "@shared/schema";
+import { Group, Project, User as UserType, ContributionWithDetails, AjoStatus } from "@shared/schema";
 import { useState } from "react";
 import { CreateProjectModal } from "@/components/create-project-modal";
 import { EditNameModal } from "@/components/edit-name-modal";
 import { VerificationBanner } from "@/components/verification-banner";
 import { VerifiedBadge } from "@/components/verified-badge";
+import { AjoSetupModal } from "@/components/ajo-setup-modal";
+import { AjoCycleStatus } from "@/components/ajo-cycle-status";
+import { Repeat } from "lucide-react";
 
 interface GroupMemberWithUser {
   id: string;
@@ -39,6 +42,7 @@ export default function GroupDetails() {
   const user = getCurrentUser();
   const [createProjectModalOpen, setCreateProjectModalOpen] = useState(false);
   const [editGroupNameModalOpen, setEditGroupNameModalOpen] = useState(false);
+  const [ajoSetupOpen, setAjoSetupOpen] = useState(false);
 
   const { data: group, isLoading: groupLoading } = useQuery<Group>({
     queryKey: ["/api/groups", groupId],
@@ -58,6 +62,14 @@ export default function GroupDetails() {
   const { data: contributions = [] } = useQuery<ContributionWithDetails[]>({
     queryKey: ["/api/contributions/group", groupId],
     enabled: !!groupId,
+  });
+
+  // Ajo cycle status — only fetched for ajo-typed groups. Returns null
+  // when the admin has not yet set up the cycle.
+  const isAjoGroup = group?.groupType === "ajo";
+  const { data: ajoStatus } = useQuery<AjoStatus | null>({
+    queryKey: ["/api/groups", groupId, "ajo"],
+    enabled: !!groupId && isAjoGroup,
   });
 
   const isLoading = groupLoading || projectsLoading || membersLoading;
@@ -250,8 +262,55 @@ export default function GroupDetails() {
           </Card>
         )}
 
-        {/* Show admin project creation option */}
-        {isAdmin && (
+        {/* Ajo-typed groups get a dedicated cycle workflow instead of the
+            generic project list. Either the setup CTA (admin, no settings yet)
+            or the active cycle status panel. */}
+        {isAjoGroup && !ajoStatus && isAdmin && (
+          <Card className="bg-gradient-to-br from-emerald-50 to-amber-50 border-emerald-200 rounded-2xl">
+            <CardContent className="p-5 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="w-11 h-11 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0">
+                  <Repeat className="h-5 w-5" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-bold text-emerald-900">Set up your Ajo cycle</h3>
+                  <p className="text-sm text-emerald-800/80 mt-0.5">
+                    Pick the contribution amount, how often everyone pays, and the
+                    order each member receives the pot. Cycle 1 starts as soon as you finish.
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={() => setAjoSetupOpen(true)}
+                disabled={members.length < 2}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-full"
+                data-testid="button-open-ajo-setup"
+              >
+                {members.length < 2 ? "Invite at least 2 members first" : "Set up cycle"}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {isAjoGroup && !ajoStatus && !isAdmin && (
+          <Card className="bg-amber-50 border-amber-200 rounded-2xl">
+            <CardContent className="p-4 text-sm text-amber-800">
+              The admin hasn't started the Ajo cycle yet. You'll see the schedule and your turn here once they do.
+            </CardContent>
+          </Card>
+        )}
+
+        {isAjoGroup && ajoStatus && (
+          <AjoCycleStatus
+            groupId={groupId!}
+            status={ajoStatus}
+            members={members}
+            isAdmin={isAdmin}
+          />
+        )}
+
+        {/* Non-Ajo groups: keep the existing project workflow. */}
+        {!isAjoGroup && isAdmin && (
           <Button
             onClick={() => setCreateProjectModalOpen(true)}
             className="w-full"
@@ -262,8 +321,7 @@ export default function GroupDetails() {
           </Button>
         )}
 
-        {/* Show member content for members (including dual-role users) */}
-        {isMember && (
+        {!isAjoGroup && isMember && (
           <MemberContent
             groupId={groupId!}
             projects={projects}
@@ -290,6 +348,16 @@ export default function GroupDetails() {
           type="group"
           currentName={group.name}
           entityId={group.id}
+        />
+      )}
+
+      {group && isAjoGroup && (
+        <AjoSetupModal
+          open={ajoSetupOpen}
+          onOpenChange={setAjoSetupOpen}
+          groupId={group.id}
+          groupName={group.name}
+          members={members.map(m => ({ userId: m.userId, user: m.user }))}
         />
       )}
     </div>

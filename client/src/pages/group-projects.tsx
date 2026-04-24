@@ -42,7 +42,10 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getCurrentUser } from "@/lib/auth";
 import { formatNaira } from "@/lib/currency";
 import { useToast } from "@/hooks/use-toast";
-import { Project, Group } from "@shared/schema";
+import { Project, Group, AjoStatus } from "@shared/schema";
+import { AjoSetupModal } from "@/components/ajo-setup-modal";
+import { AjoCycleStatus } from "@/components/ajo-cycle-status";
+import { Repeat } from "lucide-react";
 
 export default function GroupProjects() {
   const user = getCurrentUser();
@@ -58,6 +61,7 @@ export default function GroupProjects() {
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [deleteGroupOpen, setDeleteGroupOpen] = useState(false);
+  const [ajoSetupOpen, setAjoSetupOpen] = useState(false);
 
   const deleteGroupMutation = useMutation({
     mutationFn: () =>
@@ -90,6 +94,12 @@ export default function GroupProjects() {
   const { data: verificationStatus } = useQuery<VerificationStatus>({
     queryKey: ["/api/groups", groupId, "verification"],
     enabled: !!groupId,
+  });
+
+  const isAjoGroup = group?.groupType === "ajo";
+  const { data: ajoStatus } = useQuery<AjoStatus | null>({
+    queryKey: ["/api/groups", groupId, "ajo"],
+    enabled: !!groupId && isAjoGroup,
   });
 
   const isLoading = groupLoading || projectsLoading;
@@ -204,7 +214,7 @@ export default function GroupProjects() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900" data-testid="text-page-title">
-              Projects
+              {isAjoGroup ? "Cycle" : "Projects"}
             </h1>
             <p className="text-gray-500 inline-flex items-center gap-1.5">
               {group.name}
@@ -222,7 +232,7 @@ export default function GroupProjects() {
                 <Trash2 className="h-5 w-5" />
               </button>
             )}
-            {isAdmin && projects.length > 0 && (
+            {!isAjoGroup && isAdmin && projects.length > 0 && (
               <button
                 onClick={() => setCreateProjectModalOpen(true)}
                 className="w-12 h-12 bg-amber-400 rounded-full flex items-center justify-center text-gray-900 shadow-lg hover:bg-amber-500 transition-colors"
@@ -234,7 +244,53 @@ export default function GroupProjects() {
           </div>
         </div>
 
-        {projects.length === 0 ? (
+        {isAjoGroup ? (
+          <>
+            {!ajoStatus && isAdmin && (
+              <Card className="bg-gradient-to-br from-emerald-50 to-amber-50 border-emerald-200 rounded-2xl">
+                <CardContent className="p-5 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0">
+                      <Repeat className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-emerald-900">Set up your Ajo cycle</h3>
+                      <p className="text-sm text-emerald-800/80 mt-0.5">
+                        Pick the contribution amount, how often everyone pays, and the
+                        order each member receives the pot. Cycle 1 starts as soon as you finish.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => setAjoSetupOpen(true)}
+                    disabled={members.length < 2}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-full"
+                    data-testid="button-open-ajo-setup"
+                  >
+                    {members.length < 2 ? "Invite at least 2 members first" : "Set up cycle"}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {!ajoStatus && !isAdmin && (
+              <Card className="bg-amber-50 border-amber-200 rounded-2xl">
+                <CardContent className="p-4 text-sm text-amber-800">
+                  The admin hasn't started the Ajo cycle yet. You'll see the schedule and your turn here once they do.
+                </CardContent>
+              </Card>
+            )}
+
+            {ajoStatus && (
+              <AjoCycleStatus
+                groupId={groupId!}
+                status={ajoStatus}
+                members={members.map(m => ({ userId: m.userId, user: m.user }))}
+                isAdmin={isAdmin}
+              />
+            )}
+          </>
+        ) : projects.length === 0 ? (
           <Card className="border-2 border-dashed border-gray-300">
             <CardContent className="py-12 text-center">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -382,9 +438,11 @@ export default function GroupProjects() {
           </div>
         )}
 
-        <div className="text-center text-sm text-gray-500 pt-4">
-          {projects.length} {projects.length === 1 ? "project" : "projects"}
-        </div>
+        {!isAjoGroup && (
+          <div className="text-center text-sm text-gray-500 pt-4">
+            {projects.length} {projects.length === 1 ? "project" : "projects"}
+          </div>
+        )}
       </main>
 
       {group && (

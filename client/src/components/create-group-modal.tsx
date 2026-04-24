@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import { useLocation } from "wouter";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Sheet, SheetContent, SheetHeader } from "@/components/ui/sheet";
@@ -47,6 +48,7 @@ export function CreateGroupModal({ open, onOpenChange, initialType }: CreateGrou
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const user = getCurrentUser();
+  const [, setLocation] = useLocation();
   const [step, setStep] = useState<"type" | "group" | "project">(initialType ? "group" : "type");
   const [selectedType, setSelectedType] = useState<GroupType | null>(initialType ?? null);
   const [createdGroup, setCreatedGroup] = useState<{ id: string; name: string } | null>(null);
@@ -108,6 +110,21 @@ export function CreateGroupModal({ open, onOpenChange, initialType }: CreateGrou
       return response.json();
     },
     onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/groups", "admin", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/groups/all"] });
+
+      // Ajo groups don't have free-form projects — the cycle is the project
+      // and is created from the dedicated Ajo setup wizard on the group page.
+      if ((selectedType ?? "project") === "ajo") {
+        toast({
+          title: "Ajo Group Created",
+          description: `Now set up the cycle for "${data.name}".`,
+        });
+        handleClose();
+        setLocation(`/group/${data.id}`);
+        return;
+      }
+
       setCreatedGroup({ id: data.id, name: data.name });
       projectForm.setValue("groupId", data.id);
       // Pre-select the project sub-type that fits the chosen group category.
