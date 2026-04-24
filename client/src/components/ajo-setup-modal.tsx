@@ -127,7 +127,7 @@ export function AjoSetupModal({ open, onOpenChange, groupId, groupName, members 
   const canSubmit =
     !!amount && Number(amount) > 0 &&
     !!startDate &&
-    order.length >= 2 &&
+    order.length >= 1 &&
     !setupMutation.isPending;
 
   return (
@@ -240,7 +240,7 @@ export function AjoSetupModal({ open, onOpenChange, groupId, groupName, members 
                   data-testid="input-ajo-amount"
                 />
               </div>
-              {!!amount && Number(amount) > 0 && order.length >= 2 && (
+              {!!amount && Number(amount) > 0 && order.length >= 1 && (
                 <p className="text-xs text-gray-500">
                   Each cycle, the recipient takes home ~₦{(Number(amount) * order.length).toLocaleString()}.
                 </p>
@@ -297,9 +297,9 @@ export function AjoSetupModal({ open, onOpenChange, groupId, groupName, members 
                 <UsersIcon className="h-4 w-4 text-emerald-600" />
                 Payout order ({order.length} members)
               </Label>
-              {order.length < 2 ? (
-                <div className="rounded-xl border-2 border-dashed border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                  You need at least 2 members in the group to start an Ajo cycle. Invite people to join first.
+              {order.length < 1 ? (
+                <div className="rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+                  No members yet. Add yourself or invite people, then come back to set the payout order.
                 </div>
               ) : (
                 <>
