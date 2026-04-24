@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
+import { AdminKycModal } from "@/components/admin-kyc-modal";
 import { Navigation } from "@/components/navigation";
 import { CreateProjectModal } from "@/components/create-project-modal";
 import { PaymentModal } from "@/components/payment-modal";
@@ -64,6 +65,37 @@ export default function GroupProjects() {
   const [deleteGroupOpen, setDeleteGroupOpen] = useState(false);
   const [ajoSetupOpen, setAjoSetupOpen] = useState(false);
   const [associationSetupOpen, setAssociationSetupOpen] = useState(false);
+  const [kycModalOpen, setKycModalOpen] = useState(false);
+  // Tracks the create-group → KYC → cycle setup chain so we open the cycle
+  // setup modal automatically once the admin closes the KYC sheet.
+  const [chainKycToCycle, setChainKycToCycle] = useState(false);
+
+  // Onboarding sequencing: when the admin lands here right after creating
+  // the Ajo group (the create modal sends them with ?onboard=1), open the
+  // KYC sheet first and then the cycle setup sheet, so the flow is:
+  // name → KYC → cycle setup. Only fires once per page load.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("onboard") !== "1") return;
+    // Strip the flag immediately so a refresh doesn't re-trigger the chain.
+    params.delete("onboard");
+    const cleanQs = params.toString();
+    const cleanUrl = window.location.pathname + (cleanQs ? `?${cleanQs}` : "");
+    window.history.replaceState(null, "", cleanUrl);
+    setKycModalOpen(true);
+    setChainKycToCycle(true);
+  }, []);
+
+  // When the KYC sheet closes during onboarding, open the cycle setup sheet
+  // so the admin sees the next step in the planned sequence.
+  const handleKycModalChange = (open: boolean) => {
+    setKycModalOpen(open);
+    if (!open && chainKycToCycle) {
+      setChainKycToCycle(false);
+      setAjoSetupOpen(true);
+    }
+  };
 
   const deleteGroupMutation = useMutation({
     mutationFn: () =>
@@ -535,6 +567,13 @@ export default function GroupProjects() {
           groupName={group.name}
           memberCount={members.length}
         />
+      )}
+
+      {/* Mounted at the page level so the create-group → KYC → cycle setup
+          chain can be driven from the onboarding effect above, not just from
+          inside the cycle setup sheet. */}
+      {isAjoGroup && isAdmin && (
+        <AdminKycModal open={kycModalOpen} onOpenChange={handleKycModalChange} />
       )}
 
       {/* Delete Group Confirmation */}

@@ -118,10 +118,10 @@ export function CreateGroupModal({ open, onOpenChange, initialType }: CreateGrou
       if ((selectedType ?? "project") === "ajo") {
         toast({
           title: "Ajo Group Created",
-          description: `Now set up the cycle for "${data.name}".`,
+          description: `Next: verify your identity, then set up the cycle.`,
         });
         handleClose();
-        setLocation(`/group/${data.id}`);
+        setLocation(`/group/${data.id}/projects?onboard=1`);
         return;
       }
 
