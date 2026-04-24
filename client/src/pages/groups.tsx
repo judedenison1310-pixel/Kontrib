@@ -246,59 +246,44 @@ export default function Groups() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {bucketedGroups.map((bucket) => {
               const SectionIcon = bucket.meta.icon;
               return (
                 <section key={bucket.type} data-testid={`bucket-${bucket.type}`}>
-                  <div className="flex items-center justify-between px-1 mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${bucket.meta.badgeBg} ${bucket.meta.accentText}`}>
-                        <SectionIcon className="h-4 w-4" />
-                      </div>
-                      <h2 className="text-sm font-bold uppercase tracking-wide text-gray-700">
-                        {bucket.meta.label}
-                      </h2>
-                      <span className="text-xs text-gray-400">({bucket.items.length})</span>
+                  <div className="flex items-center gap-2 px-1 mb-1.5">
+                    <div className={`w-5 h-5 rounded-md flex items-center justify-center ${bucket.meta.badgeBg} ${bucket.meta.accentText}`}>
+                      <SectionIcon className="h-3 w-3" />
                     </div>
+                    <h2 className="text-xs font-bold uppercase tracking-wide text-gray-600">
+                      {bucket.meta.label}
+                    </h2>
+                    <span className="text-xs text-gray-400">({bucket.items.length})</span>
                   </div>
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {bucket.items.map((group) => (
               <Card
                 key={group.id}
-                className={`bg-white rounded-2xl border shadow-sm hover:shadow-md transition-all cursor-pointer active:scale-[0.99] ${
+                className={`bg-white rounded-xl border shadow-sm hover:shadow-md transition-all cursor-pointer active:scale-[0.99] ${
                   isGroupAdmin(group) ? "border-amber-200" : "border-gray-100"
                 }`}
                 onClick={() => setLocation(`/group/${group.id}/projects`)}
                 data-testid={`group-card-${group.id}`}
               >
                 <CardContent className="p-0">
-                  <div className="p-4">
-                    {/* Top row: name + badges + edit */}
-                    <div className="flex items-start justify-between mb-3">
+                  <div className="p-3">
+                    {/* Top row: name + badges (left) — amount (right) */}
+                    <div className="flex items-start justify-between gap-2 mb-1.5">
                       <div className="flex items-center gap-1.5 flex-1 min-w-0">
                         <h3 className="font-bold text-gray-900 truncate" data-testid={`text-group-name-${group.id}`}>
                           {group.name}
                         </h3>
                         <VerifiedBadge verifiedAt={group.verifiedAt} expiresAt={group.verificationExpiresAt} />
                         {isGroupAdmin(group) && (
-                          <>
-                            <span className="shrink-0 flex items-center gap-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                              <Crown className="h-2.5 w-2.5" />
-                              Admin
-                            </span>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingGroup(group);
-                                setEditGroupModalOpen(true);
-                              }}
-                              className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors shrink-0"
-                              data-testid={`button-edit-group-name-${group.id}`}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </button>
-                          </>
+                          <span className="shrink-0 flex items-center gap-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                            <Crown className="h-2.5 w-2.5" />
+                            Admin
+                          </span>
                         )}
                         {!isGroupAdmin(group) && (group.coAdmins ?? []).includes(user?.id ?? '') && (
                           <span className="shrink-0 flex items-center gap-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
@@ -313,93 +298,92 @@ export default function Groups() {
                           </span>
                         )}
                       </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-[10px] text-gray-400 uppercase tracking-wide leading-none">Total</p>
+                        <p className="font-bold text-primary text-base leading-tight" data-testid={`text-total-collected-${group.id}`}>
+                          {formatNaira(group.totalCollected)}
+                        </p>
+                      </div>
                     </div>
 
-                    {/* Total Generated */}
-                    <div className="mb-3">
-                      <p className="text-xs text-gray-400 mb-0.5">Total Generated</p>
-                      <p className="font-bold text-primary text-lg" data-testid={`text-total-collected-${group.id}`}>
-                        {formatNaira(group.totalCollected)}
-                      </p>
-                    </div>
-
-                    {/* Members + Projects as links */}
-                    <div className="flex items-center gap-3 border-t border-gray-50 pt-3">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setLocation(`/group/${group.id}/members`);
-                        }}
-                        className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary transition-colors"
-                        data-testid={`button-members-${group.id}`}
-                      >
-                        <Users className="h-3.5 w-3.5" />
-                        Members {group.memberCount}
-                      </button>
-                      <span className="text-gray-200">|</span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setLocation(`/group/${group.id}/projects`);
-                        }}
-                        className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary transition-colors"
-                        data-testid={`button-projects-${group.id}`}
-                      >
-                        <FolderKanban className="h-3.5 w-3.5" />
-                        Projects {group.projectCount}
-                      </button>
+                    {/* Meta row: members · projects (left) — quick actions (right) */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5 text-xs text-gray-500 min-w-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLocation(`/group/${group.id}/members`);
+                          }}
+                          className="flex items-center gap-1 hover:text-primary transition-colors"
+                          data-testid={`button-members-${group.id}`}
+                        >
+                          <Users className="h-3 w-3" />
+                          {group.memberCount}
+                        </button>
+                        <span className="text-gray-200">·</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLocation(`/group/${group.id}/projects`);
+                          }}
+                          className="flex items-center gap-1 hover:text-primary transition-colors"
+                          data-testid={`button-projects-${group.id}`}
+                        >
+                          <FolderKanban className="h-3 w-3" />
+                          {group.projectCount}
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {isGroupAdmin(group) && (
+                          <>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                shareGroupViaWhatsApp(group);
+                              }}
+                              className="p-1.5 rounded-lg hover:bg-green-50 text-green-600 transition-colors"
+                              title="Invite members & earn"
+                              data-testid={`button-invite-earn-${group.id}`}
+                            >
+                              <SiWhatsapp className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingGroup(group);
+                                setEditGroupModalOpen(true);
+                              }}
+                              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+                              title="Edit name"
+                              data-testid={`button-edit-group-name-${group.id}`}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Pending approvals action strip — visible to admins and co-admins with pending receipts */}
+                  {/* Pending approvals strip — compact, only when applicable */}
                   {isGroupReviewer(group) && group.pendingApprovals && group.pendingApprovals > 0 ? (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setLocation(`/group/${group.id}/pending`);
                       }}
-                      className="w-full flex items-center justify-between px-4 py-3 bg-orange-50 border-t border-orange-100 hover:bg-orange-100 transition-colors"
+                      className="w-full flex items-center justify-between px-3 py-2 bg-orange-50 border-t border-orange-100 rounded-b-xl hover:bg-orange-100 transition-colors"
                       data-testid={`button-pending-approvals-${group.id}`}
                     >
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center">
-                          <Clock className="h-3.5 w-3.5 text-white" />
-                        </div>
-                        <span className="text-sm font-semibold text-orange-700">
-                          {group.pendingApprovals} receipt{group.pendingApprovals > 1 ? 's' : ''} pending approval
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 text-orange-600" />
+                        <span className="text-xs font-semibold text-orange-700">
+                          {group.pendingApprovals} pending receipt{group.pendingApprovals > 1 ? 's' : ''}
                         </span>
                       </div>
-                      <div className="flex items-center gap-1 text-orange-600 text-sm font-medium">
-                        Review
-                        <ChevronRight className="h-4 w-4" />
-                      </div>
+                      <ChevronRight className="h-4 w-4 text-orange-600" />
                     </button>
                   ) : null}
-
-                  {/* Invite & Earn strip — admins only */}
-                  {isGroupAdmin(group) && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        shareGroupViaWhatsApp(group);
-                      }}
-                      className="w-full flex items-center justify-between px-4 py-3 bg-green-50 border-t border-green-100 rounded-b-2xl hover:bg-green-100 transition-colors"
-                      data-testid={`button-invite-earn-${group.id}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                          <SiWhatsapp className="h-3.5 w-3.5 text-white" />
-                        </div>
-                        <span className="text-sm font-semibold text-green-700">
-                          Invite members &amp; earn
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 text-green-600 text-sm font-medium">
-                        Share
-                        <ChevronRight className="h-4 w-4" />
-                      </div>
-                    </button>
-                  )}
                 </CardContent>
               </Card>
                     ))}
