@@ -37,6 +37,11 @@ import {
   type AjoStatus,
   type AjoFrequency,
   type CreateAjoSettingsPayload,
+  type AssociationSettings,
+  type AssociationStatus,
+  type AssociationFrequency,
+  type CreateAssociationSettingsPayload,
+  type CreateAssociationLevyPayload,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -152,6 +157,13 @@ export interface IStorage {
   createAjoSettingsAndStartCycle(groupId: string, payload: CreateAjoSettingsPayload): Promise<AjoStatus>;
   updateAjoPayoutOrder(groupId: string, payoutOrder: string[]): Promise<AjoSettings | undefined>;
   advanceAjoCycle(groupId: string): Promise<AjoStatus>;
+
+  // Association dues + levies
+  getAssociationSettings(groupId: string): Promise<AssociationSettings | undefined>;
+  getAssociationStatus(groupId: string): Promise<AssociationStatus | null>;
+  createAssociationSettingsAndStartPeriod(groupId: string, payload: CreateAssociationSettingsPayload): Promise<AssociationStatus>;
+  advanceAssociationPeriod(groupId: string): Promise<AssociationStatus>;
+  createAssociationLevy(groupId: string, payload: CreateAssociationLevyPayload): Promise<Project>;
 
   // Verified Ajo
   getVerificationStatus(groupId: string): Promise<VerificationStatus | null>;
@@ -3032,6 +3044,215 @@ MemStorage.prototype.updateAjoPayoutOrder = async function () {
 };
 MemStorage.prototype.advanceAjoCycle = async function () {
   throw new Error("Ajo cycles require database storage");
+};
+
+// ---- Association dues + levies (DbStorage) -------------------------------
+import { associationSettings as associationSettingsTable } from "@shared/schema";
+
+// Step the dues schedule forward by one frequency unit.
+function addAssociationFrequency(from: Date, frequency: AssociationFrequency): Date {
+  const next = new Date(from);
+  if (frequency === "monthly") next.setMonth(next.getMonth() + 1);
+  else if (frequency === "quarterly") next.setMonth(next.getMonth() + 3);
+  else next.setFullYear(next.getFullYear() + 1); // yearly
+  return next;
+}
+
+// Friendly label for a dues period, e.g. "Monthly Dues — Period 1".
+function periodLabel(periodNumber: number, frequency: AssociationFrequency, dueDate: Date): string {
+  const monthYear = dueDate.toLocaleString("en-US", { month: "long", year: "numeric" });
+  if (frequency === "monthly") return `${monthYear} dues`;
+  if (frequency === "yearly") return `${dueDate.getFullYear()} annual dues`;
+  // quarterly
+  const q = Math.floor(dueDate.getMonth() / 3) + 1;
+  return `Q${q} ${dueDate.getFullYear()} dues`;
+}
+
+async function buildAssociationStatus(groupId: string): Promise<AssociationStatus | null> {
+  const [settings] = await db.select().from(associationSettingsTable)
+    .where(eq(associationSettingsTable.groupId, groupId)).limit(1);
+  if (!settings) return null;
+
+  // Active dues period — projects row tagged association_dues with this period number.
+  const [periodProject] = await db.select().from(projectsTable)
+    .where(and(
+      eq(projectsTable.groupId, groupId),
+      eq(projectsTable.projectType, "association_dues"),
+      eq(projectsTable.cycleNumber, settings.currentPeriodNumber),
+    )).limit(1);
+
+  // Levies for this group, newest first.
+  const levies = await db.select().from(projectsTable)
+    .where(and(
+      eq(projectsTable.groupId, groupId),
+      eq(projectsTable.projectType, "association_levy"),
+    ))
+    .orderBy(desc(projectsTable.createdAt));
+
+  // Active membership — used as the expected payer count for both dues and levies.
+  const memberRows = await db.select({ userId: groupMembersTable.userId })
+    .from(groupMembersTable).where(eq(groupMembersTable.groupId, groupId));
+  const expectedCount = memberRows.length;
+
+  let paidCount = 0;
+  if (periodProject) {
+    const paidRows = await db
+      .selectDistinct({ userId: contributionsTable.userId })
+      .from(contributionsTable)
+      .where(and(
+        eq(contributionsTable.projectId, periodProject.id),
+        eq(contributionsTable.status, "confirmed"),
+      ));
+    paidCount = paidRows.length;
+  }
+
+  return {
+    settings,
+    currentPeriod: periodProject ?? null,
+    paidCount,
+    expectedCount,
+    levies,
+  };
+}
+
+// Insert a projects row for one dues period.
+async function insertDuesPeriodProject(
+  groupId: string,
+  periodNumber: number,
+  duesAmount: string,
+  frequency: AssociationFrequency,
+  dueDate: Date,
+): Promise<Project> {
+  const [group] = await db.select().from(groupsTable).where(eq(groupsTable.id, groupId)).limit(1);
+  const groupSlug = group?.customSlug || "group";
+  const projectSlug = `dues-${periodNumber}-${randomUUID().slice(0, 6)}`;
+  const label = periodLabel(periodNumber, frequency, dueDate);
+
+  const [created] = await db.insert(projectsTable).values({
+    groupId,
+    name: label,
+    description: `Association dues — ${label}.`,
+    projectType: "association_dues",
+    targetAmount: duesAmount, // per-member amount; UI multiplies by member count for the pot
+    deadline: dueDate,
+    customSlug: `${groupSlug}/${projectSlug}`,
+    cycleNumber: periodNumber,
+  }).returning();
+  return created;
+}
+
+DbStorage.prototype.getAssociationSettings = async function (groupId: string) {
+  const [row] = await db.select().from(associationSettingsTable)
+    .where(eq(associationSettingsTable.groupId, groupId)).limit(1);
+  return row;
+};
+
+DbStorage.prototype.getAssociationStatus = async function (groupId: string) {
+  return buildAssociationStatus(groupId);
+};
+
+DbStorage.prototype.createAssociationSettingsAndStartPeriod = async function (
+  groupId: string,
+  payload: CreateAssociationSettingsPayload,
+) {
+  const existing = await this.getAssociationSettings(groupId);
+  if (existing) throw new Error("Association dues are already set up for this group");
+
+  const startDate = new Date(payload.startDate);
+  if (Number.isNaN(startDate.getTime())) throw new Error("Invalid start date");
+
+  await db.insert(associationSettingsTable).values({
+    groupId,
+    duesAmount: payload.duesAmount,
+    duesFrequency: payload.duesFrequency,
+    startDate,
+    currentPeriodNumber: 1,
+    status: "active",
+  });
+
+  await insertDuesPeriodProject(
+    groupId,
+    1,
+    payload.duesAmount,
+    payload.duesFrequency,
+    startDate,
+  );
+
+  return (await buildAssociationStatus(groupId))!;
+};
+
+DbStorage.prototype.advanceAssociationPeriod = async function (groupId: string) {
+  const settings = await this.getAssociationSettings(groupId);
+  if (!settings) throw new Error("Association dues not set up");
+  if (settings.status !== "active") throw new Error("Association dues are not active");
+
+  // Close the current period's dues project.
+  const [currentProject] = await db.select().from(projectsTable)
+    .where(and(
+      eq(projectsTable.groupId, groupId),
+      eq(projectsTable.projectType, "association_dues"),
+      eq(projectsTable.cycleNumber, settings.currentPeriodNumber),
+    )).limit(1);
+  if (currentProject) {
+    await db.update(projectsTable)
+      .set({ status: "completed" })
+      .where(eq(projectsTable.id, currentProject.id));
+  }
+
+  const nextPeriodNumber = settings.currentPeriodNumber + 1;
+  const prevDue = currentProject?.deadline ?? settings.startDate;
+  const nextDue = addAssociationFrequency(prevDue, settings.duesFrequency as AssociationFrequency);
+
+  await insertDuesPeriodProject(
+    groupId,
+    nextPeriodNumber,
+    settings.duesAmount,
+    settings.duesFrequency as AssociationFrequency,
+    nextDue,
+  );
+
+  await db.update(associationSettingsTable)
+    .set({ currentPeriodNumber: nextPeriodNumber, updatedAt: new Date() })
+    .where(eq(associationSettingsTable.groupId, groupId));
+
+  return (await buildAssociationStatus(groupId))!;
+};
+
+DbStorage.prototype.createAssociationLevy = async function (
+  groupId: string,
+  payload: CreateAssociationLevyPayload,
+) {
+  const settings = await this.getAssociationSettings(groupId);
+  if (!settings) throw new Error("Set up association dues before adding a levy");
+
+  const [group] = await db.select().from(groupsTable).where(eq(groupsTable.id, groupId)).limit(1);
+  const groupSlug = group?.customSlug || "group";
+  const projectSlug = `levy-${randomUUID().slice(0, 6)}`;
+
+  const [created] = await db.insert(projectsTable).values({
+    groupId,
+    name: payload.name,
+    description: payload.description ?? `One-off levy — ${payload.name}.`,
+    projectType: "association_levy",
+    currency: payload.currency ?? group?.currency ?? "NGN",
+    targetAmount: payload.amount,
+    deadline: payload.deadline ? new Date(payload.deadline) : null,
+    customSlug: `${groupSlug}/${projectSlug}`,
+  }).returning();
+  return created;
+};
+
+// MemStorage stubs (Association lives only in the database)
+MemStorage.prototype.getAssociationSettings = async function () { return undefined; };
+MemStorage.prototype.getAssociationStatus = async function () { return null; };
+MemStorage.prototype.createAssociationSettingsAndStartPeriod = async function () {
+  throw new Error("Association dues require database storage");
+};
+MemStorage.prototype.advanceAssociationPeriod = async function () {
+  throw new Error("Association dues require database storage");
+};
+MemStorage.prototype.createAssociationLevy = async function () {
+  throw new Error("Association dues require database storage");
 };
 
 export const storage = new DbStorage();

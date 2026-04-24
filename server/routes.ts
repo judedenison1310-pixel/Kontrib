@@ -9,7 +9,8 @@ import {
   insertProjectSchema, insertAccountabilityPartnerSchema, insertContributionSchema,
   insertNotificationSchema, insertOtpVerificationSchema, insertPushSubscriptionSchema,
   submitVerificationSchema, officerResponseSchema, attesterResponseSchema,
-  createAjoSettingsSchema
+  createAjoSettingsSchema,
+  createAssociationSettingsSchema, createAssociationLevySchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -713,6 +714,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Advance ajo error:", error);
       res.status(400).json({ message: error?.message || "Failed to advance cycle" });
+    }
+  });
+
+  // ---- Association dues + levies -----------------------------------------
+  // Returns null when the association group has not yet configured dues, so
+  // the UI can render the "Set up your association" CTA.
+  app.get("/api/groups/:groupId/association", async (req, res) => {
+    try {
+      const status = await storage.getAssociationStatus(req.params.groupId);
+      res.json(status);
+    } catch (error: any) {
+      console.error("Get association status error:", error);
+      res.status(500).json({ message: error?.message || "Failed to load association status" });
+    }
+  });
+
+  // Admin sets up dues: amount, frequency, start date.
+  // Creates association_settings + period #1 dues project in one shot.
+  app.post("/api/groups/:groupId/association", async (req, res) => {
+    try {
+      const { groupId } = req.params;
+      const { actorId, ...payloadInput } = req.body;
+      const group = await storage.getGroup(groupId);
+      if (!group) return res.status(404).json({ message: "Group not found" });
+      if (group.groupType !== "association") {
+        return res.status(400).json({ message: "Only association groups can configure dues" });
+      }
+      if (group.adminId !== actorId) {
+        return res.status(403).json({ message: "Only the group admin can set up dues" });
+      }
+      const payload = createAssociationSettingsSchema.parse(payloadInput);
+      const status = await storage.createAssociationSettingsAndStartPeriod(groupId, payload);
+      res.json(status);
+    } catch (error: any) {
+      if (error?.issues) return res.status(400).json({ message: "Invalid setup", errors: error.issues });
+      console.error("Setup association error:", error);
+      res.status(400).json({ message: error?.message || "Failed to set up dues" });
+    }
+  });
+
+  // Admin closes the current dues period and rolls forward to the next.
+  app.post("/api/groups/:groupId/association/advance", async (req, res) => {
+    try {
+      const { groupId } = req.params;
+      const { actorId } = req.body;
+      const group = await storage.getGroup(groupId);
+      if (!group) return res.status(404).json({ message: "Group not found" });
+      if (group.adminId !== actorId) {
+        return res.status(403).json({ message: "Only the group admin can advance the period" });
+      }
+      const status = await storage.advanceAssociationPeriod(groupId);
+      res.json(status);
+    } catch (error: any) {
+      console.error("Advance association error:", error);
+      res.status(400).json({ message: error?.message || "Failed to advance period" });
+    }
+  });
+
+  // Admin adds a one-off levy (e.g. building fund, end-of-year contribution).
+  app.post("/api/groups/:groupId/association/levy", async (req, res) => {
+    try {
+      const { groupId } = req.params;
+      const { actorId, ...payloadInput } = req.body;
+      const group = await storage.getGroup(groupId);
+      if (!group) return res.status(404).json({ message: "Group not found" });
+      if (group.groupType !== "association") {
+        return res.status(400).json({ message: "Only association groups can add levies" });
+      }
+      if (group.adminId !== actorId) {
+        return res.status(403).json({ message: "Only the group admin can add a levy" });
+      }
+      const payload = createAssociationLevySchema.parse(payloadInput);
+      const levy = await storage.createAssociationLevy(groupId, payload);
+      res.json(levy);
+    } catch (error: any) {
+      if (error?.issues) return res.status(400).json({ message: "Invalid levy", errors: error.issues });
+      console.error("Create levy error:", error);
+      res.status(400).json({ message: error?.message || "Failed to create levy" });
     }
   });
 

@@ -197,12 +197,27 @@ export const ajoSettings = pgTable("ajo_settings", {
   updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
+// One row per association group. Recurring dues schedule; each period is
+// materialised as a project (projectType='association_dues') so the existing
+// contribution/approval/disbursement flow is reused.
+export const associationSettings = pgTable("association_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  groupId: varchar("group_id").notNull().unique().references(() => groups.id),
+  duesAmount: decimal("dues_amount", { precision: 15, scale: 2 }).notNull(),
+  duesFrequency: text("dues_frequency").notNull(),         // monthly | quarterly | yearly
+  startDate: timestamp("start_date").notNull(),
+  currentPeriodNumber: integer("current_period_number").notNull().default(1),
+  status: text("status").notNull().default("active"),      // "active" | "paused"
+  createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
 export const projects = pgTable("projects", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   groupId: varchar("group_id").notNull().references(() => groups.id),
   name: text("name").notNull(),
   description: text("description"),
-  projectType: text("project_type").notNull().default("target"), // "target", "monthly", "yearly", "event", "emergency", "ajo_cycle"
+  projectType: text("project_type").notNull().default("target"), // "target", "monthly", "yearly", "event", "emergency", "ajo_cycle", "association_dues", "association_levy"
   currency: text("currency").notNull().default("NGN"), // "NGN", "USD", "EUR"
   targetAmount: decimal("target_amount", { precision: 15, scale: 2 }), // Optional for monthly/yearly types
   collectedAmount: decimal("collected_amount", { precision: 15, scale: 2 }).notNull().default("0"),
@@ -501,4 +516,46 @@ export type AjoStatus = {
   currentCycle: AjoCycleProject | null;
   paidCount: number;     // Members who've contributed to the current cycle (confirmed)
   expectedCount: number; // payoutOrder.length
+};
+
+// ---- Association dues + levies -------------------------------------------
+
+export const ASSOCIATION_FREQUENCIES = ["monthly", "quarterly", "yearly"] as const;
+export type AssociationFrequency = (typeof ASSOCIATION_FREQUENCIES)[number];
+
+export type AssociationSettings = typeof associationSettings.$inferSelect;
+
+export const insertAssociationSettingsSchema = createInsertSchema(associationSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertAssociationSettings = z.infer<typeof insertAssociationSettingsSchema>;
+
+// Payload the admin POSTs from the setup wizard.
+export const createAssociationSettingsSchema = z.object({
+  duesAmount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Enter a valid amount"),
+  duesFrequency: z.enum(ASSOCIATION_FREQUENCIES),
+  startDate: z.string().min(1, "Pick a start date"), // ISO date
+});
+export type CreateAssociationSettingsPayload = z.infer<typeof createAssociationSettingsSchema>;
+
+// Payload for adding a one-off levy.
+export const createAssociationLevySchema = z.object({
+  name: z.string().min(2, "Give the levy a short name"),
+  amount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Enter a valid amount"),
+  deadline: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  currency: z.string().optional(),
+});
+export type CreateAssociationLevyPayload = z.infer<typeof createAssociationLevySchema>;
+
+// Detailed view returned to the group page — settings + active dues period
+// + all levies + roll-ups.
+export type AssociationStatus = {
+  settings: AssociationSettings;
+  currentPeriod: Project | null;       // The active dues period project
+  paidCount: number;                   // Members who've contributed to the period (confirmed)
+  expectedCount: number;               // Active group members
+  levies: Project[];                   // All association_levy projects, newest first
 };

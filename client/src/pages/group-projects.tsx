@@ -42,10 +42,12 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getCurrentUser } from "@/lib/auth";
 import { formatNaira } from "@/lib/currency";
 import { useToast } from "@/hooks/use-toast";
-import { Project, Group, AjoStatus } from "@shared/schema";
+import { Project, Group, AjoStatus, AssociationStatus } from "@shared/schema";
 import { AjoSetupModal } from "@/components/ajo-setup-modal";
 import { AjoCycleStatus } from "@/components/ajo-cycle-status";
-import { Repeat } from "lucide-react";
+import { AssociationSetupModal } from "@/components/association-setup-modal";
+import { AssociationStatusPanel } from "@/components/association-status";
+import { Repeat, Banknote } from "lucide-react";
 
 export default function GroupProjects() {
   const user = getCurrentUser();
@@ -62,6 +64,7 @@ export default function GroupProjects() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [deleteGroupOpen, setDeleteGroupOpen] = useState(false);
   const [ajoSetupOpen, setAjoSetupOpen] = useState(false);
+  const [associationSetupOpen, setAssociationSetupOpen] = useState(false);
 
   const deleteGroupMutation = useMutation({
     mutationFn: () =>
@@ -97,9 +100,14 @@ export default function GroupProjects() {
   });
 
   const isAjoGroup = group?.groupType === "ajo";
+  const isAssociationGroup = group?.groupType === "association";
   const { data: ajoStatus } = useQuery<AjoStatus | null>({
     queryKey: ["/api/groups", groupId, "ajo"],
     enabled: !!groupId && isAjoGroup,
+  });
+  const { data: associationStatus } = useQuery<AssociationStatus | null>({
+    queryKey: ["/api/groups", groupId, "association"],
+    enabled: !!groupId && isAssociationGroup,
   });
 
   const isLoading = groupLoading || projectsLoading;
@@ -214,7 +222,7 @@ export default function GroupProjects() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900" data-testid="text-page-title">
-              {isAjoGroup ? "Cycle" : "Projects"}
+              {isAjoGroup ? "Cycle" : isAssociationGroup ? "Dues" : "Projects"}
             </h1>
             <p className="text-gray-500 inline-flex items-center gap-1.5">
               {group.name}
@@ -232,7 +240,7 @@ export default function GroupProjects() {
                 <Trash2 className="h-5 w-5" />
               </button>
             )}
-            {!isAjoGroup && isAdmin && projects.length > 0 && (
+            {!isAjoGroup && !isAssociationGroup && isAdmin && projects.length > 0 && (
               <button
                 onClick={() => setCreateProjectModalOpen(true)}
                 className="w-12 h-12 bg-amber-400 rounded-full flex items-center justify-center text-gray-900 shadow-lg hover:bg-amber-500 transition-colors"
@@ -244,7 +252,51 @@ export default function GroupProjects() {
           </div>
         </div>
 
-        {isAjoGroup ? (
+        {isAssociationGroup ? (
+          <>
+            {!associationStatus && isAdmin && (
+              <Card className="bg-gradient-to-br from-emerald-50 to-amber-50 border-emerald-200 rounded-2xl">
+                <CardContent className="p-5 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0">
+                      <Banknote className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-emerald-900">Set up association dues</h3>
+                      <p className="text-sm text-emerald-800/80 mt-0.5">
+                        Pick the dues amount and how often members pay (monthly, quarterly, or yearly). You can add one-off levies any time after.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => setAssociationSetupOpen(true)}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-full"
+                    data-testid="button-open-association-setup"
+                  >
+                    Set up dues
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {!associationStatus && !isAdmin && (
+              <Card className="bg-amber-50 border-amber-200 rounded-2xl">
+                <CardContent className="p-4 text-sm text-amber-800">
+                  The admin hasn't set up dues yet. You'll see what you owe and any levies here once they do.
+                </CardContent>
+              </Card>
+            )}
+
+            {associationStatus && (
+              <AssociationStatusPanel
+                groupId={groupId!}
+                status={associationStatus}
+                members={members.map(m => ({ userId: m.userId, user: m.user }))}
+                isAdmin={isAdmin}
+              />
+            )}
+          </>
+        ) : isAjoGroup ? (
           <>
             {!ajoStatus && isAdmin && (
               <Card className="bg-gradient-to-br from-emerald-50 to-amber-50 border-emerald-200 rounded-2xl">
@@ -467,6 +519,16 @@ export default function GroupProjects() {
           open={editModalOpen}
           onOpenChange={setEditModalOpen}
           project={editProject}
+        />
+      )}
+
+      {group && isAssociationGroup && (
+        <AssociationSetupModal
+          open={associationSetupOpen}
+          onOpenChange={setAssociationSetupOpen}
+          groupId={group.id}
+          groupName={group.name}
+          memberCount={members.length}
         />
       )}
 
