@@ -13,7 +13,9 @@ import {
   Bell,
   Plus,
   Pencil,
+  Copy,
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { getCurrentUser } from "@/lib/auth";
 import { formatNaira } from "@/lib/currency";
 import { Group, Project, User as UserType, ContributionWithDetails, AjoStatus } from "@shared/schema";
@@ -43,6 +45,7 @@ export default function GroupDetails() {
   const [createProjectModalOpen, setCreateProjectModalOpen] = useState(false);
   const [editGroupNameModalOpen, setEditGroupNameModalOpen] = useState(false);
   const [ajoSetupOpen, setAjoSetupOpen] = useState(false);
+  const { toast } = useToast();
 
   const { data: group, isLoading: groupLoading } = useQuery<Group>({
     queryKey: ["/api/groups", groupId],
@@ -280,14 +283,49 @@ export default function GroupDetails() {
                   </p>
                 </div>
               </div>
-              <Button
-                onClick={() => setAjoSetupOpen(true)}
-                disabled={members.length < 2}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-full"
-                data-testid="button-open-ajo-setup"
-              >
-                {members.length < 2 ? "Invite at least 2 members first" : "Set up cycle"}
-              </Button>
+              {members.length < 2 ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-emerald-800/80">
+                    Add at least one more member, then come back to set up your cycle.
+                  </p>
+                  <div className="flex gap-2">
+                    {group?.whatsappLink && (
+                      <Button
+                        asChild
+                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full"
+                        data-testid="button-invite-whatsapp"
+                      >
+                        <a href={group.whatsappLink} target="_blank" rel="noopener noreferrer">
+                          Invite via WhatsApp
+                        </a>
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      onClick={async () => {
+                        const slug = group?.customSlug || group?.registrationLink;
+                        if (!slug) return;
+                        const url = `${window.location.origin}/join/${slug}`;
+                        await navigator.clipboard.writeText(url);
+                        toast({ title: "Invite link copied!", description: "Share it with members to join the group." });
+                      }}
+                      className="flex-1 rounded-full border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+                      data-testid="button-copy-invite-link"
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy link
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  onClick={() => setAjoSetupOpen(true)}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-full"
+                  data-testid="button-open-ajo-setup"
+                >
+                  Set up cycle
+                </Button>
+              )}
             </CardContent>
           </Card>
         )}
