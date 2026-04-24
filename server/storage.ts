@@ -43,6 +43,7 @@ export interface IStorage {
   getUserByPhoneNumber(phoneNumber: string): Promise<User | undefined>;
   findOrCreateUserByPhone(phoneNumber: string): Promise<User>;
   updateUserProfile(userId: string, updates: { fullName?: string; role?: string }): Promise<User | undefined>;
+  setUserOnboardingChoice(userId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   
   // Group methods
@@ -219,6 +220,14 @@ export class MemStorage implements IStorage {
       role: validatedRole,
       profileCompletedAt: updates.fullName ? new Date() : user.profileCompletedAt,
     };
+    this.users.set(userId, updatedUser);
+    return updatedUser;
+  }
+
+  async setUserOnboardingChoice(userId: string): Promise<User | undefined> {
+    const user = this.users.get(userId);
+    if (!user) return undefined;
+    const updatedUser: User = { ...user, onboardingChoiceAt: new Date() };
     this.users.set(userId, updatedUser);
     return updatedUser;
   }
@@ -1219,6 +1228,15 @@ export class DbStorage implements IStorage {
     const result = await db
       .update(usersTable)
       .set(updateData)
+      .where(eq(usersTable.id, userId))
+      .returning();
+    return result[0];
+  }
+
+  async setUserOnboardingChoice(userId: string): Promise<User | undefined> {
+    const result = await db
+      .update(usersTable)
+      .set({ onboardingChoiceAt: new Date() })
       .where(eq(usersTable.id, userId))
       .returning();
     return result[0];

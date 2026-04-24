@@ -150,6 +150,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Stamp that the user has acknowledged (or skipped) the post-signup
+  // group-type onboarding card so it stops showing on the home page.
+  app.patch("/api/users/:userId/onboarding-choice", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const user = await storage.setUserOnboardingChoice(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json({ user: { ...user, password: undefined } });
+    } catch (error) {
+      console.error("Set onboarding choice error:", error);
+      res.status(500).json({ message: "Failed to save onboarding choice" });
+    }
+  });
+
   // Group routes
   app.get("/api/groups/admin/:adminId", async (req, res) => {
     try {

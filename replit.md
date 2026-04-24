@@ -59,3 +59,21 @@ End-to-end stress test of all 7 shipped steps passed after one bug fix:
 - **Bug found & fixed**: the apply flow was creating a `verification_officers` row for the admin themselves with `status='pending'`, but no UX existed for the admin to ever "accept" themselves. As a result, `maybeAdvanceVerificationStatus` could never see all-officers-accepted, and applications were stuck in `submitted` forever even after 5+ vouches.
 - **Fix**: `submitVerificationSchema` now requires `adminLegalName` + `adminSelfie`. The apply storage call writes the admin officer row directly as `accepted` with those values and mirrors them onto the user profile. The apply modal collects them on step 2 (legal name input + selfie file upload with preview).
 - **Verified end-to-end**: eligibility floor, apply gating, officer accept/decline (with auth + selfie validation), attester vouch/decline, auto-advance to `under_review` at 5 vouches, ops queue auth, ops approve → group becomes verified-active with 12-month expiry + public listing default-on, admin-only listing toggle, locality-ranked discovery (same-LGA > other state), discovery hides on listing-off and on expiry, identity-light join gate (legal name + data: image selfie required for verified groups, NOT required for unverified groups, persisted on `group_members.joiner_legal_name` / `joiner_selfie_data_url`).
+
+## 3-Group-Type Architecture — Phase 1 Foundation (April 2026)
+
+The product now distinguishes three categories of groups end-to-end:
+
+- **Ajo / Esusu** (`groupType='ajo'`) — rotating cycle savings; members pay a fixed amount each cycle and take turns receiving the pot.
+- **Association Dues & Levies** (`groupType='association'`) — recurring dues plus one-off levies; money goes to the association.
+- **Project Funds** (`groupType='project'`) — goal-based collection (weddings, gifts, fundraisers); the original Kontrib flow.
+
+Phase 1 (foundation) shipped:
+
+- **Schema**: `groups.group_type` text column (notNull, default `'project'`). All 43 pre-existing groups backfilled to `'project'` automatically by the default. New `users.onboarding_choice_at` timestamp tracks whether the post-signup type-picker card has been acknowledged.
+- **Type metadata**: `client/src/lib/group-types.ts` is the single source of truth for label, blurb, example, icon and color per type — used by the onboarding card, the create-group modal, and the dashboard buckets.
+- **Onboarding card**: New `GroupTypeOnboarding` component renders on `/groups` for signed-in users with zero groups and no `onboardingChoiceAt`. Three big cards open the create-modal pre-set to that type; a "Have an invite link?" footer routes to `/join-group`. Skipping or picking stamps `onboardingChoiceAt` via `PATCH /api/users/:userId/onboarding-choice`.
+- **Create-group modal**: Now a 3-step flow (`type → group → project`). Step 1 is the type picker; on selection the group sub-type pre-selects sensibly (`ajo→monthly`, `association→yearly`, `project→target`). The chosen `groupType` is sent with `POST /api/groups`. When opened with an `initialType` prop, the type step is skipped.
+- **Dashboard bucketing**: `/groups` lists are now grouped under section headers per type with the type icon and count, instead of one flat list. Buckets only render when they contain groups.
+
+Phases 2-4 (planned, not started): Ajo cycle workflow → Association dues/levies → Reports & polish (Verified Ajo restricted to `ajo`-type groups, public discovery filtered by type).

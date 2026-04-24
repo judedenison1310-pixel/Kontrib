@@ -19,13 +19,24 @@ export const users = pgTable("users", {
   // Verified Ajo identity (only collected when user is officer/attester/verified-group joiner)
   legalName: text("legal_name"),
   selfieUrl: text("selfie_url"), // Stored under .private/verifications/ in object storage
+  // Onboarding: stamped when the user picks (or skips) a group-type on the post-signup card
+  onboardingChoiceAt: timestamp("onboarding_choice_at"),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
+
+// The 3 group categories that drive routing, dashboards and reports.
+//   ajo         - rotating cycle savings (Esusu), members take turns receiving the pot
+//   association - recurring dues / one-off levies, money goes to the association
+//   project     - goal-based collection (weddings, gifts, fundraisers) — current default
+export const GROUP_TYPES = ["ajo", "association", "project"] as const;
+export type GroupType = (typeof GROUP_TYPES)[number];
 
 export const groups = pgTable("groups", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   description: text("description"),
+  // Discriminator — see GROUP_TYPES above. Existing groups default to 'project'.
+  groupType: text("group_type").notNull().default("project"),
   whatsappLink: text("whatsapp_link"),
   registrationLink: text("registration_link").notNull().unique(),
   customSlug: text("custom_slug").unique(), // For kontrib.app/customslug URLs
@@ -301,6 +312,8 @@ export const insertGroupSchema = createInsertSchema(groups).omit({
   customSlug: true,
   adminId: true,
   createdAt: true,
+}).extend({
+  groupType: z.enum(GROUP_TYPES).default("project"),
 });
 
 export const insertGroupMemberSchema = createInsertSchema(groupMembers).omit({

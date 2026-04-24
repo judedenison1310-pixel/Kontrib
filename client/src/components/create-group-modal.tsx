@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -7,17 +7,26 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { insertGroupSchema, insertProjectSchema } from "@shared/schema";
+import { insertGroupSchema, insertProjectSchema, type GroupType } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { getCurrentUser } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { getDefaultPaymentTypes } from "@/lib/payment-types";
+import { GROUP_TYPE_ORDER, GROUP_TYPE_META } from "@/lib/group-types";
 import { z } from "zod";
-import { ArrowLeft, Calendar, Building2, ChevronDown, ChevronUp, CheckCircle, Lock, Users } from "lucide-react";
+import { ArrowLeft, Calendar, Building2, ChevronDown, ChevronUp, CheckCircle, Lock, Users, ChevronRight } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
 const createGroupFormSchema = insertGroupSchema;
 type CreateGroupFormData = z.infer<typeof createGroupFormSchema>;
+
+// Default project sub-type per group category, so admins land on a sensible
+// preset and rarely have to touch the Type dropdown.
+const DEFAULT_PROJECT_TYPE: Record<GroupType, "monthly" | "yearly" | "target"> = {
+  ajo: "monthly",
+  association: "yearly",
+  project: "target",
+};
 
 const createProjectFormSchema = insertProjectSchema.extend({
   targetAmount: z.string().optional(),
@@ -29,15 +38,28 @@ type CreateProjectFormData = z.infer<typeof createProjectFormSchema>;
 interface CreateGroupModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  // Optional preselected group type — when provided, the modal skips the
+  // "what kind of group?" step and goes straight to naming.
+  initialType?: GroupType;
 }
 
-export function CreateGroupModal({ open, onOpenChange }: CreateGroupModalProps) {
+export function CreateGroupModal({ open, onOpenChange, initialType }: CreateGroupModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const user = getCurrentUser();
-  const [step, setStep] = useState<"group" | "project">("group");
+  const [step, setStep] = useState<"type" | "group" | "project">(initialType ? "group" : "type");
+  const [selectedType, setSelectedType] = useState<GroupType | null>(initialType ?? null);
   const [createdGroup, setCreatedGroup] = useState<{ id: string; name: string } | null>(null);
   const [showPaymentDetails, setShowPaymentDetails] = useState(false);
+
+  // When the modal is reopened with a different initialType, reset to the
+  // appropriate starting step.
+  useEffect(() => {
+    if (open) {
+      setStep(initialType ? "group" : "type");
+      setSelectedType(initialType ?? null);
+    }
+  }, [open, initialType]);
 
   const groupForm = useForm<CreateGroupFormData>({
     resolver: zodResolver(createGroupFormSchema),
@@ -45,6 +67,7 @@ export function CreateGroupModal({ open, onOpenChange }: CreateGroupModalProps) 
       name: "",
       description: "",
       privacyMode: "standard",
+      groupType: "project",
     },
   });
 
@@ -79,6 +102,7 @@ export function CreateGroupModal({ open, onOpenChange }: CreateGroupModalProps) 
     mutationFn: async (data: CreateGroupFormData) => {
       const response = await apiRequest("POST", "/api/groups", {
         ...data,
+        groupType: selectedType ?? "project",
         adminId: user?.id,
       });
       return response.json();
@@ -86,6 +110,9 @@ export function CreateGroupModal({ open, onOpenChange }: CreateGroupModalProps) 
     onSuccess: (data) => {
       setCreatedGroup({ id: data.id, name: data.name });
       projectForm.setValue("groupId", data.id);
+      // Pre-select the project sub-type that fits the chosen group category.
+      const presetProjectType = DEFAULT_PROJECT_TYPE[(selectedType ?? "project") as GroupType];
+      projectForm.setValue("projectType", presetProjectType);
       setStep("project");
       toast({
         title: "Group Created!",
@@ -134,7 +161,8 @@ export function CreateGroupModal({ open, onOpenChange }: CreateGroupModalProps) 
   const handleClose = () => {
     groupForm.reset();
     projectForm.reset();
-    setStep("group");
+    setStep(initialType ? "group" : "type");
+    setSelectedType(initialType ?? null);
     setCreatedGroup(null);
     setShowPaymentDetails(false);
     onOpenChange(false);
@@ -143,6 +171,9 @@ export function CreateGroupModal({ open, onOpenChange }: CreateGroupModalProps) 
   const handleBack = () => {
     if (step === "project") {
       setStep("group");
+    } else if (step === "group" && !initialType) {
+      // Go back to the type-picker only when we showed it in the first place
+      setStep("type");
     } else {
       handleClose();
     }
@@ -195,16 +226,73 @@ export function CreateGroupModal({ open, onOpenChange }: CreateGroupModalProps) 
                 </div>
               )}
               <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${step === "group" ? "bg-primary" : "bg-primary"}`} />
+                {!initialType && (
+                  <div className={`w-2 h-2 rounded-full ${step !== "type" ? "bg-primary" : "bg-primary"}`} />
+                )}
+                <div className={`w-2 h-2 rounded-full ${step === "group" || step === "project" ? "bg-primary" : "bg-gray-300"}`} />
                 <div className={`w-2 h-2 rounded-full ${step === "project" ? "bg-primary" : "bg-gray-300"}`} />
               </div>
             </div>
           </SheetHeader>
 
           <div className="flex-1 overflow-y-auto px-5 py-6">
+            {step === "type" && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-3xl font-bold text-gray-900">What kind of group?</h2>
+                  <p className="text-gray-500 mt-2">
+                    Pick the option that fits — we'll set things up to match.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  {GROUP_TYPE_ORDER.map((t) => {
+                    const meta = GROUP_TYPE_META[t];
+                    const Icon = meta.icon;
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => {
+                          setSelectedType(t);
+                          setStep("group");
+                        }}
+                        className={`w-full text-left p-4 rounded-2xl border-2 ${meta.accentBg} hover:shadow-md transition-all active:scale-[0.99] flex items-start gap-3`}
+                        data-testid={`type-pick-${t}`}
+                      >
+                        <div className={`w-11 h-11 rounded-xl bg-white flex items-center justify-center shrink-0 ${meta.accentText}`}>
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-bold text-gray-900">{meta.label}</p>
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${meta.badgeBg} ${meta.accentText}`}>
+                              {meta.tagline}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-600 mt-0.5">{meta.blurb}</p>
+                          <p className="text-xs text-gray-400 mt-1">{meta.example}</p>
+                        </div>
+                        <ChevronRight className="h-5 w-5 text-gray-400 shrink-0 mt-3" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {step === "group" && (
               <div className="space-y-6">
                 <div>
+                  {selectedType && (
+                    <div className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full mb-3 ${GROUP_TYPE_META[selectedType].badgeBg} ${GROUP_TYPE_META[selectedType].accentText}`}>
+                      {(() => {
+                        const Icon = GROUP_TYPE_META[selectedType].icon;
+                        return <Icon className="h-3 w-3" />;
+                      })()}
+                      {GROUP_TYPE_META[selectedType].label}
+                    </div>
+                  )}
                   <h2 className="text-3xl font-bold text-gray-900">Name your Group</h2>
                   <p className="text-gray-500 mt-2">
                     Eg. "Chioma's Wedding", "Office Ajo", "Church Youth"

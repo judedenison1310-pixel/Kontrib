@@ -10,6 +10,7 @@ import { EditNameModal } from "@/components/edit-name-modal";
 import { VerificationInbox } from "@/components/verification-inbox";
 import { VerifiedDiscoveryStrip } from "@/components/verified-discovery-strip";
 import { VerifiedBadge } from "@/components/verified-badge";
+import { GroupTypeOnboarding } from "@/components/group-type-onboarding";
 import { SiWhatsapp } from "react-icons/si";
 import { 
   Users, 
@@ -26,7 +27,8 @@ import {
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { formatNaira } from "@/lib/currency";
-import type { GroupWithRole } from "@shared/schema";
+import type { GroupWithRole, GroupType } from "@shared/schema";
+import { GROUP_TYPE_ORDER, GROUP_TYPE_META, metaForGroupType } from "@/lib/group-types";
 
 type FilterType = 'all' | 'admin' | 'member';
 
@@ -34,10 +36,16 @@ export default function Groups() {
   const user = getCurrentUser();
   const [, setLocation] = useLocation();
   const [createGroupModalOpen, setCreateGroupModalOpen] = useState(false);
+  const [createGroupInitialType, setCreateGroupInitialType] = useState<GroupType | undefined>(undefined);
   const [editGroupModalOpen, setEditGroupModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<GroupWithRole | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+
+  const openCreateModal = (type?: GroupType) => {
+    setCreateGroupInitialType(type);
+    setCreateGroupModalOpen(true);
+  };
 
   const { data: groups = [], isLoading } = useQuery<GroupWithRole[]>({
     queryKey: ["/api/groups", "all", user?.id],
@@ -83,6 +91,20 @@ export default function Groups() {
   const isGroupReviewer = (group: GroupWithRole) =>
     isGroupAdmin(group) || (group.coAdmins ?? []).includes(user?.id ?? '');
 
+  // Bucket the filtered list by group type so the dashboard shows clear
+  // sections (Ajo / Association / Project Funds). Falls back to "project"
+  // for legacy rows that pre-date the discriminator.
+  const bucketedGroups = GROUP_TYPE_ORDER.map((type) => ({
+    type,
+    meta: GROUP_TYPE_META[type],
+    items: filteredGroups.filter((g) => ((g as any).groupType ?? "project") === type),
+  })).filter((b) => b.items.length > 0);
+
+  // Show the post-signup onboarding card only on the empty state when the
+  // user hasn't picked (or skipped) yet.
+  const showOnboarding =
+    !!user?.id && groups.length === 0 && !((user as any).onboardingChoiceAt);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -104,6 +126,14 @@ export default function Groups() {
         {user?.id && <VerificationInbox userId={user.id} />}
         <VerifiedDiscoveryStrip userId={user?.id ?? null} state={(user as any)?.state ?? null} lga={(user as any)?.lga ?? null} />
 
+        {showOnboarding && user?.id && (
+          <GroupTypeOnboarding
+            userId={user.id}
+            onPickType={(type) => openCreateModal(type)}
+            onJoinExisting={() => setLocation("/join-group")}
+          />
+        )}
+
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900" data-testid="text-page-title">
@@ -112,7 +142,7 @@ export default function Groups() {
             <p className="text-gray-500">All your groups in one place</p>
           </div>
           <button
-            onClick={() => setCreateGroupModalOpen(true)}
+            onClick={() => openCreateModal()}
             className="w-12 h-12 bg-amber-400 rounded-full flex items-center justify-center text-gray-900 shadow-lg hover:bg-amber-500 transition-colors"
             data-testid="button-create-group-fab"
           >
@@ -188,7 +218,7 @@ export default function Groups() {
                     Create a group to manage contributions, or ask someone to invite you to theirs
                   </p>
                   <Button
-                    onClick={() => setCreateGroupModalOpen(true)}
+                    onClick={() => openCreateModal()}
                     className="bg-amber-400 hover:bg-amber-500 text-gray-900 font-bold"
                     data-testid="button-create-first-group"
                   >
@@ -216,8 +246,24 @@ export default function Groups() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-3">
-            {filteredGroups.map((group) => (
+          <div className="space-y-6">
+            {bucketedGroups.map((bucket) => {
+              const SectionIcon = bucket.meta.icon;
+              return (
+                <section key={bucket.type} data-testid={`bucket-${bucket.type}`}>
+                  <div className="flex items-center justify-between px-1 mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${bucket.meta.badgeBg} ${bucket.meta.accentText}`}>
+                        <SectionIcon className="h-4 w-4" />
+                      </div>
+                      <h2 className="text-sm font-bold uppercase tracking-wide text-gray-700">
+                        {bucket.meta.label}
+                      </h2>
+                      <span className="text-xs text-gray-400">({bucket.items.length})</span>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    {bucket.items.map((group) => (
               <Card
                 key={group.id}
                 className={`bg-white rounded-2xl border shadow-sm hover:shadow-md transition-all cursor-pointer active:scale-[0.99] ${
@@ -356,7 +402,11 @@ export default function Groups() {
                   )}
                 </CardContent>
               </Card>
-            ))}
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
           </div>
         )}
 
@@ -364,7 +414,7 @@ export default function Groups() {
         {groups.length > 0 && adminCount === 0 && (
           <div
             className="rounded-2xl border-2 border-dashed border-amber-200 bg-amber-50 p-5 flex items-start gap-4 cursor-pointer hover:bg-amber-100 transition-colors"
-            onClick={() => setCreateGroupModalOpen(true)}
+            onClick={() => openCreateModal()}
             data-testid="banner-create-own-group"
           >
             <div className="w-11 h-11 rounded-xl bg-amber-200 flex items-center justify-center shrink-0">
@@ -377,7 +427,7 @@ export default function Groups() {
               </p>
             </div>
             <button
-              onClick={(e) => { e.stopPropagation(); setCreateGroupModalOpen(true); }}
+              onClick={(e) => { e.stopPropagation(); openCreateModal(); }}
               className="shrink-0 bg-amber-400 text-gray-900 text-sm font-bold px-4 py-2 rounded-xl hover:bg-amber-500 transition-colors"
               data-testid="button-create-own-group"
             >
@@ -396,6 +446,7 @@ export default function Groups() {
       <CreateGroupModal
         open={createGroupModalOpen}
         onOpenChange={setCreateGroupModalOpen}
+        initialType={createGroupInitialType}
       />
 
       {editingGroup && (
