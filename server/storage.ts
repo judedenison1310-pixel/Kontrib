@@ -1357,6 +1357,22 @@ export class DbStorage implements IStorage {
         .where(and(eq(contributionsTable.groupId, group.id), eq(contributionsTable.status, "pending")));
       const pendingApprovals = pendingApprovalsResult[0]?.count || 0;
       
+      // Phase 4 follow-up: surface category-specific setup completion so
+      // the homepage can render an "Awaiting confirmation" state for ajo /
+      // association groups whose admin still needs to run the setup wizard.
+      const [ajoRow] = group.groupType === "ajo"
+        ? await db.select({ id: ajoSettingsTable.id })
+            .from(ajoSettingsTable)
+            .where(eq(ajoSettingsTable.groupId, group.id))
+            .limit(1)
+        : [undefined];
+      const [assocRow] = group.groupType === "association"
+        ? await db.select({ id: associationSettingsTable.id })
+            .from(associationSettingsTable)
+            .where(eq(associationSettingsTable.groupId, group.id))
+            .limit(1)
+        : [undefined];
+
       groupMap.set(group.id, {
         ...group,
         memberCount,
@@ -1366,6 +1382,8 @@ export class DbStorage implements IStorage {
         totalCollected,
         role: 'admin',
         pendingApprovals,
+        ajoStarted: !!ajoRow,
+        associationStarted: !!assocRow,
       });
     }
     
@@ -1419,6 +1437,21 @@ export class DbStorage implements IStorage {
           pendingApprovals = pendingApprovalsResult[0]?.count || 0;
         }
 
+        // Same setup-completion lookup as the admin branch above so members
+        // viewing groups they don't admin still see the correct state.
+        const [ajoRow2] = group.groupType === "ajo"
+          ? await db.select({ id: ajoSettingsTable.id })
+              .from(ajoSettingsTable)
+              .where(eq(ajoSettingsTable.groupId, group.id))
+              .limit(1)
+          : [undefined];
+        const [assocRow2] = group.groupType === "association"
+          ? await db.select({ id: associationSettingsTable.id })
+              .from(associationSettingsTable)
+              .where(eq(associationSettingsTable.groupId, group.id))
+              .limit(1)
+          : [undefined];
+
         groupMap.set(group.id, {
           ...group,
           memberCount,
@@ -1429,6 +1462,8 @@ export class DbStorage implements IStorage {
           role: 'member',
           myPendingPayments,
           ...(pendingApprovals !== undefined ? { pendingApprovals } : {}),
+          ajoStarted: !!ajoRow2,
+          associationStarted: !!assocRow2,
         });
       }
     }

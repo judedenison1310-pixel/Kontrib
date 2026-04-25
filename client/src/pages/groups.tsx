@@ -323,13 +323,37 @@ export default function Groups() {
                     </span>
                   </div>
                   <div className="space-y-2">
-                    {bucket.items.map((group) => (
+                    {bucket.items.map((group) => {
+                      // Ajo / Association groups need the admin to complete a
+                      // setup wizard (cycle setup or first round of dues)
+                      // before the group is fully usable. Until that's done
+                      // the homepage card shows an "Awaiting confirmation"
+                      // state and re-opens the wizard chain on tap.
+                      const isAjo = ((group as any).groupType ?? "project") === "ajo";
+                      const isAssoc = ((group as any).groupType ?? "project") === "association";
+                      const awaitingAjoSetup = isAjo && isGroupAdmin(group) && !group.ajoStarted;
+                      const awaitingAssocSetup = isAssoc && isGroupAdmin(group) && !group.associationStarted;
+                      const awaitingSetup = awaitingAjoSetup || awaitingAssocSetup;
+                      const cardOnClick = () => {
+                        if (awaitingAjoSetup) {
+                          setLocation(`/group/${group.id}/projects?onboard=ajo`);
+                        } else if (awaitingAssocSetup) {
+                          setLocation(`/group/${group.id}/projects?onboard=association`);
+                        } else {
+                          setLocation(`/group/${group.id}/projects`);
+                        }
+                      };
+                      return (
               <Card
                 key={group.id}
                 className={`bg-white rounded-xl border shadow-sm hover:shadow-md transition-all cursor-pointer active:scale-[0.99] ${
-                  isGroupAdmin(group) ? "border-amber-200" : "border-gray-100"
+                  awaitingSetup
+                    ? "border-amber-300 bg-amber-50/40"
+                    : isGroupAdmin(group)
+                      ? "border-amber-200"
+                      : "border-gray-100"
                 }`}
-                onClick={() => setLocation(`/group/${group.id}/projects`)}
+                onClick={cardOnClick}
                 data-testid={`group-card-${group.id}`}
               >
                 <CardContent className="p-0">
@@ -365,6 +389,15 @@ export default function Groups() {
                           <span className="shrink-0 flex items-center gap-0.5 bg-gray-100 text-gray-500 text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
                             <Lock className="h-2.5 w-2.5" />
                             Private
+                          </span>
+                        )}
+                        {awaitingSetup && (
+                          <span
+                            className="shrink-0 flex items-center gap-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                            data-testid={`badge-awaiting-confirmation-${group.id}`}
+                          >
+                            <Clock className="h-2.5 w-2.5" />
+                            Awaiting confirmation
                           </span>
                         )}
                       </div>
@@ -456,7 +489,8 @@ export default function Groups() {
                   ) : null}
                 </CardContent>
               </Card>
-                    ))}
+                      );
+                    })}
                   </div>
                 </section>
               );

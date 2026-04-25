@@ -113,26 +113,41 @@ export function CreateGroupModal({ open, onOpenChange, initialType }: CreateGrou
       queryClient.invalidateQueries({ queryKey: ["/api/groups", "admin", user?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/groups/all"] });
 
+      const type = (selectedType ?? "project") as GroupType;
+
       // Ajo groups don't have free-form projects — the cycle is the project
       // and is created from the dedicated Ajo setup wizard on the group page.
-      if ((selectedType ?? "project") === "ajo") {
+      if (type === "ajo") {
         toast({
-          title: "Ajo Group Created",
-          description: `Next: verify your identity, then set up the cycle.`,
+          title: "Ajo group created",
+          description: "Next: verify your identity, then set up the cycle.",
         });
         handleClose();
-        setLocation(`/group/${data.id}/projects?onboard=1`);
+        setLocation(`/group/${data.id}/projects?onboard=ajo`);
+        return;
+      }
+
+      // Association groups also skip the free-form project step. The first
+      // round of dues is configured by the Association setup wizard on the
+      // group page, mirroring the Ajo flow.
+      if (type === "association") {
+        toast({
+          title: "Association group created",
+          description: "Next: verify your identity, then set up the first round of dues.",
+        });
+        handleClose();
+        setLocation(`/group/${data.id}/projects?onboard=association`);
         return;
       }
 
       setCreatedGroup({ id: data.id, name: data.name });
       projectForm.setValue("groupId", data.id);
       // Pre-select the project sub-type that fits the chosen group category.
-      const presetProjectType = DEFAULT_PROJECT_TYPE[(selectedType ?? "project") as GroupType];
+      const presetProjectType = DEFAULT_PROJECT_TYPE[type];
       projectForm.setValue("projectType", presetProjectType);
       setStep("project");
       toast({
-        title: "Group Created!",
+        title: "Group created",
         description: "Now add your first project to start collecting.",
       });
     },
@@ -318,7 +333,11 @@ export function CreateGroupModal({ open, onOpenChange, initialType }: CreateGrou
                   )}
                   <h2 className="text-3xl font-bold text-gray-900">Name your Group</h2>
                   <p className="text-gray-500 mt-2">
-                    Eg. "Chioma's Wedding", "Office Ajo", "Church Youth"
+                    {selectedType === "ajo"
+                      ? 'Eg. "Office Ajo", "Mama P Esusu"'
+                      : selectedType === "association"
+                        ? 'Eg. "Noble Association", "Old Boys Union"'
+                        : 'Eg. "Chioma\'s Wedding", "Church Youth Project"'}
                   </p>
                 </div>
 
@@ -358,11 +377,9 @@ export function CreateGroupModal({ open, onOpenChange, initialType }: CreateGrou
                                 )}
                               </div>
                               <div>
-                                <p className="font-medium text-gray-900">Private Group (Ajo)</p>
+                                <p className="font-medium text-gray-900">Private Group</p>
                                 <p className="text-sm text-gray-500">
-                                  {field.value === "private" 
-                                    ? "Members cannot see each other — only the admin sees who joined and who paid" 
-                                    : "Members can see each other's contributions and who has paid"}
+                                  Toggle to make members invisible to each other. Only admin can see members.
                                 </p>
                               </div>
                             </div>
@@ -390,7 +407,13 @@ export function CreateGroupModal({ open, onOpenChange, initialType }: CreateGrou
                           Creating...
                         </div>
                       ) : (
-                        "Next: Add a Project"
+                        // Ajo / Association skip the project step and go straight to
+                        // their setup wizard on the next page; only the open-ended
+                        // "Project Funds" category still has a project step inside
+                        // this modal.
+                        (selectedType === "ajo" || selectedType === "association")
+                          ? "Proceed"
+                          : "Next: Add a Project"
                       )}
                     </button>
                   </form>

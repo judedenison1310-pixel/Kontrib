@@ -604,6 +604,11 @@ export type GroupWithRole = GroupWithStats & {
   role: 'admin' | 'member' | 'both';
   pendingApprovals?: number;
   myPendingPayments?: number;
+  // Phase 4 follow-up — surface whether the category-specific setup wizard
+  // has been completed yet, so the homepage can show an "Awaiting confirmation"
+  // state for groups whose admin still needs to confirm cycle / dues setup.
+  ajoStarted?: boolean;          // ajo_settings row exists for this group
+  associationStarted?: boolean;  // association_settings row exists for this group
 };
 
 // ---- Ajo cycles -----------------------------------------------------------

@@ -66,34 +66,45 @@ export default function GroupProjects() {
   const [ajoSetupOpen, setAjoSetupOpen] = useState(false);
   const [associationSetupOpen, setAssociationSetupOpen] = useState(false);
   const [kycModalOpen, setKycModalOpen] = useState(false);
-  // Tracks the create-group → KYC → cycle setup chain so we open the cycle
-  // setup modal automatically once the admin closes the KYC sheet.
-  const [chainKycToCycle, setChainKycToCycle] = useState(false);
+  // Tracks the create-group → KYC → category setup chain. After the admin
+  // closes the KYC sheet during onboarding we open the appropriate setup
+  // wizard (Ajo cycle setup or Association dues setup).
+  const [chainKycTo, setChainKycTo] = useState<"ajo" | "association" | null>(null);
 
   // Onboarding sequencing: when the admin lands here right after creating
-  // the Ajo group (the create modal sends them with ?onboard=1), open the
-  // KYC sheet first and then the cycle setup sheet, so the flow is:
-  // name → KYC → cycle setup. Only fires once per page load.
+  // a group (the create modal sends them with ?onboard=ajo or ?onboard=association),
+  // open the KYC sheet first and then the relevant setup wizard, so the
+  // flow is: name → KYC → setup. Also accepts the legacy ?onboard=1 value
+  // for backwards compatibility (treated as ajo). Only fires once per page load.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get("onboard") !== "1") return;
+    const flag = params.get("onboard");
+    if (!flag) return;
+    const target: "ajo" | "association" =
+      flag === "association" ? "association" : "ajo";
     // Strip the flag immediately so a refresh doesn't re-trigger the chain.
     params.delete("onboard");
     const cleanQs = params.toString();
     const cleanUrl = window.location.pathname + (cleanQs ? `?${cleanQs}` : "");
     window.history.replaceState(null, "", cleanUrl);
     setKycModalOpen(true);
-    setChainKycToCycle(true);
+    setChainKycTo(target);
   }, []);
 
-  // When the KYC sheet closes during onboarding, open the cycle setup sheet
-  // so the admin sees the next step in the planned sequence.
+  // When the KYC sheet closes during onboarding, open the appropriate
+  // category setup sheet so the admin sees the next step in the planned
+  // sequence.
   const handleKycModalChange = (open: boolean) => {
     setKycModalOpen(open);
-    if (!open && chainKycToCycle) {
-      setChainKycToCycle(false);
-      setAjoSetupOpen(true);
+    if (!open && chainKycTo) {
+      const next = chainKycTo;
+      setChainKycTo(null);
+      if (next === "association") {
+        setAssociationSetupOpen(true);
+      } else {
+        setAjoSetupOpen(true);
+      }
     }
   };
 
