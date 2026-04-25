@@ -136,10 +136,14 @@ export function CreateGroupModal({ open, onOpenChange, initialType }: CreateGrou
         description: "Now add your first project to start collecting.",
       });
     },
-    onError: () => {
+    onError: (err: unknown) => {
+      // Surface the actual backend message (apiRequest throws "<status>: <body>")
+      // so we can debug failures instead of always showing "Failed to create group".
+      const raw = err instanceof Error ? err.message : String(err);
+      const friendly = raw.replace(/^\d+:\s*/, "").slice(0, 220) || "Please try again.";
       toast({
-        title: "Error",
-        description: "Failed to create group. Please try again.",
+        title: "Couldn't create group",
+        description: friendly,
         variant: "destructive",
       });
     },
@@ -166,10 +170,12 @@ export function CreateGroupModal({ open, onOpenChange, initialType }: CreateGrou
       });
       handleClose();
     },
-    onError: () => {
+    onError: (err: unknown) => {
+      const raw = err instanceof Error ? err.message : String(err);
+      const friendly = raw.replace(/^\d+:\s*/, "").slice(0, 220) || "Please try again.";
       toast({
-        title: "Error",
-        description: "Failed to create project. Please try again.",
+        title: "Couldn't create project",
+        description: friendly,
         variant: "destructive",
       });
     },

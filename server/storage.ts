@@ -1479,12 +1479,35 @@ export class DbStorage implements IStorage {
   }
 
   async deleteGroup(id: string): Promise<boolean> {
-    // Cascade delete in FK-safe order
+    // Cascade delete in FK-safe order. We have to walk every table that
+    // references groups (or projects within the group) to avoid FK violations
+    // — Drizzle does not auto-cascade because the FKs aren't declared with
+    // ON DELETE CASCADE.
+    // 1) Drop the FK on referrals (kept as a soft pointer for audit history).
+    await db.execute(sql`UPDATE referrals SET trigger_group_id = NULL WHERE trigger_group_id = ${id}`);
+
+    // 2) Phase 2A/3A category-specific settings.
+    await db.execute(sql`DELETE FROM ajo_settings WHERE group_id = ${id}`);
+    await db.execute(sql`DELETE FROM association_settings WHERE group_id = ${id}`);
+
+    // 3) Verification chain (officers/attestations FK -> verification_applications.id).
+    await db.execute(sql`
+      DELETE FROM verification_officers
+      WHERE application_id IN (SELECT id FROM verification_applications WHERE group_id = ${id})
+    `);
+    await db.execute(sql`
+      DELETE FROM verification_attestations
+      WHERE application_id IN (SELECT id FROM verification_applications WHERE group_id = ${id})
+    `);
+    await db.execute(sql`DELETE FROM verification_applications WHERE group_id = ${id}`);
+
+    // 4) Standard children.
     await db.delete(disbursementsTable).where(eq(disbursementsTable.groupId, id));
     await db.delete(contributionsTable).where(eq(contributionsTable.groupId, id));
     await db.delete(accountabilityPartnersTable).where(eq(accountabilityPartnersTable.groupId, id));
     await db.delete(projectsTable).where(eq(projectsTable.groupId, id));
     await db.delete(groupMembersTable).where(eq(groupMembersTable.groupId, id));
+
     const result = await db.delete(groupsTable).where(eq(groupsTable.id, id)).returning();
     return result.length > 0;
   }
