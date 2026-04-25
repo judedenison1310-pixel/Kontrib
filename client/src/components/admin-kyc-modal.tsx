@@ -88,14 +88,17 @@ export function AdminKycModal({ open, onOpenChange, mandatory = false }: AdminKy
     !!kycSelfieUrl &&
     !submitMutation.isPending;
 
-  // KYC counts as "completed for this group" once it has actually been
-  // submitted (pending review) or fully approved. Anything else (none /
-  // rejected) means the admin still owes us a submission.
+  // The admin owes us a submission until KYC is at least pending review
+  // (or already approved). "none" / "rejected" mean they still need to
+  // upload their documents.
   const kycSubmitted = status === "pending" || status === "approved";
+  const kycApproved = status === "approved";
 
-  // In mandatory mode the sheet is non-dismissible until KYC is submitted.
-  // Outside mandatory mode (e.g. opening from settings) the user can close
-  // freely.
+  // In mandatory mode the sheet stays locked until the admin has at least
+  // submitted their KYC — that prevents them from skipping the form
+  // entirely. Once it's submitted (pending review) we let them close the
+  // sheet so they're not trapped, but the *chain* into the cycle / dues
+  // wizard is still gated on full approval (see group-projects.tsx).
   const canDismiss = !mandatory || kycSubmitted;
 
   const handleSheetOpenChange = (next: boolean) => {
@@ -182,6 +185,13 @@ export function AdminKycModal({ open, onOpenChange, mandatory = false }: AdminKy
                   {kyc?.submittedAt ? new Date(kyc.submittedAt).toLocaleString() : "—"}.
                   We usually reply within 1 business day.
                 </p>
+                {mandatory && (
+                  <p className="text-sm text-amber-800 mt-2 font-medium">
+                    You can't start collecting on this group until our team
+                    approves your verification. We'll notify you the moment
+                    that's done.
+                  </p>
+                )}
               </div>
             ) : status === "approved" ? (
               <div className="rounded-xl border-2 border-emerald-200 bg-emerald-50 p-4">
@@ -274,7 +284,7 @@ export function AdminKycModal({ open, onOpenChange, mandatory = false }: AdminKy
                 className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-base h-12 rounded-full"
                 data-testid="button-kyc-continue"
               >
-                Continue to setup
+                {mandatory ? "Close — I'll wait for review" : "Continue"}
               </Button>
             </div>
           )}

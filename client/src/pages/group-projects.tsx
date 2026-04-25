@@ -92,14 +92,38 @@ export default function GroupProjects() {
     setChainKycTo(target);
   }, []);
 
+  // Pull the admin's KYC status so the chain only advances to the
+  // category setup wizard once verification has actually been APPROVED.
+  // While KYC is pending or missing, the AdminKycModal keeps itself open
+  // (it's mandatory) and we never auto-open the cycle / dues setup.
+  const { data: adminKyc } = useQuery<{ status: "none" | "pending" | "approved" | "rejected" }>({
+    queryKey: ["/api/users", user?.id, "admin-kyc"],
+    queryFn: async () => {
+      const r = await fetch(`/api/users/${user?.id}/admin-kyc`);
+      if (!r.ok) throw new Error("Failed to fetch KYC");
+      return r.json();
+    },
+    enabled: !!user?.id,
+  });
+
   // When the KYC sheet closes during onboarding, open the appropriate
   // category setup sheet so the admin sees the next step in the planned
-  // sequence.
+  // sequence — but only if KYC has been approved. If it's still pending
+  // (or missing), do NOT chain to setup; the admin has to wait for our
+  // team to clear them before they can configure cycles or dues.
   const handleKycModalChange = (open: boolean) => {
     setKycModalOpen(open);
     if (!open && chainKycTo) {
       const next = chainKycTo;
       setChainKycTo(null);
+      if (adminKyc?.status !== "approved") {
+        toast({
+          title: "Verification still in review",
+          description:
+            "We'll notify you the moment your verification is approved — then you can finish setting up this group.",
+        });
+        return;
+      }
       if (next === "association") {
         setAssociationSetupOpen(true);
       } else {
