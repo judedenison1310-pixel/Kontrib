@@ -1531,6 +1531,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return true;
   }
 
+  // ----- Temporary diagnostic (no secrets leaked) -----------------------
+  // Reports whether OPS_PASSWORD is loaded into the running server and the
+  // length of any password the caller supplied, so we can confirm whether
+  // the production deployment received the secret. Returns NO actual values.
+  // Remove once the password issue is resolved.
+  app.get("/api/ops/_debug-env", (req, res) => {
+    const env = process.env.OPS_PASSWORD;
+    const provided =
+      (req.headers?.["x-ops-password"] as string | undefined) ??
+      (typeof req.query?.password === "string" ? req.query.password : undefined);
+    res.json({
+      envSet: typeof env === "string" && env.length > 0,
+      envLength: typeof env === "string" ? env.length : 0,
+      providedSet: typeof provided === "string" && provided.length > 0,
+      providedLength: typeof provided === "string" ? provided.length : 0,
+      lengthsMatch:
+        typeof env === "string" && typeof provided === "string" && env.length === provided.length,
+      exactMatch: typeof env === "string" && typeof provided === "string" && env === provided,
+      nodeEnv: process.env.NODE_ENV || "unknown",
+    });
+  });
+
   // ----- Users: search, view, suspend ------------------------------------
   app.get("/api/ops/users/search", async (req, res) => {
     if (!requireOpsAuth(req, res)) return;
