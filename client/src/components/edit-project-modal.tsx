@@ -32,8 +32,7 @@ export function EditProjectModal({ open, onOpenChange, project }: EditProjectMod
 
   const [name, setName] = useState(project.name);
   const [description, setDescription] = useState(project.description || "");
-  const [projectType, setProjectType] = useState(project.projectType || "target");
-  const [targetAmount, setTargetAmount] = useState(
+  const [amount, setAmount] = useState(
     project.targetAmount ? String(parseFloat(project.targetAmount)) : ""
   );
   const [deadline, setDeadline] = useState(
@@ -45,24 +44,33 @@ export function EditProjectModal({ open, onOpenChange, project }: EditProjectMod
     if (open) {
       setName(project.name);
       setDescription(project.description || "");
-      setProjectType(project.projectType || "target");
-      setTargetAmount(project.targetAmount ? String(parseFloat(project.targetAmount)) : "");
+      setAmount(project.targetAmount ? String(parseFloat(project.targetAmount)) : "");
       setDeadline(project.deadline ? new Date(project.deadline).toISOString().split("T")[0] : "");
       setStatus(project.status || "active");
     }
   }, [open, project]);
 
+  // Project type is intentionally NOT editable here. It's set at creation time
+  // (target / association_dues / ajo_cycle / etc.) and changing it would put
+  // the project in an inconsistent state with the rest of the app.
+  const projectType = project.projectType || "target";
+
   const requiresTarget =
     projectType === "target" || projectType === "event" || projectType === "emergency";
 
   // Per-member amount types (dues / levies / ajo cycles) store the per-member
-  // amount in `targetAmount`. Don't show a target field for them and — more
-  // importantly — don't overwrite that amount with "0" on save, otherwise the
-  // dues amount shown on the project card disappears.
+  // amount in `targetAmount`. We expose it as an editable "Dues Amount" field
+  // so an admin can correct a wrong amount entered earlier.
   const isPerMemberAmount =
     projectType === "association_dues" ||
     projectType === "association_levy" ||
     projectType === "ajo_cycle";
+
+  const showAmountField = requiresTarget || isPerMemberAmount;
+  const amountLabel = isPerMemberAmount ? "Dues Amount (₦)" : "Target Amount (₦)";
+  const amountHelper = isPerMemberAmount
+    ? "Per-member amount each member is expected to pay."
+    : null;
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -70,15 +78,13 @@ export function EditProjectModal({ open, onOpenChange, project }: EditProjectMod
         name: name.trim(),
         description: description.trim() || null,
         status,
-        projectType,
       };
 
-      if (requiresTarget) {
-        updates.targetAmount = targetAmount || "0";
-      } else if (!isPerMemberAmount) {
-        // Generic non-target type: clear out any existing target so progress
-        // bars stop tracking it. For per-member types we leave targetAmount
-        // alone so the dues amount stays intact.
+      if (showAmountField) {
+        updates.targetAmount = amount || "0";
+      } else {
+        // Open-ended type with no amount: clear any stale value so progress
+        // bars stop tracking it.
         updates.targetAmount = "0";
       }
 
@@ -108,9 +114,12 @@ export function EditProjectModal({ open, onOpenChange, project }: EditProjectMod
       toast({ title: "Project name is required", variant: "destructive" });
       return;
     }
-    if (requiresTarget) {
-      if (!targetAmount || isNaN(parseFloat(targetAmount)) || parseFloat(targetAmount) <= 0) {
-        toast({ title: "Enter a valid target amount", variant: "destructive" });
+    if (showAmountField) {
+      if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+        toast({
+          title: isPerMemberAmount ? "Enter a valid dues amount" : "Enter a valid target amount",
+          variant: "destructive",
+        });
         return;
       }
     }
@@ -147,48 +156,22 @@ export function EditProjectModal({ open, onOpenChange, project }: EditProjectMod
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="proj-type">Project Type</Label>
-            <Select value={projectType} onValueChange={setProjectType}>
-              <SelectTrigger id="proj-type" data-testid="select-project-type">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="target">Target-based collection</SelectItem>
-                <SelectItem value="event">Event collection</SelectItem>
-                <SelectItem value="emergency">Emergency fund</SelectItem>
-                <SelectItem value="monthly">Monthly contributions / dues</SelectItem>
-                <SelectItem value="yearly">Yearly dues / levies</SelectItem>
-                <SelectItem value="association_dues">Dues amount</SelectItem>
-                <SelectItem value="association_levy">Special levy</SelectItem>
-                <SelectItem value="ajo_cycle">Ajo cycle</SelectItem>
-              </SelectContent>
-            </Select>
-            {!requiresTarget && !isPerMemberAmount && (
-              <p className="text-xs text-gray-500">
-                No target amount needed for this type — contributions are open-ended.
-              </p>
-            )}
-            {isPerMemberAmount && (
-              <p className="text-xs text-gray-500">
-                The per-member dues amount is managed from the group's dues setup, not from here.
-              </p>
-            )}
-          </div>
-
-          {requiresTarget && (
+          {showAmountField && (
             <div className="space-y-2">
-              <Label htmlFor="proj-target">Target Amount (₦)</Label>
+              <Label htmlFor="proj-amount">{amountLabel}</Label>
               <Input
-                id="proj-target"
+                id="proj-amount"
                 type="number"
                 min="0"
                 step="any"
-                value={targetAmount}
-                onChange={(e) => setTargetAmount(e.target.value)}
-                placeholder="e.g. 500000"
-                data-testid="input-target-amount"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder={isPerMemberAmount ? "e.g. 50000" : "e.g. 500000"}
+                data-testid={isPerMemberAmount ? "input-dues-amount" : "input-target-amount"}
               />
+              {amountHelper && (
+                <p className="text-xs text-gray-500">{amountHelper}</p>
+              )}
             </div>
           )}
 

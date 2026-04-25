@@ -170,6 +170,7 @@ export interface IStorage {
   createAssociationSettingsAndStartPeriod(groupId: string, payload: CreateAssociationSettingsPayload): Promise<AssociationStatus>;
   advanceAssociationPeriod(groupId: string): Promise<AssociationStatus>;
   createAssociationLevy(groupId: string, payload: CreateAssociationLevyPayload): Promise<Project>;
+  updateAssociationDuesAmount(groupId: string, duesAmount: string): Promise<void>;
 
   // Verified Ajo
   getVerificationStatus(groupId: string): Promise<VerificationStatus | null>;
@@ -3246,6 +3247,20 @@ DbStorage.prototype.getAssociationSettings = async function (groupId: string) {
 
 DbStorage.prototype.getAssociationStatus = async function (groupId: string) {
   return buildAssociationStatus(groupId);
+};
+
+// Update the per-member dues amount on the group's association settings so
+// future periods spawn with the corrected amount. Used when an admin fixes
+// a wrong amount via the project edit modal.
+DbStorage.prototype.updateAssociationDuesAmount = async function (
+  groupId: string,
+  duesAmount: string,
+) {
+  const settings = await this.getAssociationSettings(groupId);
+  if (!settings) return; // No settings to sync — nothing to do.
+  await db.update(associationSettingsTable)
+    .set({ duesAmount })
+    .where(eq(associationSettingsTable.groupId, groupId));
 };
 
 DbStorage.prototype.createAssociationSettingsAndStartPeriod = async function (

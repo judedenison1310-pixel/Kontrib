@@ -1123,6 +1123,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
       }
+
+      // If the admin corrected the per-member dues amount on an
+      // association_dues project, mirror it onto the group's association
+      // settings so future dues periods spawn with the corrected amount.
+      if (
+        project.projectType === "association_dues" &&
+        updates.targetAmount !== undefined &&
+        typeof storage.updateAssociationDuesAmount === "function"
+      ) {
+        try {
+          await storage.updateAssociationDuesAmount(project.groupId, String(updates.targetAmount));
+        } catch (syncErr) {
+          // Don't fail the project update if the settings sync fails — log it
+          // and continue. The project itself was updated successfully.
+          console.error("Failed to sync association dues amount:", syncErr);
+        }
+      }
+
       res.json(project);
     } catch (error) {
       console.error("Update project error:", error);
