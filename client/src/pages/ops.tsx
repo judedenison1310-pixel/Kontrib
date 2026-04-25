@@ -1,18 +1,16 @@
 // Phase 4 — Unified Kontrib Ops shell.
-// Single password-gated dashboard that surfaces every internal operations
-// function: stats overview, admin KYC review, custom T&C moderation, Verified
-// Ajo decisions, user / group lookup + suspend, payments view, referral
-// payouts, and a push notification debugger.
+// Google sign-in gated dashboard (allow-listed admin emails only) that surfaces
+// every internal operations function: stats overview, admin KYC review, custom
+// T&C moderation, Verified Ajo decisions, user / group lookup + suspend,
+// payments view, referral payouts, and a push notification debugger.
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { getCurrentUser } from "@/lib/auth";
 import {
   Users as UsersIcon,
   Gift,
@@ -21,7 +19,7 @@ import {
   Clock,
   AlertCircle,
   Banknote,
-  Lock,
+  LogOut,
   RefreshCw,
   ChevronDown,
   ChevronUp,
@@ -34,9 +32,11 @@ import {
   Folder,
   Bell,
   Wallet,
+  Loader2,
 } from "lucide-react";
+import { SiGoogle } from "react-icons/si";
 import kontribLogo from "@assets/8_1764455185903.png";
-import { OPS_PASS_KEY, opsFetch, formatDateTime, formatNgn, StatusPill } from "@/components/ops/ops-shared";
+import { opsFetch, formatDateTime, formatNgn, StatusPill } from "@/components/ops/ops-shared";
 import { UsersPanel } from "@/components/ops/users-panel";
 import { GroupsPanel } from "@/components/ops/groups-panel";
 import { CustomTermsPanel } from "@/components/ops/custom-terms-panel";
@@ -115,11 +115,10 @@ function daysSince(d: string) {
   return Math.max(0, Math.floor((now - then) / (1000 * 60 * 60 * 24)));
 }
 
-// ----- Verifications panel (Verified Ajo) — unchanged from earlier rounds.
+// ----- Verifications panel (Verified Ajo)
 function VerificationsPanel({
-  password, data, isLoading, onChanged,
+  data, isLoading, onChanged,
 }: {
-  password: string;
   data: OpsVerificationData | undefined;
   isLoading: boolean;
   onChanged: () => void;
@@ -130,18 +129,8 @@ function VerificationsPanel({
   const [notesByApp, setNotesByApp] = useState<Record<string, string>>({});
 
   const decideMutation = useMutation({
-    mutationFn: async ({ appId, decision, notes }: { appId: string; decision: "approve" | "reject" | "request_info"; notes?: string }) => {
-      const res = await fetch(`/api/ops/verifications/${appId}/decide`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-ops-password": password },
-        body: JSON.stringify({ decision, notes }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Failed" }));
-        throw new Error(err.message || "Failed");
-      }
-      return res.json();
-    },
+    mutationFn: async ({ appId, decision, notes }: { appId: string; decision: "approve" | "reject" | "request_info"; notes?: string }) =>
+      opsFetch("POST", `/api/ops/verifications/${appId}/decide`, { decision, notes }),
     onSuccess: (_d, vars) => {
       toast({
         title:
@@ -462,38 +451,38 @@ const SECTIONS: Array<{ key: SectionKey; label: string; icon: any }> = [
   { key: "push", label: "Push test", icon: Bell },
 ];
 
-export default function Ops() {
-  const currentUser = getCurrentUser();
-  const actorId = currentUser?.id || "ops";
+type AuthMe = {
+  authed: boolean;
+  user: { email: string; name?: string; picture?: string } | null;
+  googleConfigured: boolean;
+};
 
-  const [password, setPassword] = useState(() => sessionStorage.getItem(OPS_PASS_KEY) || "");
-  const [inputPassword, setInputPassword] = useState("");
-  const [nonce, setNonce] = useState(0);
-  const [authError, setAuthError] = useState(false);
+export default function Ops() {
   const [section, setSection] = useState<SectionKey>("overview");
 
+  // Check whether the visitor has a valid ops session (Google login).
+  const auth = useQuery<AuthMe>({
+    queryKey: ["/api/ops/auth/me"],
+    queryFn: () => opsFetch("GET", "/api/ops/auth/me"),
+    retry: false,
+    staleTime: 30_000,
+  });
+
+  const authed = auth.data?.authed === true;
+  const opsUser = auth.data?.user || null;
+  const actorId = opsUser?.email || "ops";
+
   const { data, isLoading, isError, refetch } = useQuery<OpsData>({
-    queryKey: ["/api/ops/overview", password, nonce],
-    queryFn: async () => {
-      const res = await fetch(`/api/ops/overview`, { headers: { "x-ops-password": password } });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Failed" }));
-        throw new Error(err.message || "Failed");
-      }
-      return res.json();
-    },
-    enabled: !!password,
+    queryKey: ["/api/ops/overview"],
+    queryFn: () => opsFetch("GET", "/api/ops/overview"),
+    enabled: authed,
     retry: false,
   });
 
   const verifications = useQuery<OpsVerificationData>({
-    queryKey: ["/api/ops/verifications", password, nonce],
-    queryFn: async () => {
-      const res = await fetch(`/api/ops/verifications`, { headers: { "x-ops-password": password } });
-      if (!res.ok) throw new Error("Failed");
-      return res.json();
-    },
-    enabled: !!password,
+    queryKey: ["/api/ops/verifications"],
+    queryFn: () => opsFetch("GET", "/api/ops/verifications"),
+    enabled: authed,
     retry: false,
   });
 
@@ -501,41 +490,44 @@ export default function Ops() {
   const kycQueue = useQuery<{ pending: any[] }>({
     queryKey: ["/api/ops/admin-kyc/pending", "shellbadge"],
     queryFn: () => opsFetch("GET", "/api/ops/admin-kyc/pending"),
-    enabled: !!password,
+    enabled: authed,
   });
   const tcQueue = useQuery<{ terms: any[] }>({
     queryKey: ["/api/ops/custom-terms/pending", "shellbadge"],
     queryFn: () => opsFetch("GET", "/api/ops/custom-terms/pending"),
-    enabled: !!password,
+    enabled: authed,
   });
 
-  // Auth failures bounce back to the lock screen.
+  // If a session expires mid-session, the auth/me query will eventually flip
+  // back to authed:false and the lock screen renders again.
   useEffect(() => {
     if (isError) {
-      sessionStorage.removeItem(OPS_PASS_KEY);
-      setAuthError(true);
-      setPassword("");
+      auth.refetch();
     }
   }, [isError]);
 
-  const handleUnlock = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputPassword.trim()) return;
-    setAuthError(false);
-    sessionStorage.setItem(OPS_PASS_KEY, inputPassword);
-    setPassword(inputPassword);
-    setNonce(n => n + 1);
-    setInputPassword("");
+  const handleSignIn = () => {
+    window.location.href = "/api/ops/auth/google";
   };
 
-  const handleLock = () => {
-    sessionStorage.removeItem(OPS_PASS_KEY);
-    setPassword("");
-    setAuthError(false);
+  const handleSignOut = async () => {
+    try { await opsFetch("POST", "/api/ops/auth/logout"); } catch {}
+    queryClient.clear();
+    auth.refetch();
   };
 
-  // ---- Lock screen ------------------------------------------------------
-  if (!password) {
+  // ---- Loading state while we check the session ------------------------
+  if (auth.isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-500">
+        <Loader2 className="h-5 w-5 animate-spin" />
+      </div>
+    );
+  }
+
+  // ---- Sign-in screen --------------------------------------------------
+  if (!authed) {
+    const googleConfigured = auth.data?.googleConfigured !== false;
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
         <div className="w-full max-w-sm">
@@ -549,29 +541,31 @@ export default function Ops() {
           <Card className="bg-gray-900 border-gray-800">
             <CardContent className="p-6">
               <div className="flex items-center justify-center w-12 h-12 bg-primary/20 rounded-full mx-auto mb-4">
-                <Lock className="h-6 w-6 text-primary" />
+                <ShieldCheck className="h-6 w-6 text-primary" />
               </div>
               <p className="text-white text-center font-semibold mb-1">Team access only</p>
-              <p className="text-gray-400 text-sm text-center mb-5">Enter your ops password to continue</p>
-              <form onSubmit={handleUnlock} className="space-y-3">
-                <Input
-                  type="password"
-                  placeholder="Ops password"
-                  value={inputPassword}
-                  onChange={e => setInputPassword(e.target.value)}
-                  className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500"
-                  autoFocus
-                  data-testid="input-ops-password"
-                />
+              <p className="text-gray-400 text-sm text-center mb-5">
+                Sign in with your authorised Kontrib admin Google account to continue.
+              </p>
+              {googleConfigured ? (
                 <button
-                  type="submit"
-                  className="w-full bg-primary text-white font-semibold py-2.5 rounded-lg hover:bg-primary/90 transition-colors"
-                  data-testid="button-ops-unlock"
+                  onClick={handleSignIn}
+                  className="w-full flex items-center justify-center gap-3 bg-white text-gray-900 font-semibold py-2.5 rounded-lg hover:bg-gray-100 transition-colors"
+                  data-testid="button-ops-google-signin"
                 >
-                  Unlock
+                  <SiGoogle className="h-4 w-4 text-[#4285F4]" />
+                  Sign in with Google
                 </button>
-                {authError && <p className="text-red-400 text-xs text-center">Incorrect password. Please try again.</p>}
-              </form>
+              ) : (
+                <div className="bg-amber-500/10 border border-amber-700/40 rounded-lg p-3 text-amber-200 text-xs">
+                  Google login isn't configured on this server yet. Ask the engineer
+                  to set the <code className="text-amber-100">GOOGLE_CLIENT_ID</code> and{" "}
+                  <code className="text-amber-100">GOOGLE_CLIENT_SECRET</code> secrets.
+                </div>
+              )}
+              <p className="text-gray-500 text-[11px] text-center mt-4">
+                Only allow-listed Kontrib admin emails can sign in.
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -594,11 +588,13 @@ export default function Ops() {
     <div className="min-h-screen bg-gray-950 text-white">
       {/* Header */}
       <div className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center justify-between sticky top-0 z-20">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <img src={kontribLogo} alt="Kontrib" className="w-8 h-8" />
-          <div>
+          <div className="min-w-0">
             <p className="font-bold text-sm">Kontrib Ops</p>
-            <p className="text-gray-400 text-xs">{currentUser?.fullName ? `Acting as ${currentUser.fullName}` : "Live dashboard"}</p>
+            <p className="text-gray-400 text-xs truncate" data-testid="text-ops-actor">
+              {opsUser?.email || "Live dashboard"}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -611,12 +607,12 @@ export default function Ops() {
             <RefreshCw className="h-4 w-4" />
           </button>
           <button
-            onClick={handleLock}
+            onClick={handleSignOut}
             className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white border border-gray-700 rounded-lg px-3 py-1.5"
-            data-testid="button-ops-lock"
+            data-testid="button-ops-signout"
           >
-            <Lock className="h-3.5 w-3.5" />
-            Lock
+            <LogOut className="h-3.5 w-3.5" />
+            Sign out
           </button>
         </div>
       </div>
@@ -697,7 +693,6 @@ export default function Ops() {
         {section === "tc" && <CustomTermsPanel actorId={actorId} />}
         {section === "verifications" && (
           <VerificationsPanel
-            password={password}
             data={verifications.data}
             isLoading={verifications.isLoading}
             onChanged={() => verifications.refetch()}

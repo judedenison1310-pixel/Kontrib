@@ -4,6 +4,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { whatsappService } from "./whatsapp-service";
 import { sendPushToSubscription, vapidPublicKey, type PushPayload } from "./push-service";
+import { getOpsUser } from "./ops-auth";
 import { 
   insertUserSchema, insertGroupSchema, insertGroupMemberSchema,
   insertProjectSchema, insertAccountabilityPartnerSchema, insertContributionSchema,
@@ -1516,42 +1517,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Phase 4 — Ops interface expansion (OPS_PASSWORD-gated)
   // ========================================================================
 
-  // Helper: require ops password (accepts header `x-ops-password` or query/body
-  // `password`). Returns true when the request is authorised.
+  // Helper: require an authenticated ops session (Google login + email
+  // allowlist). The session is set by the OAuth callback in server/ops-auth.ts.
+  // Returns true when the request is authorised. The legacy `OPS_PASSWORD`
+  // header/query/body is no longer accepted.
   function requireOpsAuth(req: any, res: any): boolean {
-    const opsPassword = process.env.OPS_PASSWORD;
-    const provided =
-      (req.headers?.["x-ops-password"] as string | undefined) ??
-      (typeof req.query?.password === "string" ? req.query.password : undefined) ??
-      (typeof req.body?.password === "string" ? req.body.password : undefined);
-    if (!opsPassword || !provided || provided !== opsPassword) {
-      res.status(401).json({ message: "Unauthorised" });
+    const user = getOpsUser(req);
+    if (!user) {
+      res.status(401).json({ message: "Not signed in", needsLogin: true });
       return false;
     }
     return true;
   }
 
-  // ----- Temporary diagnostic (no secrets leaked) -----------------------
-  // Reports whether OPS_PASSWORD is loaded into the running server and the
-  // length of any password the caller supplied, so we can confirm whether
-  // the production deployment received the secret. Returns NO actual values.
-  // Remove once the password issue is resolved.
-  app.get("/api/ops/_debug-env", (req, res) => {
-    const env = process.env.OPS_PASSWORD;
-    const provided =
-      (req.headers?.["x-ops-password"] as string | undefined) ??
-      (typeof req.query?.password === "string" ? req.query.password : undefined);
-    res.json({
-      envSet: typeof env === "string" && env.length > 0,
-      envLength: typeof env === "string" ? env.length : 0,
-      providedSet: typeof provided === "string" && provided.length > 0,
-      providedLength: typeof provided === "string" ? provided.length : 0,
-      lengthsMatch:
-        typeof env === "string" && typeof provided === "string" && env.length === provided.length,
-      exactMatch: typeof env === "string" && typeof provided === "string" && env === provided,
-      nodeEnv: process.env.NODE_ENV || "unknown",
-    });
-  });
+  // Returns the actor identifier for audit fields. Prefers the signed-in ops
+  // admin's email; falls back to a literal "ops" if somehow missing.
+  function opsActorId(req: any, fallback?: string): string {
+    const u = getOpsUser(req);
+    return u?.email || fallback || "ops";
+  }
 
   // ----- Users: search, view, suspend ------------------------------------
   app.get("/api/ops/users/search", async (req, res) => {
@@ -1583,10 +1567,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const schema = z.object({
         reason: z.string().min(3).max(500),
-        actorId: z.string().optional(),
       });
-      const { reason, actorId } = schema.parse(req.body || {});
-      const u = await storage.suspendUser(req.params.id, reason, actorId || "ops");
+      const { reason } = schema.parse(req.body || {});
+      const u = await storage.suspendUser(req.params.id, reason, opsActorId(req));
       res.json({ ok: true, user: u });
     } catch (error: any) {
       if (error?.issues) return res.status(400).json({ message: "Invalid payload", errors: error.issues });
@@ -1634,10 +1617,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const schema = z.object({
         reason: z.string().min(3).max(500),
-        actorId: z.string().optional(),
       });
-      const { reason, actorId } = schema.parse(req.body || {});
-      const g = await storage.suspendGroup(req.params.id, reason, actorId || "ops");
+      const { reason } = schema.parse(req.body || {});
+      const g = await storage.suspendGroup(req.params.id, reason, opsActorId(req));
       res.json({ ok: true, group: g });
     } catch (error: any) {
       if (error?.issues) return res.status(400).json({ message: "Invalid payload", errors: error.issues });
@@ -1672,13 +1654,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const schema = z.object({
         decision: z.enum(["approve", "reject"]),
         note: z.string().max(2000).optional(),
-        actorId: z.string().optional(),
       });
-      const { decision, note, actorId } = schema.parse(req.body || {});
+      const { decision, note } = schema.parse(req.body || {});
       if (decision === "reject" && (!note || !note.trim())) {
         return res.status(400).json({ message: "A reason is required when rejecting" });
       }
-      const g = await storage.reviewCustomTerms(req.params.groupId, decision, note ?? null, actorId || "ops");
+      const g = await storage.reviewCustomTerms(req.params.groupId, decision, note ?? null, opsActorId(req));
       res.json({ ok: true, group: g });
     } catch (error: any) {
       if (error?.issues) return res.status(400).json({ message: "Invalid payload", errors: error.issues });
@@ -1690,8 +1671,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/ops/referrals/:id/mark-paid", async (req, res) => {
     if (!requireOpsAuth(req, res)) return;
     try {
-      const actorId = (req.body && typeof req.body.actorId === "string") ? req.body.actorId : "ops";
-      const r = await storage.markReferralPaid(req.params.id, actorId);
+      const r = await storage.markReferralPaid(req.params.id, opsActorId(req));
       res.json({ ok: true, referral: r });
     } catch (error: any) {
       res.status(400).json({ message: error?.message || "Failed to mark referral paid" });

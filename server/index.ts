@@ -3,11 +3,16 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { handleDynamicOGTags } from "./og-middleware";
+import { setupOpsAuth } from "./ops-auth";
 
 const app = express();
 // Increase body parser limits to handle image uploads (up to 50MB)
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: false, limit: "50mb" }));
+
+// Mount ops auth (session + passport + Google OAuth routes) BEFORE the rest of
+// the app routes so requireOpsSession can read req.session in /api/ops/* routes.
+setupOpsAuth(app);
 
 app.use((req, res, next) => {
   const start = Date.now();

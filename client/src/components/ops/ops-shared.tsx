@@ -1,32 +1,26 @@
 // Phase 4 — Shared helpers for the Kontrib ops shell.
-// Provides a tiny `opsFetch` wrapper that auto-attaches the ops password
-// (stored in sessionStorage by the parent ops page).
+// Authentication is now handled by Google sign-in (see server/ops-auth.ts) and
+// a session cookie. opsFetch just needs to send credentials so the browser
+// includes the session cookie on every request.
 
 import { Badge } from "@/components/ui/badge";
 
-export const OPS_PASS_KEY = "kontrib_ops_pass";
-
-export function getOpsPassword(): string {
-  return sessionStorage.getItem(OPS_PASS_KEY) || "";
-}
-
 /**
- * Sends a JSON request to an `/api/ops/...` endpoint. The ops password is
- * sent ONLY via the `x-ops-password` request header — never in the URL or
- * request body — so it doesn't leak into server logs / referrers / browser
- * history. Throws on non-2xx with the parsed error message when possible.
+ * Sends a JSON request to an `/api/ops/...` endpoint. Includes session cookies
+ * automatically. On 401 (session expired / not signed in) the page will reload
+ * back to the lock screen via the auth check at the top of the ops page.
  */
 export async function opsFetch<T = any>(
   method: "GET" | "POST" | "PATCH" | "DELETE",
   path: string,
   body?: any,
 ): Promise<T> {
-  const password = getOpsPassword();
-  const headers: Record<string, string> = { "x-ops-password": password };
+  const headers: Record<string, string> = {};
   if (body) headers["Content-Type"] = "application/json";
   const res = await fetch(path, {
     method,
     headers,
+    credentials: "include",
     body: body ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
@@ -34,7 +28,10 @@ export async function opsFetch<T = any>(
   try { parsed = text ? JSON.parse(text) : {}; } catch { parsed = { message: text }; }
   if (!res.ok) {
     const msg = parsed?.message || `Request failed (${res.status})`;
-    throw new Error(msg);
+    const err: any = new Error(msg);
+    err.status = res.status;
+    err.needsLogin = parsed?.needsLogin === true || res.status === 401;
+    throw err;
   }
   return parsed as T;
 }
