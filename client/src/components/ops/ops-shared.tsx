@@ -11,9 +11,10 @@ export function getOpsPassword(): string {
 }
 
 /**
- * Sends a JSON request to an `/api/ops/...` endpoint. Always appends the ops
- * password as a query parameter so the server's `requireOpsAuth` accepts it.
- * Throws on non-2xx with the parsed error message when possible.
+ * Sends a JSON request to an `/api/ops/...` endpoint. The ops password is
+ * sent ONLY via the `x-ops-password` request header — never in the URL or
+ * request body — so it doesn't leak into server logs / referrers / browser
+ * history. Throws on non-2xx with the parsed error message when possible.
  */
 export async function opsFetch<T = any>(
   method: "GET" | "POST" | "PATCH" | "DELETE",
@@ -21,11 +22,11 @@ export async function opsFetch<T = any>(
   body?: any,
 ): Promise<T> {
   const password = getOpsPassword();
-  const sep = path.includes("?") ? "&" : "?";
-  const url = `${path}${sep}password=${encodeURIComponent(password)}`;
-  const res = await fetch(url, {
+  const headers: Record<string, string> = { "x-ops-password": password };
+  if (body) headers["Content-Type"] = "application/json";
+  const res = await fetch(path, {
     method,
-    headers: body ? { "Content-Type": "application/json", "x-ops-password": password } : { "x-ops-password": password },
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();

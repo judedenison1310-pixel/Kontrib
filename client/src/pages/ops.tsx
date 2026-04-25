@@ -131,9 +131,9 @@ function VerificationsPanel({
 
   const decideMutation = useMutation({
     mutationFn: async ({ appId, decision, notes }: { appId: string; decision: "approve" | "reject" | "request_info"; notes?: string }) => {
-      const res = await fetch(`/api/ops/verifications/${appId}/decide?password=${encodeURIComponent(password)}`, {
+      const res = await fetch(`/api/ops/verifications/${appId}/decide`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-ops-password": password },
         body: JSON.stringify({ decision, notes }),
       });
       if (!res.ok) {
@@ -475,7 +475,7 @@ export default function Ops() {
   const { data, isLoading, isError, refetch } = useQuery<OpsData>({
     queryKey: ["/api/ops/overview", password, nonce],
     queryFn: async () => {
-      const res = await fetch(`/api/ops/overview?password=${encodeURIComponent(password)}`);
+      const res = await fetch(`/api/ops/overview`, { headers: { "x-ops-password": password } });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ message: "Failed" }));
         throw new Error(err.message || "Failed");
@@ -489,7 +489,7 @@ export default function Ops() {
   const verifications = useQuery<OpsVerificationData>({
     queryKey: ["/api/ops/verifications", password, nonce],
     queryFn: async () => {
-      const res = await fetch(`/api/ops/verifications?password=${encodeURIComponent(password)}`);
+      const res = await fetch(`/api/ops/verifications`, { headers: { "x-ops-password": password } });
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },
