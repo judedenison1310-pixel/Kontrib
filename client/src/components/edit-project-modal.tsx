@@ -101,6 +101,14 @@ export function EditProjectModal({ open, onOpenChange, project }: EditProjectMod
       queryClient.invalidateQueries({ queryKey: [`/api/projects/${project.id}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/groups", project.groupId, "projects"] });
       queryClient.invalidateQueries({ queryKey: [`/api/groups/${project.groupId}`] });
+      // For per-member-amount projects (association dues / levies / ajo
+      // cycles), the corresponding status panel reads from a separate
+      // endpoint. Invalidate those so the new dues amount and the recomputed
+      // expected pot reflect immediately on the dues page.
+      if (isPerMemberAmount) {
+        queryClient.invalidateQueries({ queryKey: ["/api/groups", project.groupId, "association"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/groups", project.groupId, "ajo"] });
+      }
       onOpenChange(false);
     },
     onError: () => {
