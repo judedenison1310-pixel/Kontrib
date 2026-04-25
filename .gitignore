@@ -5,3 +5,8 @@ server/public
 vite.config.ts.*
 *.tar.gz
 .env
+
+# PII / data exports — never commit user data exports to the repo
+kontrib_users.csv
+*_users.csv
+*.pii.csv
