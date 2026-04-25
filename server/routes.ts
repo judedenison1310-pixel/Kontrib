@@ -447,9 +447,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const groupData = { ...processedData };
       const group = await storage.createGroup(groupData, adminId);
       res.json(group);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Create group error:", error);
-      res.status(400).json({ message: "Invalid group data" });
+      // Surface the real failure reason instead of a generic message so the
+      // frontend toast can show something actionable. Postgres unique
+      // violations come back with code "23505" — translate them into a
+      // friendly hint about the group name being already in use.
+      if (error?.code === "23505") {
+        return res.status(409).json({
+          message: "A group with a similar name already exists. Please pick a different name.",
+        });
+      }
+      const detail = error?.message || error?.toString?.() || "Unknown error";
+      res.status(400).json({ message: `Invalid group data: ${detail}` });
     }
   });
 

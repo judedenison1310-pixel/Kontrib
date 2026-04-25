@@ -1472,15 +1472,36 @@ export class DbStorage implements IStorage {
   }
 
   async createGroup(insertGroup: InsertGroup, adminId: string): Promise<Group> {
+    // Slug + registration link are derived from the group name. Both columns
+    // have UNIQUE constraints, so a second group with the same (or
+    // similar-after-normalization) name would collide. Walk a numeric suffix
+    // until we find a free pair instead of letting the insert blow up with
+    // a generic 23505.
     const baseCode = insertGroup.name
       .toLowerCase()
       .replace(/[^a-z0-9\s]/g, '')
       .replace(/\s+/g, '')
-      .substring(0, 15);
-    
+      .substring(0, 15) || "group";
+
     const currentYear = new Date().getFullYear();
-    const registrationLink = `${baseCode}${currentYear}`;
-    const groupSlug = baseCode;
+
+    let groupSlug = baseCode;
+    let registrationLink = `${baseCode}${currentYear}`;
+    for (let attempt = 1; attempt <= 50; attempt++) {
+      const [slugClash] = await db
+        .select({ id: groupsTable.id })
+        .from(groupsTable)
+        .where(eq(groupsTable.customSlug, groupSlug))
+        .limit(1);
+      const [linkClash] = await db
+        .select({ id: groupsTable.id })
+        .from(groupsTable)
+        .where(eq(groupsTable.registrationLink, registrationLink))
+        .limit(1);
+      if (!slugClash && !linkClash) break;
+      groupSlug = `${baseCode}${attempt + 1}`;
+      registrationLink = `${baseCode}${currentYear}${attempt + 1}`;
+    }
 
     let whatsappLink = insertGroup.whatsappLink;
     if (!whatsappLink) {
