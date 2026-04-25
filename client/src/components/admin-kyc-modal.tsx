@@ -208,6 +208,18 @@ export function AdminKycModal({ open, onOpenChange }: AdminKycModalProps) {
             </div>
           )}
 
+          {status === "pending" && (
+            <div className="border-t border-gray-100 px-5 py-4 bg-white">
+              <Button
+                onClick={() => onOpenChange(false)}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-base h-12 rounded-full"
+                data-testid="button-kyc-continue"
+              >
+                Continue to setup
+              </Button>
+            </div>
+          )}
+
           {status === "approved" && (
             <div className="border-t border-gray-100 px-5 py-4 bg-white">
               <Button
@@ -215,7 +227,7 @@ export function AdminKycModal({ open, onOpenChange }: AdminKycModalProps) {
                 className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-base h-12 rounded-full"
                 data-testid="button-kyc-done"
               >
-                Done
+                Continue to setup
               </Button>
             </div>
           )}
