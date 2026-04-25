@@ -3226,7 +3226,9 @@ async function insertDuesPeriodProject(
   const [created] = await db.insert(projectsTable).values({
     groupId,
     name: label,
-    description: `Association dues — ${label}.`,
+    // Description intentionally left null — the project type badge ("Dues") and
+    // the title already convey the same information.
+    description: null,
     projectType: "association_dues",
     targetAmount: duesAmount, // per-member amount; UI multiplies by member count for the pot
     deadline: dueDate,

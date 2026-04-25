@@ -248,9 +248,25 @@ export default function ProjectDetails() {
       case "yearly": return "Dues and Levies";
       case "event": return "Event Collection";
       case "emergency": return "Emergency Fund";
+      case "association_dues": return "Dues";
+      case "association_levy": return "Levy";
+      case "ajo_cycle": return "Ajo Cycle";
       default: return "Target Goal";
     }
   };
+
+  // For per-member amounts (dues, levies, ajo cycles) the targetAmount stored
+  // on the project is what each member owes — not a single collection target.
+  // We still want to display the amount, but as "Dues amount" instead of
+  // "Target", and we hide the "% of goal reached" progress bar because a
+  // running total / per-member total doesn't map onto a single percentage.
+  const isPerMemberAmount =
+    project?.projectType === "association_dues" ||
+    project?.projectType === "association_levy" ||
+    project?.projectType === "ajo_cycle";
+
+  const amountLabel = isPerMemberAmount ? "Dues Amount" : "Target";
+  const showProgressBar = hasTarget && !isPerMemberAmount;
 
   const formatDeadline = (deadline: string | Date | null) => {
     if (!deadline) return null;
@@ -412,7 +428,7 @@ export default function ProjectDetails() {
                 <div className="bg-white/10 rounded-xl p-3">
                   <p className="text-green-200 text-xs flex items-center gap-1">
                     <Target className="h-3 w-3" />
-                    Target
+                    {amountLabel}
                   </p>
                   <p className="font-bold text-lg">{formatCurrency(project.targetAmount!, projectCurrency)}</p>
                 </div>
@@ -422,7 +438,7 @@ export default function ProjectDetails() {
                 <p className="font-bold text-lg">{formatCurrency(project.collectedAmount, projectCurrency)}</p>
               </div>
             </div>
-            {hasTarget && (
+            {showProgressBar && (
               <div className="mt-3">
                 <Progress value={progress} className="h-2 bg-white/20 [&>div]:bg-white" />
                 <p className="text-green-200 text-xs mt-1">{progress}% of goal reached</p>
@@ -477,7 +493,7 @@ export default function ProjectDetails() {
               <div className="bg-white/10 rounded-xl p-3">
                 <p className="text-green-200 text-xs flex items-center gap-1">
                   <Target className="h-3 w-3" />
-                  Target
+                  {amountLabel}
                 </p>
                 <p className="font-bold text-lg">{formatCurrency(project.targetAmount!, projectCurrency)}</p>
               </div>

@@ -55,6 +55,15 @@ export function EditProjectModal({ open, onOpenChange, project }: EditProjectMod
   const requiresTarget =
     projectType === "target" || projectType === "event" || projectType === "emergency";
 
+  // Per-member amount types (dues / levies / ajo cycles) store the per-member
+  // amount in `targetAmount`. Don't show a target field for them and — more
+  // importantly — don't overwrite that amount with "0" on save, otherwise the
+  // dues amount shown on the project card disappears.
+  const isPerMemberAmount =
+    projectType === "association_dues" ||
+    projectType === "association_levy" ||
+    projectType === "ajo_cycle";
+
   const mutation = useMutation({
     mutationFn: async () => {
       const updates: Record<string, unknown> = {
@@ -66,8 +75,10 @@ export function EditProjectModal({ open, onOpenChange, project }: EditProjectMod
 
       if (requiresTarget) {
         updates.targetAmount = targetAmount || "0";
-      } else {
-        // Non-target type: clear out any existing target so progress bars stop tracking it
+      } else if (!isPerMemberAmount) {
+        // Generic non-target type: clear out any existing target so progress
+        // bars stop tracking it. For per-member types we leave targetAmount
+        // alone so the dues amount stays intact.
         updates.targetAmount = "0";
       }
 
@@ -148,11 +159,19 @@ export function EditProjectModal({ open, onOpenChange, project }: EditProjectMod
                 <SelectItem value="emergency">Emergency fund</SelectItem>
                 <SelectItem value="monthly">Monthly contributions / dues</SelectItem>
                 <SelectItem value="yearly">Yearly dues / levies</SelectItem>
+                <SelectItem value="association_dues">Dues amount</SelectItem>
+                <SelectItem value="association_levy">Special levy</SelectItem>
+                <SelectItem value="ajo_cycle">Ajo cycle</SelectItem>
               </SelectContent>
             </Select>
-            {!requiresTarget && (
+            {!requiresTarget && !isPerMemberAmount && (
               <p className="text-xs text-gray-500">
                 No target amount needed for this type — contributions are open-ended.
+              </p>
+            )}
+            {isPerMemberAmount && (
+              <p className="text-xs text-gray-500">
+                The per-member dues amount is managed from the group's dues setup, not from here.
               </p>
             )}
           </div>
