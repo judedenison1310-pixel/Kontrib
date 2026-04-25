@@ -1512,6 +1512,240 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========================================================================
+  // Phase 4 — Ops interface expansion (OPS_PASSWORD-gated)
+  // ========================================================================
+
+  // Helper: require ops password (accepts header `x-ops-password` or query/body
+  // `password`). Returns true when the request is authorised.
+  function requireOpsAuth(req: any, res: any): boolean {
+    const opsPassword = process.env.OPS_PASSWORD;
+    const provided =
+      (req.headers?.["x-ops-password"] as string | undefined) ??
+      (typeof req.query?.password === "string" ? req.query.password : undefined) ??
+      (typeof req.body?.password === "string" ? req.body.password : undefined);
+    if (!opsPassword || !provided || provided !== opsPassword) {
+      res.status(401).json({ message: "Unauthorised" });
+      return false;
+    }
+    return true;
+  }
+
+  // ----- Users: search, view, suspend ------------------------------------
+  app.get("/api/ops/users/search", async (req, res) => {
+    if (!requireOpsAuth(req, res)) return;
+    try {
+      const q = (req.query.q as string) || "";
+      const limit = Math.min(Number(req.query.limit) || 25, 100);
+      const hits = await storage.searchUsers(q, limit);
+      res.json({ users: hits });
+    } catch (error: any) {
+      console.error("Ops search users error:", error);
+      res.status(500).json({ message: error?.message || "Failed to search users" });
+    }
+  });
+
+  app.get("/api/ops/users/:id", async (req, res) => {
+    if (!requireOpsAuth(req, res)) return;
+    try {
+      const detail = await storage.getUserDetail(req.params.id);
+      res.json(detail);
+    } catch (error: any) {
+      const msg = error?.message || "Failed to fetch user";
+      res.status(msg.includes("not found") ? 404 : 500).json({ message: msg });
+    }
+  });
+
+  app.post("/api/ops/users/:id/suspend", async (req, res) => {
+    if (!requireOpsAuth(req, res)) return;
+    try {
+      const schema = z.object({
+        reason: z.string().min(3).max(500),
+        actorId: z.string().optional(),
+      });
+      const { reason, actorId } = schema.parse(req.body || {});
+      const u = await storage.suspendUser(req.params.id, reason, actorId || "ops");
+      res.json({ ok: true, user: u });
+    } catch (error: any) {
+      if (error?.issues) return res.status(400).json({ message: "Invalid payload", errors: error.issues });
+      res.status(400).json({ message: error?.message || "Failed to suspend user" });
+    }
+  });
+
+  app.post("/api/ops/users/:id/unsuspend", async (req, res) => {
+    if (!requireOpsAuth(req, res)) return;
+    try {
+      const u = await storage.unsuspendUser(req.params.id);
+      res.json({ ok: true, user: u });
+    } catch (error: any) {
+      res.status(400).json({ message: error?.message || "Failed to unsuspend user" });
+    }
+  });
+
+  // ----- Groups: search, view, suspend -----------------------------------
+  app.get("/api/ops/groups/search", async (req, res) => {
+    if (!requireOpsAuth(req, res)) return;
+    try {
+      const q = (req.query.q as string) || "";
+      const limit = Math.min(Number(req.query.limit) || 25, 100);
+      const hits = await storage.searchGroups(q, limit);
+      res.json({ groups: hits });
+    } catch (error: any) {
+      console.error("Ops search groups error:", error);
+      res.status(500).json({ message: error?.message || "Failed to search groups" });
+    }
+  });
+
+  app.get("/api/ops/groups/:id", async (req, res) => {
+    if (!requireOpsAuth(req, res)) return;
+    try {
+      const detail = await storage.getGroupDetail(req.params.id);
+      res.json(detail);
+    } catch (error: any) {
+      const msg = error?.message || "Failed to fetch group";
+      res.status(msg.includes("not found") ? 404 : 500).json({ message: msg });
+    }
+  });
+
+  app.post("/api/ops/groups/:id/suspend", async (req, res) => {
+    if (!requireOpsAuth(req, res)) return;
+    try {
+      const schema = z.object({
+        reason: z.string().min(3).max(500),
+        actorId: z.string().optional(),
+      });
+      const { reason, actorId } = schema.parse(req.body || {});
+      const g = await storage.suspendGroup(req.params.id, reason, actorId || "ops");
+      res.json({ ok: true, group: g });
+    } catch (error: any) {
+      if (error?.issues) return res.status(400).json({ message: "Invalid payload", errors: error.issues });
+      res.status(400).json({ message: error?.message || "Failed to suspend group" });
+    }
+  });
+
+  app.post("/api/ops/groups/:id/unsuspend", async (req, res) => {
+    if (!requireOpsAuth(req, res)) return;
+    try {
+      const g = await storage.unsuspendGroup(req.params.id);
+      res.json({ ok: true, group: g });
+    } catch (error: any) {
+      res.status(400).json({ message: error?.message || "Failed to unsuspend group" });
+    }
+  });
+
+  // ----- Custom T&C PDF moderation ---------------------------------------
+  app.get("/api/ops/custom-terms/pending", async (req, res) => {
+    if (!requireOpsAuth(req, res)) return;
+    try {
+      const list = await storage.listPendingCustomTerms();
+      res.json({ terms: list });
+    } catch (error: any) {
+      res.status(500).json({ message: error?.message || "Failed to list pending terms" });
+    }
+  });
+
+  app.post("/api/ops/custom-terms/:groupId/review", async (req, res) => {
+    if (!requireOpsAuth(req, res)) return;
+    try {
+      const schema = z.object({
+        decision: z.enum(["approve", "reject"]),
+        note: z.string().max(2000).optional(),
+        actorId: z.string().optional(),
+      });
+      const { decision, note, actorId } = schema.parse(req.body || {});
+      if (decision === "reject" && (!note || !note.trim())) {
+        return res.status(400).json({ message: "A reason is required when rejecting" });
+      }
+      const g = await storage.reviewCustomTerms(req.params.groupId, decision, note ?? null, actorId || "ops");
+      res.json({ ok: true, group: g });
+    } catch (error: any) {
+      if (error?.issues) return res.status(400).json({ message: "Invalid payload", errors: error.issues });
+      res.status(400).json({ message: error?.message || "Failed to review terms" });
+    }
+  });
+
+  // ----- Referral payout: mark/unmark paid -------------------------------
+  app.post("/api/ops/referrals/:id/mark-paid", async (req, res) => {
+    if (!requireOpsAuth(req, res)) return;
+    try {
+      const actorId = (req.body && typeof req.body.actorId === "string") ? req.body.actorId : "ops";
+      const r = await storage.markReferralPaid(req.params.id, actorId);
+      res.json({ ok: true, referral: r });
+    } catch (error: any) {
+      res.status(400).json({ message: error?.message || "Failed to mark referral paid" });
+    }
+  });
+
+  app.post("/api/ops/referrals/:id/unmark-paid", async (req, res) => {
+    if (!requireOpsAuth(req, res)) return;
+    try {
+      const r = await storage.unmarkReferralPaid(req.params.id);
+      res.json({ ok: true, referral: r });
+    } catch (error: any) {
+      res.status(400).json({ message: error?.message || "Failed to unmark referral" });
+    }
+  });
+
+  // ----- Push notification debugger --------------------------------------
+  // Sends a test push to all of a target user's subscriptions and reports per-
+  // subscription results so ops can see whether their device is reachable.
+  app.post("/api/ops/push-test", async (req, res) => {
+    if (!requireOpsAuth(req, res)) return;
+    try {
+      const schema = z.object({
+        userId: z.string().min(1),
+        title: z.string().min(1).max(120).default("Kontrib test"),
+        body: z.string().min(1).max(500).default("This is a test push from Kontrib ops."),
+        url: z.string().optional(),
+      });
+      const payload = schema.parse(req.body || {});
+      const subs = await storage.getUserPushSubscriptions(payload.userId);
+      if (subs.length === 0) {
+        return res.json({ ok: false, sent: 0, results: [], message: "User has no active push subscriptions" });
+      }
+      const results = await Promise.all(subs.map(async (sub) => {
+        const ok = await sendPushToSubscription(sub, {
+          title: payload.title, body: payload.body, url: payload.url || "/",
+          tag: "ops-test",
+        });
+        if (!ok) await storage.deletePushSubscription(sub.endpoint).catch(() => {});
+        return {
+          endpoint: sub.endpoint.replace(/^(https?:\/\/[^/]+\/).*$/, "$1…"),
+          ok,
+        };
+      }));
+      const sent = results.filter(r => r.ok).length;
+      res.json({ ok: sent > 0, sent, total: subs.length, results });
+    } catch (error: any) {
+      if (error?.issues) return res.status(400).json({ message: "Invalid payload", errors: error.issues });
+      res.status(500).json({ message: error?.message || "Failed to send test push" });
+    }
+  });
+
+  // ----- Admin KYC: ops-password mirror so unified shell can use it -------
+  app.get("/api/ops/admin-kyc/pending", async (req, res) => {
+    if (!requireOpsAuth(req, res)) return;
+    try {
+      const pending = await storage.listPendingAdminKyc();
+      res.json({ pending });
+    } catch (error: any) {
+      res.status(500).json({ message: error?.message || "Failed to list pending KYC" });
+    }
+  });
+
+  app.post("/api/ops/admin-kyc/:userId/review", async (req, res) => {
+    if (!requireOpsAuth(req, res)) return;
+    try {
+      const { actorId, ...rest } = req.body || {};
+      const payload = reviewAdminKycSchema.parse(rest);
+      const view = await storage.reviewAdminKyc(req.params.userId, payload, actorId || "ops");
+      res.json(view);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ errors: error.errors });
+      res.status(500).json({ message: error?.message || "Failed to review KYC" });
+    }
+  });
+
   // Referral routes
   app.get("/api/referrals/me", async (req, res) => {
     try {

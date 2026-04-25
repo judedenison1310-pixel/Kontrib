@@ -3368,9 +3368,20 @@ DbStorage.prototype.setGroupTerms = async function (groupId, payload) {
   if (payload.tcMode === "custom") {
     setData.customTcUrl = payload.customTcUrl;
     setData.customTcIndemnityAcceptedAt = new Date();
+    // Phase 4 — every custom T&C upload enters the Kontrib ops review queue.
+    // Re-uploads after a rejection clear the previous review note so ops sees
+    // it as a fresh submission.
+    setData.customTcStatus = "pending";
+    setData.customTcReviewNote = null;
+    setData.customTcReviewedAt = null;
+    setData.customTcReviewedBy = null;
   } else {
     setData.customTcUrl = null;
     setData.customTcIndemnityAcceptedAt = null;
+    setData.customTcStatus = null;
+    setData.customTcReviewNote = null;
+    setData.customTcReviewedAt = null;
+    setData.customTcReviewedBy = null;
   }
   const [updated] = await db
     .update(groupsTable)
@@ -3455,3 +3466,363 @@ MemStorage.prototype.setGroupTerms = async function () { throw new Error("Group 
 MemStorage.prototype.setGroupLogo = async function () { throw new Error("Group logo requires database storage"); };
 MemStorage.prototype.getGroupTerms = async function () { return null; };
 MemStorage.prototype.recordMemberTcAcceptance = async function () { /* no-op */ };
+
+// ============================================================================
+// Phase 4 — Ops interface expansion
+// User & group lookup + suspend, custom-T&C moderation, referral payout,
+// push notification debugger.
+// ============================================================================
+
+import { ilike, or as drizzleOr, count as drizzleCount } from "drizzle-orm";
+
+export type OpsUserSearchHit = {
+  id: string;
+  fullName: string | null;
+  phoneNumber: string;
+  role: string;
+  adminKycStatus: string;
+  suspendedAt: Date | null;
+  createdAt: Date;
+};
+
+export type OpsUserDetail = {
+  user: User;
+  groupsAsAdmin: Array<{ id: string; name: string; groupType: string; suspendedAt: Date | null }>;
+  groupsAsMember: Array<{ id: string; name: string; groupType: string; joinedAt: Date | null }>;
+  contributionsCount: number;
+  totalContributed: string;
+  pushSubscriptionCount: number;
+};
+
+export type OpsGroupSearchHit = {
+  id: string;
+  name: string;
+  groupType: string;
+  status: string;
+  memberCount: number;
+  adminName: string | null;
+  adminPhone: string;
+  suspendedAt: Date | null;
+  createdAt: Date;
+};
+
+export type OpsGroupDetail = {
+  group: Group;
+  admin: { id: string; fullName: string | null; phoneNumber: string };
+  memberCount: number;
+  projectCount: number;
+  contributionsTotal: string;
+  contributionsCount: number;
+  recentMembers: Array<{ userId: string; fullName: string | null; phoneNumber: string; joinedAt: Date | null }>;
+};
+
+export type OpsCustomTermsEntry = {
+  groupId: string;
+  groupName: string;
+  groupType: string;
+  customTcUrl: string;
+  customTcStatus: string;
+  customTcReviewNote: string | null;
+  customTcReviewedAt: Date | null;
+  uploadedAt: Date;
+  admin: { id: string; fullName: string | null; phoneNumber: string };
+};
+
+export interface DbStorage {
+  searchUsers(q: string, limit?: number): Promise<OpsUserSearchHit[]>;
+  getUserDetail(userId: string): Promise<OpsUserDetail>;
+  suspendUser(userId: string, reason: string, byUserId: string): Promise<User>;
+  unsuspendUser(userId: string): Promise<User>;
+  searchGroups(q: string, limit?: number): Promise<OpsGroupSearchHit[]>;
+  getGroupDetail(groupId: string): Promise<OpsGroupDetail>;
+  suspendGroup(groupId: string, reason: string, byUserId: string): Promise<Group>;
+  unsuspendGroup(groupId: string): Promise<Group>;
+  listPendingCustomTerms(): Promise<OpsCustomTermsEntry[]>;
+  reviewCustomTerms(groupId: string, decision: "approve" | "reject", note: string | null, byUserId: string): Promise<Group>;
+  markReferralPaid(referralId: string, byUserId: string): Promise<Referral>;
+  unmarkReferralPaid(referralId: string): Promise<Referral>;
+}
+export interface MemStorage {
+  searchUsers(q: string, limit?: number): Promise<OpsUserSearchHit[]>;
+  getUserDetail(userId: string): Promise<OpsUserDetail>;
+  suspendUser(userId: string, reason: string, byUserId: string): Promise<User>;
+  unsuspendUser(userId: string): Promise<User>;
+  searchGroups(q: string, limit?: number): Promise<OpsGroupSearchHit[]>;
+  getGroupDetail(groupId: string): Promise<OpsGroupDetail>;
+  suspendGroup(groupId: string, reason: string, byUserId: string): Promise<Group>;
+  unsuspendGroup(groupId: string): Promise<Group>;
+  listPendingCustomTerms(): Promise<OpsCustomTermsEntry[]>;
+  reviewCustomTerms(groupId: string, decision: "approve" | "reject", note: string | null, byUserId: string): Promise<Group>;
+  markReferralPaid(referralId: string, byUserId: string): Promise<Referral>;
+  unmarkReferralPaid(referralId: string): Promise<Referral>;
+}
+
+DbStorage.prototype.searchUsers = async function (q, limit = 25) {
+  const term = (q || "").trim();
+  if (!term) {
+    const rows = await db
+      .select()
+      .from(usersTable)
+      .orderBy(desc(usersTable.createdAt))
+      .limit(limit);
+    return rows.map((u: any) => ({
+      id: u.id, fullName: u.fullName ?? null, phoneNumber: u.phoneNumber,
+      role: u.role, adminKycStatus: u.adminKycStatus ?? "none",
+      suspendedAt: u.suspendedAt ?? null, createdAt: u.createdAt,
+    }));
+  }
+  const like = `%${term.replace(/%/g, "\\%")}%`;
+  const rows = await db
+    .select()
+    .from(usersTable)
+    .where(drizzleOr(
+      ilike(usersTable.fullName, like),
+      ilike(usersTable.phoneNumber, like),
+      ilike(usersTable.id, like),
+      ilike((usersTable as any).referralCode, like),
+    ))
+    .orderBy(desc(usersTable.createdAt))
+    .limit(limit);
+  return rows.map((u: any) => ({
+    id: u.id, fullName: u.fullName ?? null, phoneNumber: u.phoneNumber,
+    role: u.role, adminKycStatus: u.adminKycStatus ?? "none",
+    suspendedAt: u.suspendedAt ?? null, createdAt: u.createdAt,
+  }));
+};
+
+DbStorage.prototype.getUserDetail = async function (userId) {
+  const [u] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  if (!u) throw new Error("User not found");
+  const adminGroups = await db
+    .select({ id: groupsTable.id, name: groupsTable.name, groupType: groupsTable.groupType, suspendedAt: (groupsTable as any).suspendedAt })
+    .from(groupsTable)
+    .where(eq(groupsTable.adminId, userId))
+    .orderBy(desc(groupsTable.createdAt));
+  const memberJoin = await db
+    .select({
+      id: groupsTable.id, name: groupsTable.name, groupType: groupsTable.groupType,
+      joinedAt: groupMembersTable.joinedAt,
+    })
+    .from(groupMembersTable)
+    .innerJoin(groupsTable, eq(groupMembersTable.groupId, groupsTable.id))
+    .where(eq(groupMembersTable.userId, userId))
+    .orderBy(desc(groupMembersTable.joinedAt));
+  const cAgg = await db
+    .select({
+      cnt: drizzleSql<number>`count(*)::int`,
+      total: drizzleSql<string>`coalesce(sum(${contributionsTable.amount}::numeric), 0)::text`,
+    })
+    .from(contributionsTable)
+    .where(eq(contributionsTable.userId, userId));
+  const subs = await db.select().from(pushSubscriptionsTable).where(eq(pushSubscriptionsTable.userId, userId));
+  return {
+    user: u as User,
+    groupsAsAdmin: adminGroups.map((g: any) => ({ id: g.id, name: g.name, groupType: g.groupType, suspendedAt: g.suspendedAt ?? null })),
+    groupsAsMember: memberJoin.map((g: any) => ({ id: g.id, name: g.name, groupType: g.groupType, joinedAt: g.joinedAt ?? null })),
+    contributionsCount: cAgg[0]?.cnt ?? 0,
+    totalContributed: cAgg[0]?.total ?? "0",
+    pushSubscriptionCount: subs.length,
+  };
+};
+
+DbStorage.prototype.suspendUser = async function (userId, reason, byUserId) {
+  const [u] = await db
+    .update(usersTable)
+    .set({ suspendedAt: new Date(), suspendedReason: reason, suspendedBy: byUserId } as any)
+    .where(eq(usersTable.id, userId))
+    .returning();
+  if (!u) throw new Error("User not found");
+  return u as User;
+};
+
+DbStorage.prototype.unsuspendUser = async function (userId) {
+  const [u] = await db
+    .update(usersTable)
+    .set({ suspendedAt: null, suspendedReason: null, suspendedBy: null } as any)
+    .where(eq(usersTable.id, userId))
+    .returning();
+  if (!u) throw new Error("User not found");
+  return u as User;
+};
+
+DbStorage.prototype.searchGroups = async function (q, limit = 25) {
+  const term = (q || "").trim();
+  const baseRows = term
+    ? await db
+        .select()
+        .from(groupsTable)
+        .where(drizzleOr(
+          ilike(groupsTable.name, `%${term.replace(/%/g, "\\%")}%`),
+          ilike(groupsTable.id, `%${term.replace(/%/g, "\\%")}%`),
+          ilike(groupsTable.registrationLink, `%${term.replace(/%/g, "\\%")}%`),
+          ilike(groupsTable.customSlug as any, `%${term.replace(/%/g, "\\%")}%`),
+        ))
+        .orderBy(desc(groupsTable.createdAt))
+        .limit(limit)
+    : await db.select().from(groupsTable).orderBy(desc(groupsTable.createdAt)).limit(limit);
+  if (baseRows.length === 0) return [];
+  const adminIds = Array.from(new Set(baseRows.map((g: any) => g.adminId)));
+  const admins = await db.select().from(usersTable).where(inArray(usersTable.id, adminIds));
+  const adminMap = new Map(admins.map((a: any) => [a.id, a]));
+  const groupIds = baseRows.map((g: any) => g.id);
+  const memberCounts = await db
+    .select({ groupId: groupMembersTable.groupId, cnt: drizzleSql<number>`count(*)::int` })
+    .from(groupMembersTable)
+    .where(inArray(groupMembersTable.groupId, groupIds))
+    .groupBy(groupMembersTable.groupId);
+  const countMap = new Map(memberCounts.map((m: any) => [m.groupId, m.cnt as number]));
+  return baseRows.map((g: any) => {
+    const a: any = adminMap.get(g.adminId);
+    return {
+      id: g.id, name: g.name, groupType: g.groupType, status: g.status,
+      memberCount: countMap.get(g.id) ?? 0,
+      adminName: a?.fullName ?? null, adminPhone: a?.phoneNumber ?? "",
+      suspendedAt: g.suspendedAt ?? null, createdAt: g.createdAt,
+    };
+  });
+};
+
+DbStorage.prototype.getGroupDetail = async function (groupId) {
+  const [g] = await db.select().from(groupsTable).where(eq(groupsTable.id, groupId)).limit(1);
+  if (!g) throw new Error("Group not found");
+  const [admin] = await db.select().from(usersTable).where(eq(usersTable.id, (g as any).adminId)).limit(1);
+  const memberRows = await db
+    .select({
+      userId: groupMembersTable.userId, joinedAt: groupMembersTable.joinedAt,
+      fullName: usersTable.fullName, phoneNumber: usersTable.phoneNumber,
+    })
+    .from(groupMembersTable)
+    .innerJoin(usersTable, eq(groupMembersTable.userId, usersTable.id))
+    .where(eq(groupMembersTable.groupId, groupId))
+    .orderBy(desc(groupMembersTable.joinedAt))
+    .limit(20);
+  const [memberCnt] = await db
+    .select({ cnt: drizzleSql<number>`count(*)::int` })
+    .from(groupMembersTable)
+    .where(eq(groupMembersTable.groupId, groupId));
+  const [projCnt] = await db
+    .select({ cnt: drizzleSql<number>`count(*)::int` })
+    .from(projectsTable)
+    .where(eq(projectsTable.groupId, groupId));
+  const [contrib] = await db
+    .select({
+      cnt: drizzleSql<number>`count(*)::int`,
+      total: drizzleSql<string>`coalesce(sum(${contributionsTable.amount}::numeric), 0)::text`,
+    })
+    .from(contributionsTable)
+    .where(eq(contributionsTable.groupId, groupId));
+  return {
+    group: g as Group,
+    admin: { id: admin?.id ?? "", fullName: admin?.fullName ?? null, phoneNumber: admin?.phoneNumber ?? "" },
+    memberCount: memberCnt?.cnt ?? 0,
+    projectCount: projCnt?.cnt ?? 0,
+    contributionsTotal: contrib?.total ?? "0",
+    contributionsCount: contrib?.cnt ?? 0,
+    recentMembers: memberRows.map((m: any) => ({
+      userId: m.userId, fullName: m.fullName ?? null, phoneNumber: m.phoneNumber, joinedAt: m.joinedAt ?? null,
+    })),
+  };
+};
+
+DbStorage.prototype.suspendGroup = async function (groupId, reason, byUserId) {
+  const [g] = await db
+    .update(groupsTable)
+    .set({ suspendedAt: new Date(), suspendedReason: reason, suspendedBy: byUserId } as any)
+    .where(eq(groupsTable.id, groupId))
+    .returning();
+  if (!g) throw new Error("Group not found");
+  return g as Group;
+};
+
+DbStorage.prototype.unsuspendGroup = async function (groupId) {
+  const [g] = await db
+    .update(groupsTable)
+    .set({ suspendedAt: null, suspendedReason: null, suspendedBy: null } as any)
+    .where(eq(groupsTable.id, groupId))
+    .returning();
+  if (!g) throw new Error("Group not found");
+  return g as Group;
+};
+
+DbStorage.prototype.listPendingCustomTerms = async function () {
+  const rows = await db
+    .select({
+      groupId: groupsTable.id,
+      groupName: groupsTable.name,
+      groupType: groupsTable.groupType,
+      customTcUrl: groupsTable.customTcUrl,
+      customTcStatus: (groupsTable as any).customTcStatus,
+      customTcReviewNote: (groupsTable as any).customTcReviewNote,
+      customTcReviewedAt: (groupsTable as any).customTcReviewedAt,
+      uploadedAt: (groupsTable as any).customTcIndemnityAcceptedAt,
+      adminId: groupsTable.adminId,
+      adminName: usersTable.fullName,
+      adminPhone: usersTable.phoneNumber,
+    })
+    .from(groupsTable)
+    .innerJoin(usersTable, eq(groupsTable.adminId, usersTable.id))
+    .where(and(
+      eq((groupsTable as any).tcMode, "custom"),
+      eq((groupsTable as any).customTcStatus, "pending"),
+    ))
+    .orderBy(desc((groupsTable as any).customTcIndemnityAcceptedAt));
+  return rows.map((r: any) => ({
+    groupId: r.groupId, groupName: r.groupName, groupType: r.groupType,
+    customTcUrl: r.customTcUrl, customTcStatus: r.customTcStatus,
+    customTcReviewNote: r.customTcReviewNote, customTcReviewedAt: r.customTcReviewedAt,
+    uploadedAt: r.uploadedAt ?? new Date(0),
+    admin: { id: r.adminId, fullName: r.adminName ?? null, phoneNumber: r.adminPhone },
+  }));
+};
+
+DbStorage.prototype.reviewCustomTerms = async function (groupId, decision, note, byUserId) {
+  const newStatus = decision === "approve" ? "approved" : "rejected";
+  const [g] = await db
+    .update(groupsTable)
+    .set({
+      customTcStatus: newStatus,
+      customTcReviewNote: note,
+      customTcReviewedAt: new Date(),
+      customTcReviewedBy: byUserId,
+    } as any)
+    .where(eq(groupsTable.id, groupId))
+    .returning();
+  if (!g) throw new Error("Group not found");
+  return g as Group;
+};
+
+DbStorage.prototype.markReferralPaid = async function (referralId, byUserId) {
+  const [existing] = await db.select().from(referralsTable).where(eq(referralsTable.id, referralId)).limit(1);
+  if (!existing) throw new Error("Referral not found");
+  if ((existing as any).status !== "complete") throw new Error("Referral is not complete yet");
+  const [r] = await db
+    .update(referralsTable)
+    .set({ paidAt: new Date(), paidBy: byUserId } as any)
+    .where(eq(referralsTable.id, referralId))
+    .returning();
+  return r as Referral;
+};
+
+DbStorage.prototype.unmarkReferralPaid = async function (referralId) {
+  const [r] = await db
+    .update(referralsTable)
+    .set({ paidAt: null, paidBy: null } as any)
+    .where(eq(referralsTable.id, referralId))
+    .returning();
+  if (!r) throw new Error("Referral not found");
+  return r as Referral;
+};
+
+// MemStorage stubs — Phase 4 ops methods only run against the database.
+MemStorage.prototype.searchUsers = async function () { return []; };
+MemStorage.prototype.getUserDetail = async function () { throw new Error("Ops requires database storage"); };
+MemStorage.prototype.suspendUser = async function () { throw new Error("Ops requires database storage"); };
+MemStorage.prototype.unsuspendUser = async function () { throw new Error("Ops requires database storage"); };
+MemStorage.prototype.searchGroups = async function () { return []; };
+MemStorage.prototype.getGroupDetail = async function () { throw new Error("Ops requires database storage"); };
+MemStorage.prototype.suspendGroup = async function () { throw new Error("Ops requires database storage"); };
+MemStorage.prototype.unsuspendGroup = async function () { throw new Error("Ops requires database storage"); };
+MemStorage.prototype.listPendingCustomTerms = async function () { return []; };
+MemStorage.prototype.reviewCustomTerms = async function () { throw new Error("Ops requires database storage"); };
+MemStorage.prototype.markReferralPaid = async function () { throw new Error("Ops requires database storage"); };
+MemStorage.prototype.unmarkReferralPaid = async function () { throw new Error("Ops requires database storage"); };

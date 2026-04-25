@@ -1,13 +1,20 @@
+// Phase 4 — Unified Kontrib Ops shell.
+// Single password-gated dashboard that surfaces every internal operations
+// function: stats overview, admin KYC review, custom T&C moderation, Verified
+// Ajo decisions, user / group lookup + suspend, payments view, referral
+// payouts, and a push notification debugger.
+
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { getCurrentUser } from "@/lib/auth";
 import {
-  Users,
+  Users as UsersIcon,
   Gift,
   CreditCard,
   CheckCircle2,
@@ -22,19 +29,24 @@ import {
   MapPin,
   X,
   HelpCircle,
+  BarChart3,
+  FileText,
+  Folder,
+  Bell,
+  Wallet,
 } from "lucide-react";
 import kontribLogo from "@assets/8_1764455185903.png";
-
-const OPS_PASS_KEY = "kontrib_ops_pass";
+import { OPS_PASS_KEY, opsFetch, formatDateTime, formatNgn, StatusPill } from "@/components/ops/ops-shared";
+import { UsersPanel } from "@/components/ops/users-panel";
+import { GroupsPanel } from "@/components/ops/groups-panel";
+import { CustomTermsPanel } from "@/components/ops/custom-terms-panel";
+import { KycPanel } from "@/components/ops/kyc-panel";
+import { PushTestPanel } from "@/components/ops/push-test-panel";
 
 function formatCurrency(n: number) {
-  return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", minimumFractionDigits: 0 }).format(n);
+  return formatNgn(n);
 }
-
-function fmtDate(d: string | null) {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-}
+const fmtDate = formatDateTime;
 
 type OpsVerificationData = {
   applications: Array<{
@@ -70,6 +82,8 @@ type OpsData = {
     rewardAmount: string;
     createdAt: string;
     completedAt: string | null;
+    paidAt?: string | null;
+    paidBy?: string | null;
     referrer: { fullName: string | null; phoneNumber: string };
     referee: { fullName: string | null; phoneNumber: string };
   }>;
@@ -101,6 +115,7 @@ function daysSince(d: string) {
   return Math.max(0, Math.floor((now - then) / (1000 * 60 * 60 * 24)));
 }
 
+// ----- Verifications panel (Verified Ajo) — unchanged from earlier rounds.
 function VerificationsPanel({
   password, data, isLoading, onChanged,
 }: {
@@ -321,15 +336,143 @@ function VerificationsPanel({
   );
 }
 
+// ----- Referrals panel: extends existing list with mark-as-paid action -----
+function ReferralsPanel({ data, actorId }: { data: OpsData; actorId: string }) {
+  const { toast } = useToast();
+  const [filter, setFilter] = useState<"all" | "complete" | "pending" | "unpaid">("unpaid");
+
+  const markPaid = useMutation({
+    mutationFn: async (id: string) => opsFetch("POST", `/api/ops/referrals/${id}/mark-paid`, { actorId }),
+    onSuccess: () => {
+      toast({ title: "Marked as paid" });
+      queryClient.invalidateQueries({ queryKey: ["/api/ops/overview"] });
+    },
+    onError: (err: any) => toast({ title: "Failed", description: err?.message, variant: "destructive" }),
+  });
+  const unmarkPaid = useMutation({
+    mutationFn: async (id: string) => opsFetch("POST", `/api/ops/referrals/${id}/unmark-paid`),
+    onSuccess: () => {
+      toast({ title: "Payment record removed" });
+      queryClient.invalidateQueries({ queryKey: ["/api/ops/overview"] });
+    },
+    onError: (err: any) => toast({ title: "Failed", description: err?.message, variant: "destructive" }),
+  });
+
+  const referrals = data.referrals || [];
+  const filtered = referrals.filter(r => {
+    if (filter === "all") return true;
+    if (filter === "unpaid") return r.status === "complete" && !r.paidAt;
+    if (filter === "complete") return r.status === "complete";
+    return r.status === filter;
+  });
+  const counts = {
+    all: referrals.length,
+    complete: referrals.filter(r => r.status === "complete").length,
+    pending: referrals.filter(r => r.status === "pending").length,
+    unpaid: referrals.filter(r => r.status === "complete" && !r.paidAt).length,
+  };
+  const owed = counts.unpaid * 20000;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-2 flex-wrap">
+        {(["unpaid", "complete", "pending", "all"] as const).map(f => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`text-xs px-3 py-1 rounded-full capitalize transition-colors ${filter === f ? "bg-primary text-white" : "bg-gray-800 text-gray-400 hover:text-white"}`}
+            data-testid={`filter-ref-${f}`}
+          >
+            {f === "unpaid" ? "Owed" : f} ({counts[f]})
+          </button>
+        ))}
+      </div>
+
+      {counts.unpaid > 0 && (
+        <div className="bg-amber-500/10 border border-amber-700/40 rounded-lg px-3 py-2 text-sm text-amber-200">
+          {counts.unpaid} reward{counts.unpaid === 1 ? "" : "s"} to pay out · {formatCurrency(owed)}
+        </div>
+      )}
+
+      {filtered.length === 0 ? (
+        <div className="text-center py-10 text-gray-500">No referrals match this filter</div>
+      ) : filtered.map(r => (
+        <Card key={r.id} className="bg-gray-900 border-gray-800">
+          <CardContent className="p-4 flex items-center gap-4 flex-wrap">
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-1.5 text-sm">
+                <span className="font-medium text-white">{r.referrer.fullName || r.referrer.phoneNumber}</span>
+                <span className="text-gray-500 text-xs">referred</span>
+                <span className="font-medium text-white">{r.referee.fullName || r.referee.phoneNumber}</span>
+              </div>
+              <p className="text-gray-500 text-xs mt-0.5">
+                {fmtDate(r.createdAt)}
+                {r.completedAt && ` · Completed ${fmtDate(r.completedAt)}`}
+                {r.paidAt && ` · Paid ${fmtDate(r.paidAt)}`}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {r.status === "complete" ? (
+                r.paidAt ? (
+                  <>
+                    <Badge className="bg-blue-500/20 text-blue-300 border-0 text-xs"><CheckCircle2 className="h-3 w-3 mr-1" />Paid</Badge>
+                    <button
+                      onClick={() => unmarkPaid.mutate(r.id)}
+                      disabled={unmarkPaid.isPending}
+                      className="text-[10px] text-gray-500 hover:text-gray-300 underline"
+                      data-testid={`button-ref-unpay-${r.id}`}
+                    >undo</button>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-green-400 text-xs font-bold">{formatCurrency(parseFloat(r.rewardAmount))}</span>
+                    <button
+                      onClick={() => markPaid.mutate(r.id)}
+                      disabled={markPaid.isPending}
+                      className="bg-primary hover:bg-primary/90 text-white text-xs font-medium px-3 py-1.5 rounded-md flex items-center gap-1"
+                      data-testid={`button-ref-pay-${r.id}`}
+                    >
+                      <Wallet className="h-3 w-3" /> Mark as paid
+                    </button>
+                  </>
+                )
+              ) : (
+                <Badge className="bg-amber-500/20 text-amber-300 border-0 text-xs"><Clock className="h-3 w-3 mr-1" />Pending</Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// ----- Section nav config -----------------------------------------------
+type SectionKey = "overview" | "kyc" | "tc" | "verifications" | "users" | "groups" | "payments" | "referrals" | "push";
+
+const SECTIONS: Array<{ key: SectionKey; label: string; icon: any }> = [
+  { key: "overview", label: "Overview", icon: BarChart3 },
+  { key: "kyc", label: "Admin KYC", icon: ShieldCheck },
+  { key: "tc", label: "Custom T&C", icon: FileText },
+  { key: "verifications", label: "Verified Ajo", icon: CheckCircle2 },
+  { key: "users", label: "Users", icon: UsersIcon },
+  { key: "groups", label: "Groups", icon: Folder },
+  { key: "payments", label: "Payments", icon: CreditCard },
+  { key: "referrals", label: "Referrals", icon: Gift },
+  { key: "push", label: "Push test", icon: Bell },
+];
+
 export default function Ops() {
+  const currentUser = getCurrentUser();
+  const actorId = currentUser?.id || "ops";
+
   const [password, setPassword] = useState(() => sessionStorage.getItem(OPS_PASS_KEY) || "");
   const [inputPassword, setInputPassword] = useState("");
   const [nonce, setNonce] = useState(0);
   const [authError, setAuthError] = useState(false);
-  const [activeTab, setActiveTab] = useState<"referrals" | "payments" | "verifications">("payments");
-  const [refFilter, setRefFilter] = useState<"all" | "complete" | "pending">("all");
+  const [section, setSection] = useState<SectionKey>("overview");
 
-  const { data, isLoading, isError, error, refetch } = useQuery<OpsData>({
+  const { data, isLoading, isError, refetch } = useQuery<OpsData>({
     queryKey: ["/api/ops/overview", password, nonce],
     queryFn: async () => {
       const res = await fetch(`/api/ops/overview?password=${encodeURIComponent(password)}`);
@@ -354,7 +497,19 @@ export default function Ops() {
     retry: false,
   });
 
-  // When any query error occurs, clear stored session and reset to lock screen
+  // Lightweight queue size queries (cheap; refresh whenever the shell mounts).
+  const kycQueue = useQuery<{ pending: any[] }>({
+    queryKey: ["/api/ops/admin-kyc/pending", "shellbadge"],
+    queryFn: () => opsFetch("GET", "/api/ops/admin-kyc/pending"),
+    enabled: !!password,
+  });
+  const tcQueue = useQuery<{ terms: any[] }>({
+    queryKey: ["/api/ops/custom-terms/pending", "shellbadge"],
+    queryFn: () => opsFetch("GET", "/api/ops/custom-terms/pending"),
+    enabled: !!password,
+  });
+
+  // Auth failures bounce back to the lock screen.
   useEffect(() => {
     if (isError) {
       sessionStorage.removeItem(OPS_PASS_KEY);
@@ -379,11 +534,7 @@ export default function Ops() {
     setAuthError(false);
   };
 
-  const filteredReferrals = (data?.referrals || []).filter(r =>
-    refFilter === "all" ? true : r.status === refFilter
-  );
-
-  // Lock screen
+  // ---- Lock screen ------------------------------------------------------
   if (!password) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
@@ -428,28 +579,41 @@ export default function Ops() {
     );
   }
 
+  // ---- Shell layout -----------------------------------------------------
+  const queueBadges: Partial<Record<SectionKey, number>> = {
+    kyc: kycQueue.data?.pending?.length ?? 0,
+    tc: tcQueue.data?.terms?.length ?? 0,
+    verifications: (verifications.data?.applications || []).filter(
+      a => a.status === "submitted" || a.status === "under_review" || a.status === "info_requested"
+    ).length,
+    payments: data?.stats?.pendingProofs ?? 0,
+    referrals: (data?.referrals || []).filter(r => r.status === "complete" && !(r as any).paidAt).length,
+  };
+
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       {/* Header */}
-      <div className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center justify-between">
+      <div className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center justify-between sticky top-0 z-20">
         <div className="flex items-center gap-2">
           <img src={kontribLogo} alt="Kontrib" className="w-8 h-8" />
           <div>
             <p className="font-bold text-sm">Kontrib Ops</p>
-            <p className="text-gray-400 text-xs">Live dashboard</p>
+            <p className="text-gray-400 text-xs">{currentUser?.fullName ? `Acting as ${currentUser.fullName}` : "Live dashboard"}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => refetch()}
+            onClick={() => { refetch(); verifications.refetch(); kycQueue.refetch(); tcQueue.refetch(); }}
             className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400"
             title="Refresh"
+            data-testid="button-ops-refresh"
           >
             <RefreshCw className="h-4 w-4" />
           </button>
           <button
             onClick={handleLock}
             className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white border border-gray-700 rounded-lg px-3 py-1.5"
+            data-testid="button-ops-lock"
           >
             <Lock className="h-3.5 w-3.5" />
             Lock
@@ -457,170 +621,147 @@ export default function Ops() {
         </div>
       </div>
 
+      {/* Section nav (horizontal pill bar that scrolls on small screens) */}
+      <div className="bg-gray-900/60 border-b border-gray-800 px-4 py-2 sticky top-[57px] z-10 overflow-x-auto">
+        <div className="flex gap-1.5 min-w-max">
+          {SECTIONS.map(s => {
+            const Icon = s.icon;
+            const badge = queueBadges[s.key];
+            const active = section === s.key;
+            return (
+              <button
+                key={s.key}
+                onClick={() => setSection(s.key)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+                  active ? "bg-primary text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"
+                }`}
+                data-testid={`nav-ops-${s.key}`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {s.label}
+                {badge !== undefined && badge > 0 && (
+                  <span className={`ml-0.5 text-[10px] font-bold rounded-full px-1.5 ${active ? "bg-white/20" : "bg-amber-500/20 text-amber-300"}`}>
+                    {badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
-        {isLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[1,2,3,4].map(i => <div key={i} className="h-20 bg-gray-800 rounded-xl animate-pulse" />)}
-          </div>
-        ) : data && (
+        {section === "overview" && (
           <>
-            {/* Stats row */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[
-                { label: "Total Users", value: data.stats.totalUsers, icon: Users, color: "text-blue-400" },
-                { label: "Rewards Owed", value: formatCurrency(data.stats.totalRewardsOwed), icon: Banknote, color: "text-green-400" },
-                { label: "Pending Proofs", value: data.stats.pendingProofs, icon: CreditCard, color: "text-amber-400" },
-                { label: "Completed Referrals", value: data.stats.completedReferrals, icon: Gift, color: "text-purple-400" },
-              ].map(({ label, value, icon: Icon, color }) => (
-                <Card key={label} className="bg-gray-900 border-gray-800">
-                  <CardContent className="p-4">
-                    <Icon className={`h-5 w-5 ${color} mb-2`} />
-                    <p className="text-xl font-bold">{value}</p>
-                    <p className="text-gray-400 text-xs mt-0.5">{label}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {/* Tabs */}
-            <div className="flex gap-2 border-b border-gray-800 pb-0 overflow-x-auto">
-              {(["payments", "referrals", "verifications"] as const).map(tab => {
-                const pendingVerifs = (verifications.data?.applications || []).filter(
-                  a => a.status === "submitted" || a.status === "under_review" || a.status === "info_requested"
-                ).length;
-                const label =
-                  tab === "payments" ? `Payments (${data.stats.totalPaymentProofs})`
-                  : tab === "referrals" ? `Referrals (${data.stats.totalReferrals})`
-                  : `Verifications (${pendingVerifs})`;
-                return (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                      activeTab === tab
-                        ? "border-primary text-primary"
-                        : "border-transparent text-gray-400 hover:text-white"
-                    }`}
-                    data-testid={`tab-${tab}`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {activeTab === "verifications" && (
-              <VerificationsPanel
-                password={password}
-                data={verifications.data}
-                isLoading={verifications.isLoading}
-                onChanged={() => verifications.refetch()}
-              />
-            )}
-
-            {/* Payment Proofs tab */}
-            {activeTab === "payments" && (
-              <div className="space-y-2">
-                {data.contributions.length === 0 ? (
-                  <div className="text-center py-10 text-gray-500">No payment proofs yet</div>
-                ) : data.contributions.map(c => (
-                  <Card key={c.id} className="bg-gray-900 border-gray-800">
-                    <CardContent className="p-4 flex items-center gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-medium text-sm">{c.userName}</p>
-                          <span className="text-gray-500 text-xs">·</span>
-                          <p className="text-gray-400 text-xs truncate">{c.groupName}</p>
-                        </div>
-                        <p className="text-gray-500 text-xs mt-0.5">{fmtDate(c.createdAt)} · {c.paymentType.replace(/_/g, " ")}</p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="font-bold text-sm">₦{parseFloat(c.amount).toLocaleString()}</p>
-                        {c.status === "pending" ? (
-                          <Badge className="bg-amber-500/20 text-amber-300 border-0 text-xs mt-1">
-                            <Clock className="h-3 w-3 mr-1" />Pending
-                          </Badge>
-                        ) : c.status === "confirmed" ? (
-                          <Badge className="bg-green-500/20 text-green-300 border-0 text-xs mt-1">
-                            <CheckCircle2 className="h-3 w-3 mr-1" />Confirmed
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-red-500/20 text-red-300 border-0 text-xs mt-1">
-                            <AlertCircle className="h-3 w-3 mr-1" />{c.status}
-                          </Badge>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+            {isLoading ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[1,2,3,4].map(i => <div key={i} className="h-20 bg-gray-800 rounded-xl animate-pulse" />)}
               </div>
-            )}
-
-            {/* Referrals tab */}
-            {activeTab === "referrals" && (
-              <div className="space-y-3">
-                {/* Filter pills */}
-                <div className="flex gap-2">
-                  {(["all", "complete", "pending"] as const).map(f => (
-                    <button
-                      key={f}
-                      onClick={() => setRefFilter(f)}
-                      className={`text-xs px-3 py-1 rounded-full capitalize transition-colors ${
-                        refFilter === f
-                          ? "bg-primary text-white"
-                          : "bg-gray-800 text-gray-400 hover:text-white"
-                      }`}
-                    >
-                      {f} {f === "all" ? `(${data.stats.totalReferrals})` : f === "complete" ? `(${data.stats.completedReferrals})` : `(${data.stats.pendingReferrals})`}
-                    </button>
+            ) : data && (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { label: "Total Users", value: data.stats.totalUsers, icon: UsersIcon, color: "text-blue-400" },
+                    { label: "Rewards Owed", value: formatCurrency(data.stats.totalRewardsOwed), icon: Banknote, color: "text-green-400" },
+                    { label: "Pending Proofs", value: data.stats.pendingProofs, icon: CreditCard, color: "text-amber-400" },
+                    { label: "Completed Referrals", value: data.stats.completedReferrals, icon: Gift, color: "text-purple-400" },
+                  ].map(({ label, value, icon: Icon, color }) => (
+                    <Card key={label} className="bg-gray-900 border-gray-800">
+                      <CardContent className="p-4">
+                        <Icon className={`h-5 w-5 ${color} mb-2`} />
+                        <p className="text-xl font-bold">{value}</p>
+                        <p className="text-gray-400 text-xs mt-0.5">{label}</p>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
 
-                {filteredReferrals.length === 0 ? (
-                  <div className="text-center py-10 text-gray-500">No referrals</div>
-                ) : filteredReferrals.map(r => (
-                  <Card key={r.id} className="bg-gray-900 border-gray-800">
-                    <CardContent className="p-4 flex items-center gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-1.5 text-sm">
-                          <span className="font-medium">{r.referrer.fullName || r.referrer.phoneNumber}</span>
-                          <span className="text-gray-500 text-xs">referred</span>
-                          <span className="font-medium">{r.referee.fullName || r.referee.phoneNumber}</span>
-                        </div>
-                        <p className="text-gray-500 text-xs mt-0.5">
-                          {fmtDate(r.createdAt)}
-                          {r.completedAt && ` · Completed ${fmtDate(r.completedAt)}`}
-                        </p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        {r.status === "complete" ? (
-                          <>
-                            <Badge className="bg-green-500/20 text-green-300 border-0 text-xs">
-                              <CheckCircle2 className="h-3 w-3 mr-1" />Complete
-                            </Badge>
-                            <p className="text-green-400 text-xs font-bold mt-1">+{formatCurrency(parseFloat(r.rewardAmount))}</p>
-                          </>
-                        ) : (
-                          <Badge className="bg-amber-500/20 text-amber-300 border-0 text-xs">
-                            <Clock className="h-3 w-3 mr-1" />Pending
-                          </Badge>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-
-                {data.stats.completedReferrals > 0 && (
-                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-center justify-between">
-                    <span className="text-gray-400 text-sm">Total rewards owed</span>
-                    <span className="text-green-400 font-bold">{formatCurrency(data.stats.totalRewardsOwed)}</span>
-                  </div>
-                )}
-              </div>
+                <Card className="bg-gray-900 border-gray-800">
+                  <CardContent className="p-4 space-y-3">
+                    <p className="text-sm font-semibold text-white">Operations queues</p>
+                    <ul className="space-y-1.5 text-sm">
+                      <QueueLink label="Admin KYC waiting" count={queueBadges.kyc ?? 0} onClick={() => setSection("kyc")} />
+                      <QueueLink label="Custom T&C PDFs to moderate" count={queueBadges.tc ?? 0} onClick={() => setSection("tc")} />
+                      <QueueLink label="Verified-Ajo applications" count={queueBadges.verifications ?? 0} onClick={() => setSection("verifications")} />
+                      <QueueLink label="Pending payment proofs" count={queueBadges.payments ?? 0} onClick={() => setSection("payments")} />
+                      <QueueLink label="Referral rewards owed" count={queueBadges.referrals ?? 0} onClick={() => setSection("referrals")} />
+                    </ul>
+                  </CardContent>
+                </Card>
+              </>
             )}
           </>
         )}
+
+        {section === "kyc" && <KycPanel actorId={actorId} />}
+        {section === "tc" && <CustomTermsPanel actorId={actorId} />}
+        {section === "verifications" && (
+          <VerificationsPanel
+            password={password}
+            data={verifications.data}
+            isLoading={verifications.isLoading}
+            onChanged={() => verifications.refetch()}
+          />
+        )}
+        {section === "users" && <UsersPanel actorId={actorId} />}
+        {section === "groups" && <GroupsPanel actorId={actorId} />}
+
+        {section === "payments" && data && (
+          <div className="space-y-2">
+            {data.contributions.length === 0 ? (
+              <div className="text-center py-10 text-gray-500">No payment proofs yet</div>
+            ) : data.contributions.map(c => (
+              <Card key={c.id} className="bg-gray-900 border-gray-800">
+                <CardContent className="p-4 flex items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium text-sm">{c.userName}</p>
+                      <span className="text-gray-500 text-xs">·</span>
+                      <p className="text-gray-400 text-xs truncate">{c.groupName}</p>
+                    </div>
+                    <p className="text-gray-500 text-xs mt-0.5">{fmtDate(c.createdAt)} · {c.paymentType.replace(/_/g, " ")}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="font-bold text-sm">₦{parseFloat(c.amount).toLocaleString()}</p>
+                    {c.status === "pending" ? (
+                      <Badge className="bg-amber-500/20 text-amber-300 border-0 text-xs mt-1">
+                        <Clock className="h-3 w-3 mr-1" />Pending
+                      </Badge>
+                    ) : c.status === "confirmed" ? (
+                      <Badge className="bg-green-500/20 text-green-300 border-0 text-xs mt-1">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />Confirmed
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-red-500/20 text-red-300 border-0 text-xs mt-1">
+                        <AlertCircle className="h-3 w-3 mr-1" />{c.status}
+                      </Badge>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {section === "referrals" && data && <ReferralsPanel data={data} actorId={actorId} />}
+        {section === "push" && <PushTestPanel />}
       </div>
     </div>
+  );
+}
+
+function QueueLink({ label, count, onClick }: { label: string; count: number; onClick: () => void }) {
+  return (
+    <li>
+      <button
+        onClick={onClick}
+        className="w-full flex items-center justify-between bg-gray-950 hover:bg-gray-800 rounded-md px-3 py-2 transition-colors"
+      >
+        <span className="text-gray-300">{label}</span>
+        <span className={`text-xs font-bold rounded-full px-2 py-0.5 ${count > 0 ? "bg-amber-500/20 text-amber-300" : "bg-gray-800 text-gray-500"}`}>
+          {count}
+        </span>
+      </button>
+    </li>
   );
 }

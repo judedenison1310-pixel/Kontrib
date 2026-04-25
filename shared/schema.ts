@@ -33,6 +33,11 @@ export const users = pgTable("users", {
   adminKycSubmittedAt: timestamp("admin_kyc_submitted_at"),
   adminKycReviewedAt: timestamp("admin_kyc_reviewed_at"),
   adminKycReviewerNotes: text("admin_kyc_reviewer_notes"),
+  // Phase 4 — ops suspension. When set, the user cannot log in (OTP verify
+  // returns suspended), and admin actions on their groups are blocked.
+  suspendedAt: timestamp("suspended_at"),
+  suspendedReason: text("suspended_reason"),
+  suspendedBy: varchar("suspended_by"), // userId of the ops actor
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
@@ -72,6 +77,18 @@ export const groups = pgTable("groups", {
   tcMode: text("tc_mode"), // "kontrib" | "custom" | null
   customTcUrl: text("custom_tc_url"), // PDF URL when tcMode='custom'
   customTcIndemnityAcceptedAt: timestamp("custom_tc_indemnity_accepted_at"), // When admin accepted Kontrib's indemnity statement for custom T&C
+  // Phase 4 — Kontrib ops moderates admin-uploaded custom T&C PDFs.
+  // Set to 'pending' on upload, then 'approved' or 'rejected' by ops.
+  // Rejected groups surface a banner asking the admin to upload a new PDF.
+  customTcStatus: text("custom_tc_status"), // null | 'pending' | 'approved' | 'rejected'
+  customTcReviewNote: text("custom_tc_review_note"),
+  customTcReviewedAt: timestamp("custom_tc_reviewed_at"),
+  customTcReviewedBy: varchar("custom_tc_reviewed_by"),
+  // Phase 4 — ops suspension (mirrors users.suspendedAt). Suspended groups
+  // cannot accept new joins and surface a banner to existing members.
+  suspendedAt: timestamp("suspended_at"),
+  suspendedReason: text("suspended_reason"),
+  suspendedBy: varchar("suspended_by"),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
@@ -303,9 +320,13 @@ export const referrals = pgTable("referrals", {
   triggerGroupId: varchar("trigger_group_id").references(() => groups.id),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   completedAt: timestamp("completed_at"),
+  // Phase 4 — ops-recorded payout. paidAt set when ops marks the reward sent;
+  // paidBy is the ops actor's userId (or 'ops' if no actor identity).
+  paidAt: timestamp("paid_at"),
+  paidBy: varchar("paid_by"),
 });
 
-export const insertReferralSchema = createInsertSchema(referrals).omit({ id: true, createdAt: true, completedAt: true });
+export const insertReferralSchema = createInsertSchema(referrals).omit({ id: true, createdAt: true, completedAt: true, paidAt: true, paidBy: true });
 export type InsertReferral = z.infer<typeof insertReferralSchema>;
 export type Referral = typeof referrals.$inferSelect;
 
