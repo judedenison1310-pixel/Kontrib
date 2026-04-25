@@ -60,9 +60,14 @@ export function AssociationSetupModal({ open, onOpenChange, groupId, groupName, 
   const setupMutation = useMutation({
     mutationFn: async () => {
       // Save logo first (if changed) so the dues setup completes with the
-      // updated branding visible everywhere.
+      // updated branding visible everywhere. The /logo endpoint requires
+      // actorId in the body to verify admin permission — without it the
+      // request is rejected with "Only the group admin can set the logo".
       if (logoUrl && logoUrl !== (group?.logoUrl ?? null)) {
-        await apiRequest("POST", `/api/groups/${groupId}/logo`, { logoUrl });
+        await apiRequest("POST", `/api/groups/${groupId}/logo`, {
+          actorId: actor?.id,
+          logoUrl,
+        });
       }
       const payload = {
         actorId: actor?.id,
