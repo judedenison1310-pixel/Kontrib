@@ -584,7 +584,11 @@ export default function GroupProjects() {
           chain can be driven from the onboarding effect above, not just from
           inside the cycle setup sheet. */}
       {isAjoGroup && isAdmin && (
-        <AdminKycModal open={kycModalOpen} onOpenChange={handleKycModalChange} />
+        <AdminKycModal
+          open={kycModalOpen}
+          onOpenChange={handleKycModalChange}
+          mandatory={chainKycTo !== null}
+        />
       )}
 
       {/* Delete Group Confirmation */}

@@ -4,7 +4,7 @@ import { Sheet, SheetContent, SheetHeader } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ShieldCheck, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Clock, CheckCircle2, XCircle, Lock } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentUser } from "@/lib/auth";
@@ -14,9 +14,16 @@ import type { AdminKycView } from "@shared/schema";
 interface AdminKycModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * When true, the sheet cannot be dismissed (no back arrow, outside-click,
+   * or Escape) until the admin has actually submitted KYC. Used during the
+   * create-group → KYC → setup chain so admin verification is mandatory for
+   * every new group.
+   */
+  mandatory?: boolean;
 }
 
-export function AdminKycModal({ open, onOpenChange }: AdminKycModalProps) {
+export function AdminKycModal({ open, onOpenChange, mandatory = false }: AdminKycModalProps) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const actor = getCurrentUser();
@@ -81,20 +88,72 @@ export function AdminKycModal({ open, onOpenChange }: AdminKycModalProps) {
     !!kycSelfieUrl &&
     !submitMutation.isPending;
 
+  // KYC counts as "completed for this group" once it has actually been
+  // submitted (pending review) or fully approved. Anything else (none /
+  // rejected) means the admin still owes us a submission.
+  const kycSubmitted = status === "pending" || status === "approved";
+
+  // In mandatory mode the sheet is non-dismissible until KYC is submitted.
+  // Outside mandatory mode (e.g. opening from settings) the user can close
+  // freely.
+  const canDismiss = !mandatory || kycSubmitted;
+
+  const handleSheetOpenChange = (next: boolean) => {
+    if (!next && !canDismiss) return;
+    onOpenChange(next);
+  };
+
+  // Radix calls onPointerDownOutside / onEscapeKeyDown BEFORE onOpenChange,
+  // and a preventDefault here suppresses the close entirely — so we surface
+  // the explanatory toast at this level instead of inside handleSheetOpenChange.
+  const blockDismiss = (e: Event) => {
+    e.preventDefault();
+    toast({
+      title: "Verify your identity to continue",
+      description:
+        "We need your KYC details before this group can start collecting.",
+    });
+  };
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[92vh] rounded-t-3xl p-0">
+    <Sheet open={open} onOpenChange={handleSheetOpenChange}>
+      <SheetContent
+        side="bottom"
+        className="h-[92vh] rounded-t-3xl p-0"
+        onPointerDownOutside={(e) => {
+          if (!canDismiss) blockDismiss(e);
+        }}
+        onEscapeKeyDown={(e) => {
+          if (!canDismiss) blockDismiss(e);
+        }}
+        onInteractOutside={(e) => {
+          if (!canDismiss) blockDismiss(e);
+        }}
+        // Hide the built-in radix close button when KYC is still required —
+        // there should be no escape hatch in mandatory mode.
+        hideCloseButton={!canDismiss}
+      >
         <div className="flex flex-col h-full">
           <SheetHeader className="px-5 py-4 border-b border-gray-100">
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => onOpenChange(false)}
-                className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
-                data-testid="button-kyc-back"
-              >
-                <ArrowLeft className="h-5 w-5" />
-                <span>Back</span>
-              </button>
+              {canDismiss ? (
+                <button
+                  onClick={() => onOpenChange(false)}
+                  className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+                  data-testid="button-kyc-back"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                  <span>Back</span>
+                </button>
+              ) : (
+                <div
+                  className="flex items-center gap-2 text-gray-500 text-sm"
+                  data-testid="text-kyc-required"
+                >
+                  <Lock className="h-4 w-4" />
+                  <span>Verification required</span>
+                </div>
+              )}
             </div>
           </SheetHeader>
 
