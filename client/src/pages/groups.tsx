@@ -100,16 +100,6 @@ export default function Groups() {
     items: filteredGroups.filter((g) => ((g as any).groupType ?? "project") === type),
   })).filter((b) => b.items.length > 0);
 
-  // Counts of all groups (not filtered) per category — used by the Categories
-  // strip at the top so people can see at a glance how many of each they run.
-  const categoryCounts = GROUP_TYPE_ORDER.reduce<Record<GroupType, number>>(
-    (acc, type) => {
-      acc[type] = groups.filter((g) => ((g as any).groupType ?? "project") === type).length;
-      return acc;
-    },
-    { ajo: 0, association: 0, project: 0 }
-  );
-
   // Show the post-signup onboarding card only on the empty state when the
   // user hasn't picked (or skipped) yet.
   const showOnboarding =
@@ -135,56 +125,6 @@ export default function Groups() {
       <main className="max-w-lg mx-auto px-4 py-6 space-y-6">
         {user?.id && <VerificationInbox userId={user.id} />}
         <VerifiedDiscoveryStrip userId={user?.id ?? null} state={(user as any)?.state ?? null} lga={(user as any)?.lga ?? null} />
-
-        {/* Major group categories — primary entry point. Tapping a card
-            opens the create-group sheet pre-selected to that category, and
-            the count shows how many of each the user already runs. */}
-        <section data-testid="group-categories" className="space-y-2">
-          <div className="flex items-end justify-between">
-            <div>
-              <h2 className="text-sm font-semibold text-gray-900">Group categories</h2>
-              <p className="text-xs text-gray-500">Pick the right setup for what you're collecting</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 gap-2.5">
-            {GROUP_TYPE_ORDER.map((t) => {
-              const meta = GROUP_TYPE_META[t];
-              const Icon = meta.icon;
-              const count = categoryCounts[t];
-              return (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => openCreateModal(t)}
-                  className={`text-left rounded-2xl border-2 p-3.5 ${meta.accentBg} hover:shadow-md transition-all active:scale-[0.99] flex items-center gap-3`}
-                  data-testid={`category-tile-${t}`}
-                >
-                  <div className={`w-12 h-12 rounded-xl bg-white flex items-center justify-center shrink-0 ${meta.accentText}`}>
-                    <Icon className="h-6 w-6" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-bold text-gray-900 text-sm">{meta.label}</p>
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${meta.badgeBg} ${meta.accentText}`}>
-                        {meta.tagline}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">{meta.blurb}</p>
-                  </div>
-                  <div className="flex flex-col items-end shrink-0 gap-1">
-                    <span className="inline-flex items-center justify-center min-w-[28px] h-6 px-2 rounded-full bg-white text-xs font-bold text-gray-700 border border-gray-200">
-                      {count}
-                    </span>
-                    <span className={`inline-flex items-center gap-0.5 text-[11px] font-semibold ${meta.accentText}`}>
-                      <Plus className="h-3 w-3" />
-                      New
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </section>
 
         {showOnboarding && user?.id && (
           <GroupTypeOnboarding
