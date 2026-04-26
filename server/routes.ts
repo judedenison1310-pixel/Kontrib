@@ -1919,7 +1919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // In production, return error but don't expose OTP
         return res.status(503).json({ 
-          message: "Unable to send WhatsApp message. Please check your WhatsApp number and try again." 
+          message: "We couldn't reach WhatsApp just now. Double-check your number has the right country code, then try again in a few seconds." 
         });
       }
       
@@ -1931,7 +1931,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Send OTP error:", error);
-      res.status(500).json({ message: "Failed to send OTP" });
+      res.status(500).json({
+        message: "WhatsApp is being a bit slow on our end. Please try again in a few seconds — your number is fine.",
+      });
     }
   });
 
@@ -2115,7 +2117,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Send login OTP error:", error);
-      res.status(500).json({ message: "Failed to send login OTP" });
+      res.status(500).json({
+        message: "WhatsApp is being a bit slow on our end. Please try again in a few seconds.",
+      });
     }
   });
 
