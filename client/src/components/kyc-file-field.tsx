@@ -21,8 +21,14 @@ async function fetchUploadUrl(): Promise<{ method: "PUT"; url: string }> {
     headers: { "Content-Type": "application/json" },
     body: "{}",
   });
-  if (!res.ok) throw new Error(`Upload URL failed (${res.status})`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Couldn't get an upload slot (server said ${res.status}). ${body.slice(0, 120)}`.trim());
+  }
   const data = await res.json();
+  if (!data?.url) {
+    throw new Error("Server didn't return an upload URL. Please refresh and try again.");
+  }
   return { method: "PUT", url: data.url };
 }
 
@@ -32,9 +38,30 @@ async function normalizePath(rawUrl: string): Promise<string> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ rawUrl }),
   });
-  if (!res.ok) throw new Error(`Normalize failed (${res.status})`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Couldn't save the file path (server said ${res.status}). ${body.slice(0, 120)}`.trim());
+  }
   const data = await res.json();
   return data.path as string;
+}
+
+function describeUppyFailure(result: { successful?: any[]; failed?: any[] }): string {
+  const failed = result.failed?.[0];
+  if (failed) {
+    const err = failed.error;
+    const status = (err && (err.statusCode || err.status)) || (failed.response && failed.response.status);
+    const msg = (err && err.message) || (typeof err === "string" ? err : null);
+    if (status === 403) {
+      return "The upload link expired before the file finished. Please try again.";
+    }
+    if (status === 0 || /network|failed to fetch|cors/i.test(msg || "")) {
+      return "Network hiccup during upload. Check your connection and try again.";
+    }
+    if (msg) return `Upload couldn't finish: ${msg}`;
+    if (status) return `Upload couldn't finish (status ${status}). Please try again.`;
+  }
+  return "Upload didn't complete. Please try again.";
 }
 
 export function KycFileField({
@@ -80,7 +107,9 @@ export function KycFileField({
               setBusy(true);
               try {
                 const uploaded = result.successful?.[0];
-                if (!uploaded?.uploadURL) throw new Error("No upload URL returned");
+                if (!uploaded?.uploadURL) {
+                  throw new Error(describeUppyFailure(result));
+                }
                 const path = await normalizePath(uploaded.uploadURL);
                 onChange(path);
               } catch (e: any) {
@@ -102,7 +131,9 @@ export function KycFileField({
             setBusy(true);
             try {
               const uploaded = result.successful?.[0];
-              if (!uploaded?.uploadURL) throw new Error("No upload URL returned");
+              if (!uploaded?.uploadURL) {
+                throw new Error(describeUppyFailure(result));
+              }
               const path = await normalizePath(uploaded.uploadURL);
               onChange(path);
             } catch (e: any) {
