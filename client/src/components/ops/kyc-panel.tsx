@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { ShieldCheck, Loader2, Check, X, ExternalLink } from "lucide-react";
+import { ShieldCheck, Loader2, Check, X, ExternalLink, ImageOff } from "lucide-react";
 import { opsFetch, formatDateTime } from "./ops-shared";
 
 type Pending = {
@@ -122,15 +122,37 @@ export function KycPanel({ actorId }: { actorId: string }) {
 }
 
 function DocThumb({ label, url, userId, kind }: { label: string; url: string | null; userId: string; kind: string }) {
+  const [failed, setFailed] = useState(false);
+
   if (!url) return (
-    <div className="bg-gray-800 rounded-lg p-3 text-center text-gray-600 text-xs h-full flex flex-col items-center justify-center">
+    <div className="bg-gray-800 rounded-lg p-3 text-center text-gray-600 text-xs h-full flex flex-col items-center justify-center" data-testid={`thumb-kyc-${kind}-${userId}-missing`}>
       <p>—</p>
       <p className="text-[10px] mt-1">{label}</p>
+      <p className="text-[10px] mt-0.5 text-gray-500">Not uploaded</p>
     </div>
   );
+
+  if (failed) return (
+    <div className="bg-gray-800 rounded-lg p-2 text-center" data-testid={`thumb-kyc-${kind}-${userId}-broken`}>
+      <div className="w-full h-24 rounded mb-1 bg-gray-900 border border-dashed border-amber-700/40 flex flex-col items-center justify-center text-amber-400">
+        <ImageOff className="h-5 w-5 mb-1" />
+        <p className="text-[10px]">Image unavailable</p>
+      </div>
+      <a href={url} target="_blank" rel="noreferrer" className="text-[10px] text-amber-300 hover:text-amber-200 flex items-center justify-center gap-1 underline" data-testid={`link-kyc-${kind}-${userId}-broken`}>
+        <ExternalLink className="h-2.5 w-2.5" /> Open {label} link
+      </a>
+    </div>
+  );
+
   return (
     <a href={url} target="_blank" rel="noreferrer" className="block bg-gray-800 hover:bg-gray-700 rounded-lg p-2 text-center" data-testid={`link-kyc-${kind}-${userId}`}>
-      <img src={url} alt={label} className="w-full h-24 object-cover rounded mb-1" />
+      <img
+        src={url}
+        alt={label}
+        loading="lazy"
+        onError={() => setFailed(true)}
+        className="w-full h-24 object-cover rounded mb-1 bg-gray-900"
+      />
       <p className="text-[10px] text-gray-300 flex items-center justify-center gap-1"><ExternalLink className="h-2.5 w-2.5" /> {label}</p>
     </a>
   );
