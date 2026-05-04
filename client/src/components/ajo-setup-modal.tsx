@@ -41,6 +41,44 @@ function memberLabel(u: User): string {
   return (u.fullName?.trim() || u.phoneNumber || "Member");
 }
 
+// Turn the server's raw Zod-shaped error into a friendly sentence the
+// admin can act on. apiRequest throws errors shaped like
+// "400: {json body}" — we pull out the body and map common cases.
+function friendlyAjoError(err: any): string {
+  const raw: string = err?.message || "";
+  const jsonStart = raw.indexOf("{");
+  let body: any = null;
+  if (jsonStart !== -1) {
+    try { body = JSON.parse(raw.slice(jsonStart)); } catch { /* ignore */ }
+  }
+  const issues: any[] = Array.isArray(body?.errors) ? body.errors : [];
+
+  const tooFewPayees = issues.find(
+    (i) => i?.path?.[0] === "payoutOrder" && i?.code === "too_small",
+  );
+  if (tooFewPayees) {
+    return "An Ajo cycle needs at least 2 members. Invite one more person to your group, then come back to start the cycle.";
+  }
+
+  const badAmount = issues.find((i) => i?.path?.[0] === "contributionAmount");
+  if (badAmount) {
+    return "Please enter a valid contribution amount above zero.";
+  }
+
+  const badDate = issues.find((i) => i?.path?.[0] === "startDate");
+  if (badDate) {
+    return "Please pick a valid first cycle due date in the future.";
+  }
+
+  if (issues.length > 0 && body?.message) {
+    return String(body.message);
+  }
+
+  // Fallback: server message if it doesn't look like raw JSON.
+  if (raw && !raw.includes("{")) return raw;
+  return "Please check the details and try again.";
+}
+
 export function AjoSetupModal({ open, onOpenChange, groupId, groupName, members }: AjoSetupModalProps) {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -118,7 +156,7 @@ export function AjoSetupModal({ open, onOpenChange, groupId, groupName, members 
     onError: (err: any) => {
       toast({
         title: "Could not start cycle",
-        description: err?.message || "Please check the details and try again.",
+        description: friendlyAjoError(err),
         variant: "destructive",
       });
     },
@@ -127,7 +165,7 @@ export function AjoSetupModal({ open, onOpenChange, groupId, groupName, members 
   const canSubmit =
     !!amount && Number(amount) > 0 &&
     !!startDate &&
-    order.length >= 1 &&
+    order.length >= 2 &&
     !setupMutation.isPending;
 
   return (
@@ -295,11 +333,15 @@ export function AjoSetupModal({ open, onOpenChange, groupId, groupName, members 
             <div className="space-y-2">
               <Label className="flex items-center gap-2 text-gray-700 font-medium">
                 <UsersIcon className="h-4 w-4 text-emerald-600" />
-                Payout order ({order.length} members)
+                Payout order ({order.length} {order.length === 1 ? "member" : "members"})
               </Label>
               {order.length < 1 ? (
                 <div className="rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
                   No members yet. Add yourself or invite people, then come back to set the payout order.
+                </div>
+              ) : order.length < 2 ? (
+                <div className="rounded-xl border-2 border-dashed border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+                  An Ajo cycle needs at least 2 members. Invite one more person to your group, then come back to start the cycle.
                 </div>
               ) : (
                 <>
