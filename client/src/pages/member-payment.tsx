@@ -25,6 +25,7 @@ import {
 import { formatNaira } from "@/lib/currency";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { uploadFileToObjectStorage } from "@/lib/objectUpload";
 
 interface PaymentProject {
   id: string;
@@ -69,7 +70,7 @@ export default function MemberPayment() {
 
   // Submit contribution mutation
   const submitContributionMutation = useMutation({
-    mutationFn: async (contributionData: FormData) => {
+    mutationFn: async (contributionData: Record<string, unknown>) => {
       return apiRequest("POST", "/api/contributions", contributionData);
     },
     onSuccess: () => {
@@ -149,15 +150,35 @@ export default function MemberPayment() {
       return;
     }
 
-    const formData = new FormData();
-    formData.append("projectId", selectedProject);
-    formData.append("userId", user.id);
-    formData.append("amount", amount);
-    formData.append("reference", reference);
-    formData.append("notes", notes);
-    formData.append("proofOfPayment", proofFile);
+    const projectData = projects.find((p) => p.id === selectedProject);
+    if (!projectData?.groupId) {
+      toast({
+        title: "Could not determine group",
+        description: "Please re-select the project and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    submitContributionMutation.mutate(formData);
+    try {
+      const proofPath = await uploadFileToObjectStorage(proofFile);
+      submitContributionMutation.mutate({
+        groupId: projectData.groupId,
+        projectId: selectedProject,
+        userId: user.id,
+        amount,
+        transactionRef: reference || null,
+        paymentNotes: notes || null,
+        proofOfPayment: proofPath,
+        paymentType: "bank_transfer",
+      });
+    } catch (err: any) {
+      toast({
+        title: "Upload failed",
+        description: err?.message || "Please try uploading your receipt again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const getProgressPercentage = (project: PaymentProject) => {

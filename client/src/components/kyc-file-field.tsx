@@ -3,6 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Upload, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { uploadFileToObjectStorage } from "@/lib/objectUpload";
 
 interface KycFileFieldProps {
   label: string;
@@ -17,57 +18,6 @@ interface KycFileFieldProps {
 }
 
 const DEFAULT_MAX_MB = 10;
-
-async function fetchSignedUploadUrl(): Promise<string> {
-  const res = await fetch("/api/objects/upload-url", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: "{}",
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Couldn't get an upload slot (server said ${res.status}). ${body.slice(0, 120)}`.trim());
-  }
-  const data = await res.json();
-  if (!data?.url) {
-    throw new Error("Server didn't return an upload URL. Please refresh and try again.");
-  }
-  return data.url as string;
-}
-
-async function putToSignedUrl(signedUrl: string, file: File): Promise<void> {
-  const res = await fetch(signedUrl, {
-    method: "PUT",
-    headers: { "Content-Type": file.type || "application/octet-stream" },
-    body: file,
-  });
-  if (!res.ok) {
-    if (res.status === 403) {
-      throw new Error("The upload link expired before the file finished. Please try again.");
-    }
-    const body = await res.text().catch(() => "");
-    throw new Error(`Storage rejected the upload (status ${res.status}). ${body.slice(0, 120)}`.trim());
-  }
-}
-
-async function normalizePath(rawUrl: string): Promise<string> {
-  const res = await fetch("/api/objects/normalize", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ rawUrl }),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Couldn't save the file path (server said ${res.status}). ${body.slice(0, 120)}`.trim());
-  }
-  const data = await res.json();
-  return data.path as string;
-}
-
-function stripQuery(url: string): string {
-  const i = url.indexOf("?");
-  return i === -1 ? url : url.slice(0, i);
-}
 
 function buildAcceptString(acceptPdf: boolean): string {
   return acceptPdf ? "image/*,application/pdf" : "image/*";
@@ -120,9 +70,7 @@ export function KycFileField({
 
     setBusy(true);
     try {
-      const signedUrl = await fetchSignedUploadUrl();
-      await putToSignedUrl(signedUrl, file);
-      const path = await normalizePath(stripQuery(signedUrl));
+      const path = await uploadFileToObjectStorage(file);
       onChange(path);
       toast({ title: "Upload complete" });
     } catch (err: any) {
