@@ -604,6 +604,16 @@ export default function GroupProjects() {
         />
       )}
 
+      {group && isAjoGroup && (
+        <AjoSetupModal
+          open={ajoSetupOpen}
+          onOpenChange={setAjoSetupOpen}
+          groupId={group.id}
+          groupName={group.name}
+          members={members.map(m => ({ userId: m.userId, user: m.user }))}
+        />
+      )}
+
       {/* Mounted at the page level so the create-group → KYC → cycle setup
           chain can be driven from the onboarding effect above, not just from
           inside the cycle setup sheet. */}
