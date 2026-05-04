@@ -20,6 +20,34 @@ interface GroupTermsModalProps {
 
 type Choice = "kontrib" | "custom" | null;
 
+// Map raw apiRequest errors ("400: {json…}") into plain-language sentences
+// the admin can act on, instead of dumping a wall of JSON in a toast.
+function friendlyTermsError(err: any): string {
+  const raw: string = err?.message || "";
+  const jsonStart = raw.indexOf("{");
+  let body: any = null;
+  if (jsonStart !== -1) {
+    try { body = JSON.parse(raw.slice(jsonStart)); } catch { /* ignore */ }
+  }
+  const issues: any[] = Array.isArray(body?.errors) ? body.errors : [];
+
+  const indemnity = issues.find((i) => i?.path?.[0] === "indemnityAccepted");
+  if (indemnity) {
+    return "Please tick the indemnity statement checkbox before saving your custom T&C.";
+  }
+  const missingFile = issues.find((i) => i?.path?.[0] === "customTcUrl");
+  if (missingFile) {
+    return "Please upload your group's T&C file (PDF or image) before saving.";
+  }
+  const badMode = issues.find((i) => i?.path?.[0] === "tcMode");
+  if (badMode) {
+    return "Please pick either Kontrib's generic terms or upload your own.";
+  }
+  if (body?.message && typeof body.message === "string") return body.message;
+  if (raw && !raw.includes("{")) return raw;
+  return "Please try again.";
+}
+
 export function GroupTermsModal({ open, onOpenChange, groupId, groupName }: GroupTermsModalProps) {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -60,7 +88,12 @@ export function GroupTermsModal({ open, onOpenChange, groupId, groupName }: Grou
       const payload =
         choice === "kontrib"
           ? { actorId: actor?.id, tcMode: "kontrib" as const }
-          : { actorId: actor?.id, tcMode: "custom" as const, customTcUrl: customTcUrl! };
+          : {
+              actorId: actor?.id,
+              tcMode: "custom" as const,
+              customTcUrl: customTcUrl!,
+              indemnityAccepted: true as const,
+            };
       const res = await apiRequest("POST", `/api/groups/${groupId}/terms`, payload);
       return res.json();
     },
@@ -76,7 +109,7 @@ export function GroupTermsModal({ open, onOpenChange, groupId, groupName }: Grou
     onError: (err: any) => {
       toast({
         title: "Could not save terms",
-        description: err?.message || "Please try again.",
+        description: friendlyTermsError(err),
         variant: "destructive",
       });
     },
