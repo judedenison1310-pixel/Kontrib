@@ -17,6 +17,40 @@ import heroImage from "@assets/Black_and_White_Modern_Linkedln_Profile_Picture_1
 
 const REF_KEY = "kontrib_referral_code";
 
+// "Load failed" (Safari), "Failed to fetch" (Chrome), "NetworkError" (Firefox),
+// "The Internet connection appears to be offline" (iOS) — all mean the request
+// never reached our server. We surface these as connection problems instead of
+// pretending the OTP itself was wrong.
+function isNetworkError(err: unknown): boolean {
+  const msg = (err as any)?.message?.toString().toLowerCase() ?? "";
+  if (!msg) return false;
+  return (
+    msg === "load failed" ||
+    msg.includes("failed to fetch") ||
+    msg.includes("networkerror") ||
+    msg.includes("network error") ||
+    msg.includes("internet connection") ||
+    msg.includes("network request failed") ||
+    msg.startsWith("typeerror")
+  );
+}
+
+// Pull the friendly message out of an apiRequest error of shape "STATUS: {json}".
+function extractServerMessage(err: unknown, fallback: string): string {
+  const raw: string = (err as any)?.message ?? "";
+  const jsonStart = raw.indexOf("{");
+  if (jsonStart !== -1) {
+    try {
+      const body = JSON.parse(raw.slice(jsonStart));
+      if (typeof body?.message === "string" && body.message.trim()) return body.message;
+    } catch {
+      /* ignore */
+    }
+  }
+  if (raw && !raw.includes("{")) return raw;
+  return fallback;
+}
+
 async function captureReferral(referralCode: string, refereeId: string) {
   try {
     await fetch("/api/referrals/capture", {
@@ -117,10 +151,19 @@ export default function Landing() {
       });
     },
     onError: (error: Error) => {
-      toast({ 
-        title: "Couldn't send code", 
-        description: error.message || "Please check your number and try again", 
-        variant: "destructive" 
+      if (isNetworkError(error)) {
+        toast({
+          title: "Connection problem",
+          description:
+            "We couldn't reach Kontrib just now. Check your internet and tap Send code again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({
+        title: "Couldn't send code",
+        description: extractServerMessage(error, "Please check your number and try again"),
+        variant: "destructive",
       });
     },
   });
@@ -150,12 +193,28 @@ export default function Landing() {
       }
     },
     onError: (error: Error) => {
-      toast({ 
-        title: "Invalid code", 
-        description: error.message || "Please check and try again", 
-        variant: "destructive" 
+      if (isNetworkError(error)) {
+        toast({
+          title: "Connection problem",
+          description:
+            "We couldn't reach Kontrib just now. Check your internet and tap Verify again — your code is still good for a few minutes.",
+          variant: "destructive",
+        });
+        // Don't reset — let the user retry without retyping 6 digits.
+        return;
+      }
+      const serverMsg = extractServerMessage(error, "Please check and try again");
+      // Server explicitly says the code is wrong/expired.
+      const isInvalidCode =
+        /invalid|expired|incorrect|wrong/i.test(serverMsg) || /^4\d\d:/.test(error.message || "");
+      toast({
+        title: isInvalidCode ? "Invalid code" : "Couldn't verify code",
+        description: isInvalidCode
+          ? "That code didn't match. Double-check the 6 digits we sent on WhatsApp, or tap Resend code."
+          : serverMsg,
+        variant: "destructive",
       });
-      otpForm.reset();
+      if (isInvalidCode) otpForm.reset();
     },
   });
 
