@@ -65,9 +65,14 @@ function friendlyAjoError(err: any): string {
     return "Please enter a valid contribution amount above zero.";
   }
 
-  const badDate = issues.find((i) => i?.path?.[0] === "startDate");
-  if (badDate) {
+  const badStart = issues.find((i) => i?.path?.[0] === "startDate");
+  if (badStart) {
     return "Please pick a valid first cycle due date in the future.";
+  }
+
+  const badEnd = issues.find((i) => i?.path?.[0] === "endDate");
+  if (badEnd) {
+    return "Please pick an end date that is on or after the first cycle date.";
   }
 
   if (issues.length > 0 && body?.message) {
@@ -89,6 +94,13 @@ export function AjoSetupModal({ open, onOpenChange, groupId, groupName, members 
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  });
+  const [endDate, setEndDate] = useState(() => {
+    // Default end date: 6 months after the default start date.
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setMonth(d.getMonth() + 6);
     return d.toISOString().slice(0, 10);
   });
   const [order, setOrder] = useState<MemberRow[]>([]);
@@ -142,6 +154,7 @@ export function AjoSetupModal({ open, onOpenChange, groupId, groupName, members 
         contributionAmount: amount,
         frequency,
         startDate: new Date(startDate).toISOString(),
+        endDate: new Date(endDate).toISOString(),
         payoutOrder: order.map(m => m.userId),
       };
       const res = await apiRequest("POST", `/api/groups/${groupId}/ajo`, payload);
@@ -162,9 +175,40 @@ export function AjoSetupModal({ open, onOpenChange, groupId, groupName, members 
     },
   });
 
+  // Compute number of cadences (cycles) between start and end at the chosen
+  // frequency. Mirrors the server's computeRoundsBetween so the preview the
+  // admin sees matches what gets saved.
+  const cadenceCount = (() => {
+    if (!startDate || !endDate) return 0;
+    const s = new Date(startDate);
+    const e = new Date(endDate);
+    if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return 0;
+    if (e.getTime() < s.getTime()) return 0;
+    if (frequency === "monthly") {
+      const months = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth());
+      return Math.max(1, months + 1);
+    }
+    const stepDays = frequency === "weekly" ? 7 : 14;
+    const diffMs = e.getTime() - s.getTime();
+    const steps = Math.floor(diffMs / (stepDays * 24 * 60 * 60 * 1000));
+    return Math.max(1, steps + 1);
+  })();
+
+  const lifetimePot =
+    !!amount && Number(amount) > 0 && order.length >= 2 && cadenceCount > 0
+      ? Number(amount) * order.length * cadenceCount
+      : 0;
+
+  const endIsValid =
+    !!startDate &&
+    !!endDate &&
+    new Date(endDate).getTime() >= new Date(startDate).getTime() &&
+    cadenceCount >= 1;
+
   const canSubmit =
     !!amount && Number(amount) > 0 &&
     !!startDate &&
+    endIsValid &&
     order.length >= 2 &&
     !setupMutation.isPending;
 
@@ -327,6 +371,49 @@ export function AjoSetupModal({ open, onOpenChange, groupId, groupName, members 
               <p className="text-xs text-gray-500">
                 Cycle 1's recipient gets paid on this date. Following cycles roll forward by your chosen frequency.
               </p>
+            </div>
+
+            {/* End date */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-gray-700 font-medium">
+                <Calendar className="h-4 w-4 text-emerald-600" />
+                End date (last cycle)
+              </Label>
+              <Input
+                type="date"
+                value={endDate}
+                min={startDate}
+                onChange={e => setEndDate(e.target.value)}
+                className="h-12 rounded-xl border-2 border-gray-200 focus:border-emerald-500"
+                data-testid="input-ajo-enddate"
+              />
+              {endIsValid ? (
+                <p className="text-xs text-gray-500">
+                  That's <span className="font-semibold text-gray-800">{cadenceCount}</span>{" "}
+                  {FREQUENCY_LABEL[frequency].toLowerCase()} {cadenceCount === 1 ? "cycle" : "cycles"} between your start and end date.
+                  {order.length >= 2 && order.length !== cadenceCount && (
+                    <>
+                      {" "}With {order.length} {order.length === 1 ? "member" : "members"}, the payout order will rotate
+                      {cadenceCount > order.length ? " — some members will receive the pot more than once." : "; not everyone will receive the pot in this run."}
+                    </>
+                  )}
+                </p>
+              ) : (
+                <p className="text-xs text-amber-700">
+                  Pick an end date that is on or after the first cycle date.
+                </p>
+              )}
+              {lifetimePot > 0 && (
+                <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-sm">
+                  <p className="text-emerald-900">
+                    <span className="font-semibold">Total expected over the run:</span>{" "}
+                    ₦{lifetimePot.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-emerald-800/80 mt-0.5">
+                    ₦{Number(amount).toLocaleString()} × {order.length} members × {cadenceCount} cycles
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Payout order */}

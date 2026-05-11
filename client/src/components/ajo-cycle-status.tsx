@@ -151,15 +151,26 @@ export function AjoCycleStatus({ groupId, status, members, isAdmin }: AjoCycleSt
 
   const recipient = currentCycle.recipient;
   const amountPerMember = settings.contributionAmount;
-  const expectedPot = (Number(amountPerMember) || 0) * expectedCount;
+  const perCyclePot = (Number(amountPerMember) || 0) * expectedCount;
+  // Lifetime expected pot = amount × members × number of cycles for this run.
+  const expectedPot = (Number(amountPerMember) || 0) * expectedCount * (totalRounds || 1);
   const days = daysUntil(currentCycle.deadline);
   const dueLabel = formatDueDate(currentCycle.deadline);
   const progressPct = expectedCount > 0 ? Math.min(100, Math.round((paidCount / expectedCount) * 100)) : 0;
 
   const meIsRecipient = actor?.id && recipient?.id === actor.id;
 
-  // Upcoming = the rest of the order after the current recipient.
-  const upcoming = order.slice(cycleNumber).slice(0, 4);
+  // Upcoming = the next few recipients, wrapping around the order when the
+  // run is longer than the member list.
+  const upcomingCount = Math.min(4, Math.max(0, totalRounds - cycleNumber));
+  const upcoming = order.length > 0
+    ? Array.from({ length: upcomingCount }, (_, i) => order[(cycleNumber + i) % order.length])
+    : [];
+  // Name of the recipient for the next cycle (with wrap), used in the
+  // "advance to next" button copy.
+  const nextRecipientName = order.length > 0
+    ? (nameById.get(order[cycleNumber % order.length]) || "next member")
+    : "next member";
 
   // Compute unpaid members for this cycle (admin view only). A member is
   // "paid" once they have at least one confirmed contribution against the
@@ -236,6 +247,9 @@ export function AjoCycleStatus({ groupId, status, members, isAdmin }: AjoCycleSt
             <div className="rounded-xl bg-white border border-gray-100 p-3">
               <p className="text-[11px] text-gray-500 uppercase tracking-wide">Expected pot</p>
               <p className="text-base font-bold text-gray-900 mt-0.5">{formatNaira(expectedPot.toString())}</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">
+                This cycle: {formatNaira(perCyclePot.toString())}
+              </p>
             </div>
           </div>
 
@@ -382,7 +396,7 @@ export function AjoCycleStatus({ groupId, status, members, isAdmin }: AjoCycleSt
                   Once {memberLabel(recipient)} has received the pot, advance to{" "}
                   {cycleNumber === totalRounds
                     ? "close out the round."
-                    : `Cycle ${cycleNumber + 1} (${nameById.get(order[cycleNumber] ?? "") || "next member"}).`}
+                    : `Cycle ${cycleNumber + 1} (${nextRecipientName}).`}
                 </p>
               </div>
             </div>

@@ -2944,6 +2944,30 @@ function addFrequency(from: Date, frequency: AjoFrequency): Date {
   return next;
 }
 
+// How many cycles fit between start and end at the chosen frequency,
+// counting both endpoints. e.g. May 1 → July 1 monthly = 3 cycles.
+function computeRoundsBetween(start: Date, end: Date, frequency: AjoFrequency): number {
+  const s = new Date(start);
+  const e = new Date(end);
+  if (e.getTime() < s.getTime()) return 0;
+  if (frequency === "monthly") {
+    const months = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth());
+    return Math.max(1, months + 1);
+  }
+  const stepDays = frequency === "weekly" ? 7 : 14;
+  const diffMs = e.getTime() - s.getTime();
+  const steps = Math.floor(diffMs / (stepDays * 24 * 60 * 60 * 1000));
+  return Math.max(1, steps + 1);
+}
+
+// Pick the recipient for a given 1-indexed cycle number, wrapping around
+// the payout order when the run is longer than the member list.
+function recipientForCycle(payoutOrder: string[], cycleNumber: number): string | undefined {
+  if (payoutOrder.length === 0) return undefined;
+  const idx = (cycleNumber - 1) % payoutOrder.length;
+  return payoutOrder[idx];
+}
+
 // Builds the AjoStatus payload returned to the group page. Includes the
 // current cycle (a project row) hydrated with recipient info, plus a paid
 // roll-up so the UI can show "5 of 8 paid".
@@ -3048,6 +3072,14 @@ DbStorage.prototype.createAjoSettingsAndStartCycle = async function (
 
   const startDate = new Date(payload.startDate);
   if (Number.isNaN(startDate.getTime())) throw new Error("Invalid start date");
+  const endDate = new Date(payload.endDate);
+  if (Number.isNaN(endDate.getTime())) throw new Error("Invalid end date");
+  if (endDate.getTime() < startDate.getTime()) {
+    throw new Error("End date must be on or after the start date");
+  }
+
+  const totalRounds = computeRoundsBetween(startDate, endDate, payload.frequency);
+  if (totalRounds < 1) throw new Error("Pick an end date that is at least one full cycle after the start date");
 
   await db.insert(ajoSettingsTable).values({
     groupId,
@@ -3055,7 +3087,8 @@ DbStorage.prototype.createAjoSettingsAndStartCycle = async function (
     frequency: payload.frequency,
     payoutOrder: payload.payoutOrder,
     startDate,
-    totalRounds: payload.payoutOrder.length,
+    endDate,
+    totalRounds,
     currentCycleNumber: 1,
     status: "active",
   });
@@ -3069,18 +3102,18 @@ DbStorage.prototype.createAjoSettingsAndStartCycle = async function (
 DbStorage.prototype.updateAjoPayoutOrder = async function (groupId: string, payoutOrder: string[]) {
   const settings = await this.getAjoSettings(groupId);
   if (!settings) throw new Error("Ajo not set up");
-  // Don't let admins reshuffle past or current recipients — only the tail
-  // (positions >= currentCycleNumber - 1) is editable. Simplest enforcement:
-  // payoutOrder must keep already-paid recipients (positions 0..currentCycle-2)
-  // in place, and the current recipient (position currentCycle-1) unchanged.
-  const lockedPrefix = settings.payoutOrder.slice(0, settings.currentCycleNumber);
-  const newPrefix = payoutOrder.slice(0, settings.currentCycleNumber);
+  // payoutOrder is now the rotation order (length = number of members),
+  // not a per-cycle schedule. Lock the prefix that's already played out
+  // within the first lap; on subsequent laps the whole order is editable.
+  const lockedCount = Math.min(settings.currentCycleNumber, settings.payoutOrder.length);
+  const lockedPrefix = settings.payoutOrder.slice(0, lockedCount);
+  const newPrefix = payoutOrder.slice(0, lockedCount);
   if (lockedPrefix.length !== newPrefix.length || lockedPrefix.some((u, i) => u !== newPrefix[i])) {
     throw new Error("Cannot reorder past or current recipients");
   }
-  // Length must still equal totalRounds (no add/remove for now).
-  if (payoutOrder.length !== settings.totalRounds) {
-    throw new Error("Payout order length must match total rounds");
+  // Length must equal the existing member count (no add/remove from here).
+  if (payoutOrder.length !== settings.payoutOrder.length) {
+    throw new Error("Payout order length must match the current member count");
   }
   const [updated] = await db.update(ajoSettingsTable)
     .set({ payoutOrder, updatedAt: new Date() })
@@ -3115,7 +3148,7 @@ DbStorage.prototype.advanceAjoCycle = async function (groupId: string) {
 
   // Otherwise create the next cycle project & advance the pointer.
   const nextCycleNumber = settings.currentCycleNumber + 1;
-  const nextRecipientId = settings.payoutOrder[nextCycleNumber - 1];
+  const nextRecipientId = recipientForCycle(settings.payoutOrder, nextCycleNumber);
   if (!nextRecipientId) throw new Error("No recipient configured for next cycle");
 
   const prevDue = currentCycleProject?.deadline ?? settings.startDate;

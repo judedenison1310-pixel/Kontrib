@@ -45,9 +45,9 @@ export function AjoReorderModal({
     if (open) setOrder(settings.payoutOrder ?? []);
   }, [open, settings.payoutOrder]);
 
-  // Past + current recipients are locked. Tail starts at currentCycleNumber
-  // (because positions are 0-indexed and currentCycleNumber-1 is the current).
-  const lockedCount = settings.currentCycleNumber;
+  // Past + current recipients are locked, but only within the first lap of
+  // the rotation. After that, the whole order is editable for future laps.
+  const lockedCount = Math.min(settings.currentCycleNumber, order.length);
 
   const move = (idx: number, delta: number) => {
     setOrder(prev => {

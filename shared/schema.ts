@@ -231,9 +231,10 @@ export const ajoSettings = pgTable("ajo_settings", {
   groupId: varchar("group_id").notNull().unique().references(() => groups.id),
   contributionAmount: decimal("contribution_amount", { precision: 15, scale: 2 }).notNull(),
   frequency: text("frequency").notNull(), // weekly | biweekly | monthly
-  payoutOrder: text("payout_order").array().notNull().default(sql`'{}'::text[]`), // ordered userIds
+  payoutOrder: text("payout_order").array().notNull().default(sql`'{}'::text[]`), // ordered userIds (length = number of members, rotation wraps)
   startDate: timestamp("start_date").notNull(),
-  totalRounds: integer("total_rounds").notNull(),       // Equals payoutOrder.length when set up
+  endDate: timestamp("end_date"), // Last cycle due date — set by admin; nullable for legacy rows
+  totalRounds: integer("total_rounds").notNull(),       // Number of cycles between start_date and end_date at the chosen frequency
   currentCycleNumber: integer("current_cycle_number").notNull().default(1),
   status: text("status").notNull().default("active"),   // "active" | "completed"
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
@@ -624,12 +625,22 @@ export type InsertAjoSettings = z.infer<typeof insertAjoSettingsSchema>;
 
 // Payload the admin POSTs from the setup wizard. We compute totalRounds and
 // startDate handling on the server, so the client just sends the essentials.
-export const createAjoSettingsSchema = z.object({
-  contributionAmount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Enter a valid amount"),
-  frequency: z.enum(AJO_FREQUENCIES),
-  payoutOrder: z.array(z.string().min(1)).min(2, "Need at least 2 members in the payout order"),
-  startDate: z.string().min(1, "Pick a start date"), // ISO date
-});
+export const createAjoSettingsSchema = z
+  .object({
+    contributionAmount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Enter a valid amount"),
+    frequency: z.enum(AJO_FREQUENCIES),
+    payoutOrder: z.array(z.string().min(1)).min(2, "Need at least 2 members in the payout order"),
+    startDate: z.string().min(1, "Pick a start date"), // ISO date
+    endDate: z.string().min(1, "Pick an end date"),     // ISO date — last cycle due date
+  })
+  .refine(
+    (v) => {
+      const s = new Date(v.startDate).getTime();
+      const e = new Date(v.endDate).getTime();
+      return Number.isFinite(s) && Number.isFinite(e) && e >= s;
+    },
+    { path: ["endDate"], message: "End date must be on or after the start date" },
+  );
 export type CreateAjoSettingsPayload = z.infer<typeof createAjoSettingsSchema>;
 
 // Detailed view returned to the group page — settings + the active cycle
