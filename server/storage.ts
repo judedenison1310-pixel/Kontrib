@@ -3264,6 +3264,12 @@ async function insertDuesPeriodProject(
   duesAmount: string,
   frequency: AssociationFrequency,
   dueDate: Date,
+  paymentInfo?: {
+    bankName?: string | null;
+    accountNumber?: string | null;
+    accountName?: string | null;
+    paymentInstructions?: string | null;
+  },
 ): Promise<Project> {
   const [group] = await db.select().from(groupsTable).where(eq(groupsTable.id, groupId)).limit(1);
   const groupSlug = group?.customSlug || "group";
@@ -3281,6 +3287,10 @@ async function insertDuesPeriodProject(
     deadline: dueDate,
     customSlug: `${groupSlug}/${projectSlug}`,
     cycleNumber: periodNumber,
+    bankName: paymentInfo?.bankName ?? null,
+    accountNumber: paymentInfo?.accountNumber ?? null,
+    accountName: paymentInfo?.accountName ?? null,
+    paymentInstructions: paymentInfo?.paymentInstructions ?? null,
   }).returning();
   return created;
 }
@@ -3326,6 +3336,10 @@ DbStorage.prototype.createAssociationSettingsAndStartPeriod = async function (
     startDate,
     currentPeriodNumber: 1,
     status: "active",
+    bankName: payload.bankName ?? null,
+    accountNumber: payload.accountNumber ?? null,
+    accountName: payload.accountName ?? null,
+    paymentInstructions: payload.paymentInstructions ?? null,
   });
 
   await insertDuesPeriodProject(
@@ -3334,6 +3348,12 @@ DbStorage.prototype.createAssociationSettingsAndStartPeriod = async function (
     payload.duesAmount,
     payload.duesFrequency,
     startDate,
+    {
+      bankName: payload.bankName ?? null,
+      accountNumber: payload.accountNumber ?? null,
+      accountName: payload.accountName ?? null,
+      paymentInstructions: payload.paymentInstructions ?? null,
+    },
   );
 
   return (await buildAssociationStatus(groupId))!;
@@ -3367,6 +3387,12 @@ DbStorage.prototype.advanceAssociationPeriod = async function (groupId: string) 
     settings.duesAmount,
     settings.duesFrequency as AssociationFrequency,
     nextDue,
+    {
+      bankName: settings.bankName,
+      accountNumber: settings.accountNumber,
+      accountName: settings.accountName,
+      paymentInstructions: settings.paymentInstructions,
+    },
   );
 
   await db.update(associationSettingsTable)
@@ -3387,6 +3413,24 @@ DbStorage.prototype.createAssociationLevy = async function (
   const groupSlug = group?.customSlug || "group";
   const projectSlug = `levy-${randomUUID().slice(0, 6)}`;
 
+  // If the admin chose to reuse the dues payment instructions, copy them
+  // straight from associationSettings; otherwise use the levy-specific
+  // fields they entered (or leave blank).
+  const useDues = payload.useDuesPaymentInstructions === true;
+  const paymentInfo = useDues
+    ? {
+        bankName: settings.bankName,
+        accountNumber: settings.accountNumber,
+        accountName: settings.accountName,
+        paymentInstructions: settings.paymentInstructions,
+      }
+    : {
+        bankName: payload.bankName ?? null,
+        accountNumber: payload.accountNumber ?? null,
+        accountName: payload.accountName ?? null,
+        paymentInstructions: payload.paymentInstructions ?? null,
+      };
+
   const [created] = await db.insert(projectsTable).values({
     groupId,
     name: payload.name,
@@ -3396,6 +3440,10 @@ DbStorage.prototype.createAssociationLevy = async function (
     targetAmount: payload.amount,
     deadline: payload.deadline ? new Date(payload.deadline) : null,
     customSlug: `${groupSlug}/${projectSlug}`,
+    bankName: paymentInfo.bankName,
+    accountNumber: paymentInfo.accountNumber,
+    accountName: paymentInfo.accountName,
+    paymentInstructions: paymentInfo.paymentInstructions,
   }).returning();
   return created;
 };

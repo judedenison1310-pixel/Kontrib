@@ -252,6 +252,12 @@ export const associationSettings = pgTable("association_settings", {
   startDate: timestamp("start_date").notNull(),
   currentPeriodNumber: integer("current_period_number").notNull().default(1),
   status: text("status").notNull().default("active"),      // "active" | "paused"
+  // Payment instructions for dues — copied onto every period project so members
+  // see the right account details when paying. Levies can opt to reuse these.
+  bankName: text("bank_name"),
+  accountNumber: text("account_number"),
+  accountName: text("account_name"),
+  paymentInstructions: text("payment_instructions"),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: timestamp("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
@@ -490,7 +496,7 @@ export const insertProjectSchema = createInsertSchema(projects).omit({
   customSlug: true,
   createdAt: true,
 }).extend({
-  projectType: z.enum(["target", "monthly", "yearly", "event", "emergency"]).default("target"),
+  projectType: z.enum(["target", "monthly", "yearly", "event", "emergency", "open"]).default("target"),
   currency: z.enum(["NGN", "USD", "EUR"]).default("NGN"),
   targetAmount: z.string().optional().nullable(), // Optional for monthly/yearly types
   deadline: z.string().optional().or(z.date().optional()),
@@ -674,6 +680,11 @@ export const createAssociationSettingsSchema = z.object({
   duesAmount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Enter a valid amount"),
   duesFrequency: z.enum(ASSOCIATION_FREQUENCIES),
   startDate: z.string().min(1, "Pick a start date"), // ISO date
+  // Optional payment account fields — shown to members when they pay.
+  bankName: z.string().nullable().optional(),
+  accountNumber: z.string().nullable().optional(),
+  accountName: z.string().nullable().optional(),
+  paymentInstructions: z.string().nullable().optional(),
 });
 export type CreateAssociationSettingsPayload = z.infer<typeof createAssociationSettingsSchema>;
 
@@ -684,6 +695,14 @@ export const createAssociationLevySchema = z.object({
   deadline: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
   currency: z.string().optional(),
+  // When true, the levy reuses the dues payment instructions stored on
+  // associationSettings. When false (or omitted), the admin can supply
+  // levy-specific account details below.
+  useDuesPaymentInstructions: z.boolean().optional(),
+  bankName: z.string().nullable().optional(),
+  accountNumber: z.string().nullable().optional(),
+  accountName: z.string().nullable().optional(),
+  paymentInstructions: z.string().nullable().optional(),
 });
 export type CreateAssociationLevyPayload = z.infer<typeof createAssociationLevySchema>;
 

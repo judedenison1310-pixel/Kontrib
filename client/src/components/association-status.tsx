@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -81,6 +82,11 @@ export function AssociationStatusPanel({ groupId, status, members, isAdmin }: As
   const [levyAmount, setLevyAmount] = useState("");
   const [levyDeadline, setLevyDeadline] = useState("");
   const [levyDescription, setLevyDescription] = useState("");
+  const [levyUseDuesPayment, setLevyUseDuesPayment] = useState(true);
+  const [levyBankName, setLevyBankName] = useState("");
+  const [levyAccountNumber, setLevyAccountNumber] = useState("");
+  const [levyAccountName, setLevyAccountName] = useState("");
+  const [levyPaymentInstructions, setLevyPaymentInstructions] = useState("");
 
   const { settings, currentPeriod, paidCount, expectedCount, levies } = status;
   const periodNumber = settings.currentPeriodNumber;
@@ -129,7 +135,16 @@ export function AssociationStatusPanel({ groupId, status, members, isAdmin }: As
     setLevyAmount("");
     setLevyDeadline("");
     setLevyDescription("");
+    setLevyUseDuesPayment(true);
+    setLevyBankName("");
+    setLevyAccountNumber("");
+    setLevyAccountName("");
+    setLevyPaymentInstructions("");
   };
+
+  const duesHasPaymentInfo = !!(
+    settings.bankName || settings.accountNumber || settings.accountName || settings.paymentInstructions
+  );
 
   const levyMutation = useMutation({
     mutationFn: async () => {
@@ -137,9 +152,16 @@ export function AssociationStatusPanel({ groupId, status, members, isAdmin }: As
         actorId: actor?.id,
         name: levyName,
         amount: levyAmount,
+        useDuesPaymentInstructions: duesHasPaymentInfo && levyUseDuesPayment,
       };
       if (levyDeadline) payload.deadline = new Date(levyDeadline).toISOString();
       if (levyDescription) payload.description = levyDescription;
+      if (!(duesHasPaymentInfo && levyUseDuesPayment)) {
+        payload.bankName = levyBankName.trim() || null;
+        payload.accountNumber = levyAccountNumber.trim() || null;
+        payload.accountName = levyAccountName.trim() || null;
+        payload.paymentInstructions = levyPaymentInstructions.trim() || null;
+      }
       const res = await apiRequest("POST", `/api/groups/${groupId}/association/levy`, payload);
       return res.json();
     },
@@ -528,6 +550,72 @@ export function AssociationStatusPanel({ groupId, status, members, isAdmin }: As
                 rows={3}
                 data-testid="input-levy-description"
               />
+            </div>
+
+            {/* Payment instructions — reuse from dues, or enter levy-specific. */}
+            <div className="space-y-3 border-t border-gray-100 pt-4">
+              {duesHasPaymentInfo ? (
+                <div className="flex items-start justify-between gap-3 rounded-xl bg-emerald-50 border border-emerald-100 p-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-emerald-900">Use the dues payment instructions</p>
+                    <p className="text-xs text-emerald-800/80 mt-0.5">
+                      Members will see the same account details you set up for dues.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={levyUseDuesPayment}
+                    onCheckedChange={setLevyUseDuesPayment}
+                    data-testid="switch-levy-use-dues-payment"
+                  />
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500">
+                  No dues payment instructions on file — enter the account details for this levy below (optional).
+                </p>
+              )}
+
+              {(!duesHasPaymentInfo || !levyUseDuesPayment) && (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label>Bank name</Label>
+                    <Input
+                      placeholder="e.g. GTBank"
+                      value={levyBankName}
+                      onChange={e => setLevyBankName(e.target.value)}
+                      data-testid="input-levy-bank-name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Account number</Label>
+                    <Input
+                      inputMode="numeric"
+                      placeholder="e.g. 0123456789"
+                      value={levyAccountNumber}
+                      onChange={e => setLevyAccountNumber(e.target.value)}
+                      data-testid="input-levy-account-number"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Account name</Label>
+                    <Input
+                      placeholder="e.g. Noble Association — Building Fund"
+                      value={levyAccountName}
+                      onChange={e => setLevyAccountName(e.target.value)}
+                      data-testid="input-levy-account-name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Other instructions</Label>
+                    <Textarea
+                      placeholder="e.g. Use your full name as the transfer reference."
+                      value={levyPaymentInstructions}
+                      onChange={e => setLevyPaymentInstructions(e.target.value)}
+                      rows={3}
+                      data-testid="input-levy-payment-instructions"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>

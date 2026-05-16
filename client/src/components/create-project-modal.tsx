@@ -18,7 +18,7 @@ import { ArrowLeft, Calendar, Building2, ChevronDown, ChevronUp } from "lucide-r
 const createProjectFormSchema = insertProjectSchema.extend({
   targetAmount: z.string().optional(),
   selectedPaymentTypes: z.array(z.string()).min(1, "Please select at least one payment method"),
-  projectType: z.enum(["target", "monthly", "yearly", "event", "emergency"]),
+  projectType: z.enum(["target", "open"]),
 });
 
 type CreateProjectFormData = z.infer<typeof createProjectFormSchema>;
@@ -62,7 +62,7 @@ export function CreateProjectModal({ open, onOpenChange, groupId, groupName }: C
 
   const projectType = form.watch("projectType");
   const selectedCurrency = form.watch("currency") as CurrencyCode || "NGN";
-  const requiresTarget = projectType === "target" || projectType === "event" || projectType === "emergency";
+  const requiresTarget = projectType === "target";
 
   const createProjectMutation = useMutation({
     mutationFn: async (data: CreateProjectFormData) => {
@@ -98,11 +98,8 @@ export function CreateProjectModal({ open, onOpenChange, groupId, groupName }: C
   };
 
   const projectTypes = [
-    { value: "monthly", label: "Monthly Contributions/Savings", description: "e.g. Ajo, Esusu" },
-    { value: "target", label: "Target Goal", description: "e.g. Wedding Gift, House Project" },
-    { value: "yearly", label: "Dues and Levies", description: "e.g. Annual Dues, Fees" },
-    { value: "event", label: "One-time Event", description: "e.g. Birthday Party, Burial" },
-    { value: "emergency", label: "Emergency Fund", description: "e.g. Medical, Urgent Needs" },
+    { value: "target", label: "Goal-based Fund", description: "e.g. House Rent, Burial Support Fund, School Fees Fundraise" },
+    { value: "open", label: "Open Fund", description: "e.g. Emergency Fund, Association General Support Fund" },
   ];
 
   return (
@@ -228,10 +225,10 @@ export function CreateProjectModal({ open, onOpenChange, groupId, groupName }: C
                     />
                   )}
 
-                  {!requiresTarget && (
+                  {!requiresTarget && projectType === "open" && (
                     <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 text-sm text-blue-700">
-                      No target needed for {projectType === "monthly" ? "monthly" : "yearly"} dues. 
-                      Contributions will be tracked as they come in.
+                      No target needed for an Open Fund. Contributions will be
+                      tracked as they come in.
                     </div>
                   )}
 

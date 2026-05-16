@@ -4,7 +4,8 @@ import { Sheet, SheetContent, SheetHeader } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Repeat, Calendar, Wallet } from "lucide-react";
+import { ArrowLeft, Repeat, Calendar, Wallet, Building2 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentUser } from "@/lib/auth";
@@ -44,6 +45,10 @@ export function AssociationSetupModal({ open, onOpenChange, groupId, groupName, 
     return d.toISOString().slice(0, 10);
   });
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [bankName, setBankName] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [accountName, setAccountName] = useState("");
+  const [paymentInstructions, setPaymentInstructions] = useState("");
 
   // Preload existing logo (admin can upload during setup or replace later).
   const { data: group } = useQuery<Group>({
@@ -74,6 +79,10 @@ export function AssociationSetupModal({ open, onOpenChange, groupId, groupName, 
         duesAmount: amount,
         duesFrequency: frequency,
         startDate: new Date(startDate).toISOString(),
+        bankName: bankName.trim() || null,
+        accountNumber: accountNumber.trim() || null,
+        accountName: accountName.trim() || null,
+        paymentInstructions: paymentInstructions.trim() || null,
       };
       const res = await apiRequest("POST", `/api/groups/${groupId}/association`, payload);
       return res.json();
@@ -202,6 +211,64 @@ export function AssociationSetupModal({ open, onOpenChange, groupId, groupName, 
               <p className="text-xs text-gray-500">
                 Period 1 is due on this date. Following periods roll forward by the chosen frequency.
               </p>
+            </div>
+
+            {/* Payment instructions — shown to members on every dues period and reusable for levies. */}
+            <div className="space-y-3 pt-2 border-t border-gray-100">
+              <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-emerald-600" />
+                <h3 className="font-medium text-gray-900">Payment instructions (optional)</h3>
+              </div>
+              <p className="text-xs text-gray-500 -mt-1">
+                Members will see these account details when paying dues. Levies can reuse them.
+              </p>
+
+              <div className="space-y-2">
+                <Label htmlFor="dues-bank" className="text-sm text-gray-700">Bank name</Label>
+                <Input
+                  id="dues-bank"
+                  placeholder="e.g. GTBank"
+                  value={bankName}
+                  onChange={e => setBankName(e.target.value)}
+                  className="h-11 rounded-xl border-2 border-gray-200 focus:border-emerald-500"
+                  data-testid="input-association-bank-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dues-acct-no" className="text-sm text-gray-700">Account number</Label>
+                <Input
+                  id="dues-acct-no"
+                  inputMode="numeric"
+                  placeholder="e.g. 0123456789"
+                  value={accountNumber}
+                  onChange={e => setAccountNumber(e.target.value)}
+                  className="h-11 rounded-xl border-2 border-gray-200 focus:border-emerald-500"
+                  data-testid="input-association-account-number"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dues-acct-name" className="text-sm text-gray-700">Account name</Label>
+                <Input
+                  id="dues-acct-name"
+                  placeholder="e.g. Noble Association"
+                  value={accountName}
+                  onChange={e => setAccountName(e.target.value)}
+                  className="h-11 rounded-xl border-2 border-gray-200 focus:border-emerald-500"
+                  data-testid="input-association-account-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dues-instructions" className="text-sm text-gray-700">Other instructions</Label>
+                <Textarea
+                  id="dues-instructions"
+                  placeholder="e.g. Use your full name as the transfer reference."
+                  value={paymentInstructions}
+                  onChange={e => setPaymentInstructions(e.target.value)}
+                  rows={3}
+                  className="rounded-xl border-2 border-gray-200 focus:border-emerald-500"
+                  data-testid="input-association-payment-instructions"
+                />
+              </div>
             </div>
 
             <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">

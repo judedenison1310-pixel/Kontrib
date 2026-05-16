@@ -139,6 +139,7 @@ export function PaymentModal({ open, onOpenChange, project }: PaymentModalProps)
     : project.projectType === "yearly" ? "Dues and Levies" 
     : project.projectType === "event" ? "Event Collection"
     : project.projectType === "emergency" ? "Emergency Fund"
+    : project.projectType === "open" ? "Open Fund"
     : "Target Goal";
 
   return (
