@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import { whatsappService } from "./whatsapp-service";
 import { sendPushToSubscription, vapidPublicKey, type PushPayload } from "./push-service";
 import { getOpsUser } from "./ops-auth";
+import { requireActorMatchesAuth } from "./auth-middleware";
 import { 
   insertUserSchema, insertGroupSchema, insertGroupMemberSchema,
   insertProjectSchema, insertAccountabilityPartnerSchema, insertContributionSchema,
@@ -1381,11 +1382,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const project = await storage.getProject(projectId);
       if (!project) return res.status(404).json({ message: "Project not found" });
 
+      // Identify the actor from the device token (trusted) and verify any
+      // body-supplied actorId/createdBy matches — protects against a logged-in
+      // user passing someone else's user id.
+      const bodyActor = req.body.createdBy || req.body.actorId;
+      const actorId = requireActorMatchesAuth(req, res, bodyActor);
+      if (!actorId) return; // 401/403 already sent
+
       // Only the group admin or a co-admin can record a disbursement.
-      const actorId: string | undefined = req.body.createdBy || req.body.actorId;
-      if (!actorId) {
-        return res.status(401).json({ message: "Sign in to record a disbursement" });
-      }
       const group = await storage.getGroup(project.groupId);
       if (!group) return res.status(404).json({ message: "Group not found" });
       const isAdmin = group.adminId === actorId;
@@ -1495,13 +1499,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
 
-      // Only the group admin or a co-admin can delete a disbursement.
-      const actorId: string | undefined =
+      // Identify the actor from the device token (trusted). If the caller
+      // also supplied an actorId in the body/query, verify it matches.
+      const bodyActor =
         (req.body && (req.body.actorId || req.body.createdBy)) ||
         (typeof req.query.actorId === "string" ? req.query.actorId : undefined);
-      if (!actorId) {
-        return res.status(401).json({ message: "Sign in to remove a disbursement" });
-      }
+      const actorId = requireActorMatchesAuth(req, res, bodyActor);
+      if (!actorId) return; // 401/403 already sent
+
+      // Only the group admin or a co-admin can delete a disbursement.
       const existing = await storage.getDisbursement(id);
       if (!existing) return res.status(404).json({ message: "Disbursement not found" });
       const group = await storage.getGroup(existing.groupId);

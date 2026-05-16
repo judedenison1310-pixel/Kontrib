@@ -4,6 +4,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { handleDynamicOGTags } from "./og-middleware";
 import { setupOpsAuth } from "./ops-auth";
+import { attachAuthUser } from "./auth-middleware";
 
 const app = express();
 // Increase body parser limits to handle image uploads (up to 50MB)
@@ -13,6 +14,12 @@ app.use(express.urlencoded({ extended: false, limit: "50mb" }));
 // Mount ops auth (session + passport + Google OAuth routes) BEFORE the rest of
 // the app routes so requireOpsSession can read req.session in /api/ops/* routes.
 setupOpsAuth(app);
+
+// Resolve the X-Device-Token header to a User on every /api/* request and
+// attach it as req.authUser. Routes can then call requireAuthUser to enforce
+// authentication and trust the actor identity instead of relying on a
+// client-supplied actorId in the body.
+app.use("/api", attachAuthUser);
 
 app.use((req, res, next) => {
   const start = Date.now();
