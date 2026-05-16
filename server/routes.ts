@@ -6,7 +6,7 @@ import { whatsappService } from "./whatsapp-service";
 import { sendPushToSubscription, vapidPublicKey, type PushPayload } from "./push-service";
 import { getOpsUser } from "./ops-auth";
 import { requireActorMatchesAuth } from "./auth-middleware";
-import { sendReceiptEmail } from "./email";
+import { sendReceiptEmail, sendRejectionEmail } from "./email";
 import { 
   insertUserSchema, insertGroupSchema, insertGroupMemberSchema,
   insertProjectSchema, insertAccountabilityPartnerSchema, insertContributionSchema,
@@ -1423,7 +1423,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Send rejection notification
       await storage.createRejectionNotification(contribution, reason);
-      
+
+      // Email the payer if they've linked an email address. Best-effort —
+      // never let an email failure block the rejection response.
+      try {
+        const payer = await storage.getUser(contribution.userId);
+        if (payer?.email) {
+          void sendRejectionEmail({
+            to: payer.email,
+            fullName: payer.fullName,
+            amount: contribution.amount,
+            groupName: group.name,
+            reason,
+            contributionId: contribution.id,
+          }).catch((e) =>
+            console.error("[routes] rejection email failed:", e),
+          );
+        }
+      } catch (mailErr) {
+        console.error("[routes] rejection email setup failed:", mailErr);
+      }
+
       res.json(contribution);
     } catch (error) {
       console.error("Reject contribution error:", error);

@@ -145,3 +145,51 @@ export async function sendReceiptEmail(args: {
     `Keep this email as your receipt.\n\n— Kontrib`;
   return send({ to: args.to, subject, html: wrapShell(subject, bodyHtml), text });
 }
+
+export async function sendRejectionEmail(args: {
+  to: string;
+  fullName?: string | null;
+  amount: string | number;
+  groupName: string;
+  reason?: string | null;
+  contributionId: string;
+}): Promise<boolean> {
+  const name = (args.fullName || "").trim().split(/\s+/)[0] || "there";
+  const amountNum =
+    typeof args.amount === "string" ? parseFloat(args.amount) : args.amount;
+  const amountStr = Number.isFinite(amountNum)
+    ? new Intl.NumberFormat("en-NG", {
+        style: "currency",
+        currency: "NGN",
+        maximumFractionDigits: 2,
+      }).format(amountNum)
+    : `₦${args.amount}`;
+  const reason = (args.reason || "").trim();
+  const reasonText = reason || "No reason was provided.";
+  const subject = `Payment not approved: ${amountStr} to ${args.groupName}`;
+  const reasonBlock = `
+    <div style="margin:16px 0;padding:12px 14px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;">
+      <div style="font-size:12px;color:#991b1b;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;">Reason from admin</div>
+      <div style="font-size:14px;color:#7f1d1d;line-height:1.5;">${htmlEscape(reasonText)}</div>
+    </div>`;
+  const bodyHtml = `
+    <h1 style="font-size:20px;margin:0 0 12px;">Payment not approved</h1>
+    <p style="font-size:14px;line-height:1.6;margin:0 0 12px;">
+      Hi ${htmlEscape(name)}, your contribution of <strong>${htmlEscape(amountStr)}</strong>
+      to <strong>${htmlEscape(args.groupName)}</strong> was reviewed and not approved by the group admin.
+    </p>
+    ${reasonBlock}
+    <p style="font-size:14px;line-height:1.6;margin:0 0 12px;">
+      Please open the group in Kontrib and re-upload your proof of payment so the admin can review it again.
+    </p>
+    <p style="font-size:12px;color:#6b7280;margin:0;">
+      Reference: <span style="font-family:ui-monospace,monospace;">${htmlEscape(args.contributionId)}</span>
+    </p>`;
+  const text =
+    `Hi ${name},\n\n` +
+    `Your contribution of ${amountStr} to ${args.groupName} was not approved by the group admin.\n\n` +
+    `Reason: ${reasonText}\n\n` +
+    `Please open Kontrib and re-upload your proof of payment so the admin can review it again.\n\n` +
+    `Reference: ${args.contributionId}\n\n— Kontrib`;
+  return send({ to: args.to, subject, html: wrapShell(subject, bodyHtml), text });
+}
