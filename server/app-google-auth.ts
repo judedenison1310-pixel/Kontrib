@@ -26,6 +26,7 @@ import {
 } from "passport-google-oauth20";
 import type { Express, Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
+import { sendWelcomeEmail } from "./email";
 
 type GoogleProfileBits = {
   googleSub: string;
@@ -290,11 +291,19 @@ export function setupAppGoogleAuth(app: Express): void {
                   );
               }
 
-              await storage.linkGoogleIdentity(linkIntent.userId, {
+              const linkedUser = await storage.linkGoogleIdentity(linkIntent.userId, {
                 googleSub: profile.googleSub,
                 email: profile.email,
                 fullName: profile.fullName,
               });
+              // Fire-and-forget welcome email so a slow/failing provider can't
+              // hold up the redirect back into the app.
+              void sendWelcomeEmail({
+                to: profile.email,
+                fullName: linkedUser?.fullName || profile.fullName,
+              }).catch((e) =>
+                console.error("[app-google-auth] welcome email failed:", e),
+              );
               return res.redirect("/?googleLinked=1");
             }
 
@@ -481,6 +490,18 @@ export function setupAppGoogleAuth(app: Express): void {
 
         // Burn the intent now that signup succeeded.
         signupIntents.delete(intentId);
+
+        // Fire-and-forget welcome email — same promise we make in the link
+        // banner ("we'll email your receipts here"), now that an email is
+        // attached to the account for the first time.
+        if (intent.email) {
+          void sendWelcomeEmail({
+            to: intent.email,
+            fullName: user.fullName || intent.fullName,
+          }).catch((e) =>
+            console.error("[app-google-auth] welcome email failed:", e),
+          );
+        }
 
         const deviceToken = await storage.createDeviceToken(
           user.id,

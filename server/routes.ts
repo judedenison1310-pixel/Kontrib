@@ -6,6 +6,7 @@ import { whatsappService } from "./whatsapp-service";
 import { sendPushToSubscription, vapidPublicKey, type PushPayload } from "./push-service";
 import { getOpsUser } from "./ops-auth";
 import { requireActorMatchesAuth } from "./auth-middleware";
+import { sendReceiptEmail } from "./email";
 import { 
   insertUserSchema, insertGroupSchema, insertGroupMemberSchema,
   insertProjectSchema, insertAccountabilityPartnerSchema, insertContributionSchema,
@@ -1363,6 +1364,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!contribution) {
         return res.status(404).json({ message: "Contribution not found" });
       }
+
+      // Email a receipt to the contributor if they've linked an email address.
+      // Best-effort — never let an email failure block the approval response.
+      try {
+        const payer = await storage.getUser(contribution.userId);
+        if (payer?.email) {
+          const project = contribution.projectId
+            ? await storage.getProject(contribution.projectId)
+            : null;
+          void sendReceiptEmail({
+            to: payer.email,
+            fullName: payer.fullName,
+            amount: contribution.amount,
+            groupName: group.name,
+            projectName: project?.name ?? null,
+            confirmedAt: new Date(),
+            contributionId: contribution.id,
+          }).catch((e) =>
+            console.error("[routes] receipt email failed:", e),
+          );
+        }
+      } catch (mailErr) {
+        console.error("[routes] receipt email setup failed:", mailErr);
+      }
+
       res.json(contribution);
     } catch (error) {
       console.error("Confirm contribution error:", error);
