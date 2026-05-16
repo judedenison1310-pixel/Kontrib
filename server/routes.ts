@@ -132,6 +132,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!userId) {
         return res.status(400).json({ message: "User ID is required" });
       }
+
+      // Only the user themselves may update their profile/role.
+      const trustedUserId = requireActorMatchesAuth(req, res, userId);
+      if (!trustedUserId) return;
       
       if (fullName && (typeof fullName !== 'string' || fullName.length < 2)) {
         return res.status(400).json({ message: "Please enter your full name" });
@@ -472,6 +476,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!userId) {
         return res.status(400).json({ message: "User ID is required" });
       }
+
+      // The joining user must match the device-token owner — prevents
+      // adding someone else to a group on their behalf.
+      const trustedUserId = requireActorMatchesAuth(req, res, userId);
+      if (!trustedUserId) return;
       
       // Check if user is already a member
       const existingMember = await storage.getGroupMember(groupId, userId);
@@ -600,9 +609,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!userId || typeof publiclyListed !== "boolean") {
         return res.status(400).json({ message: "userId and publiclyListed required" });
       }
+      const trustedUserId = requireActorMatchesAuth(req, res, userId);
+      if (!trustedUserId) return;
       const group = await storage.getGroup(req.params.groupId);
       if (!group) return res.status(404).json({ message: "Group not found" });
-      if (group.adminId !== userId) return res.status(403).json({ message: "Only the admin can change this" });
+      if (group.adminId !== trustedUserId) return res.status(403).json({ message: "Only the admin can change this" });
       await storage.updateGroup(req.params.groupId, {
         publiclyListed,
         publicListingDecisionAt: new Date(),
@@ -684,7 +695,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/groups/:groupId/ajo", async (req, res) => {
     try {
       const { groupId } = req.params;
-      const { actorId, ...payloadInput } = req.body;
+      const { actorId: bodyActor, ...payloadInput } = req.body;
+      const actorId = requireActorMatchesAuth(req, res, bodyActor);
+      if (!actorId) return;
       const group = await storage.getGroup(groupId);
       if (!group) return res.status(404).json({ message: "Group not found" });
       if (group.groupType !== "ajo") {
@@ -716,7 +729,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/groups/:groupId/ajo/payout-order", async (req, res) => {
     try {
       const { groupId } = req.params;
-      const { actorId, payoutOrder } = req.body;
+      const { actorId: bodyActor, payoutOrder } = req.body;
+      const actorId = requireActorMatchesAuth(req, res, bodyActor);
+      if (!actorId) return;
       const group = await storage.getGroup(groupId);
       if (!group) return res.status(404).json({ message: "Group not found" });
       if (group.adminId !== actorId) {
@@ -739,7 +754,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/groups/:groupId/ajo/advance", async (req, res) => {
     try {
       const { groupId } = req.params;
-      const { actorId } = req.body;
+      const bodyActor = req.body?.actorId;
+      const actorId = requireActorMatchesAuth(req, res, bodyActor);
+      if (!actorId) return;
       const group = await storage.getGroup(groupId);
       if (!group) return res.status(404).json({ message: "Group not found" });
       if (group.adminId !== actorId) {
@@ -771,7 +788,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/groups/:groupId/association", async (req, res) => {
     try {
       const { groupId } = req.params;
-      const { actorId, ...payloadInput } = req.body;
+      const { actorId: bodyActor, ...payloadInput } = req.body;
+      const actorId = requireActorMatchesAuth(req, res, bodyActor);
+      if (!actorId) return;
       const group = await storage.getGroup(groupId);
       if (!group) return res.status(404).json({ message: "Group not found" });
       if (group.groupType !== "association") {
@@ -794,7 +813,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/groups/:groupId/association/advance", async (req, res) => {
     try {
       const { groupId } = req.params;
-      const { actorId } = req.body;
+      const bodyActor = req.body?.actorId;
+      const actorId = requireActorMatchesAuth(req, res, bodyActor);
+      if (!actorId) return;
       const group = await storage.getGroup(groupId);
       if (!group) return res.status(404).json({ message: "Group not found" });
       if (group.adminId !== actorId) {
@@ -812,7 +833,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/groups/:groupId/association/levy", async (req, res) => {
     try {
       const { groupId } = req.params;
-      const { actorId, ...payloadInput } = req.body;
+      const { actorId: bodyActor, ...payloadInput } = req.body;
+      const actorId = requireActorMatchesAuth(req, res, bodyActor);
+      if (!actorId) return;
       const group = await storage.getGroup(groupId);
       if (!group) return res.status(404).json({ message: "Group not found" });
       if (group.groupType !== "association") {
@@ -863,7 +886,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/groups/:groupId", async (req, res) => {
     try {
       const { groupId } = req.params;
-      const userId = req.body?.userId || req.query.userId;
+      const bodyUser = req.body?.userId || (typeof req.query.userId === "string" ? req.query.userId : undefined);
+      const userId = requireActorMatchesAuth(req, res, bodyUser);
+      if (!userId) return;
 
       const group = await storage.getGroup(groupId);
       if (!group) return res.status(404).json({ message: "Group not found" });
@@ -890,12 +915,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "adminId, userId, and action are required" });
       }
 
+      // adminId is the *acting* primary admin — must match the token owner.
+      const trustedAdminId = requireActorMatchesAuth(req, res, adminId);
+      if (!trustedAdminId) return;
+
       const group = await storage.getGroup(groupId);
       if (!group) {
         return res.status(404).json({ message: "Group not found" });
       }
 
-      if (group.adminId !== adminId) {
+      if (group.adminId !== trustedAdminId) {
         return res.status(403).json({ message: "Only the primary group admin can manage co-admins" });
       }
 
@@ -1169,6 +1198,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!userId) {
         return res.status(400).json({ message: "User ID is required" });
       }
+
+      // Self-add only — the user volunteering to be an accountability
+      // partner must match the device-token owner.
+      const trustedUserId = requireActorMatchesAuth(req, res, userId);
+      if (!trustedUserId) return;
       
       // Check if user is already an accountability partner
       const existingPartners = await storage.getGroupAccountabilityPartners(groupId);
@@ -1437,7 +1471,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/disbursements/:id/confirm", async (req, res) => {
     try {
       const { id } = req.params;
-      const { userId } = req.body;
+      const userId = requireActorMatchesAuth(req, res, req.body?.userId);
+      if (!userId) return;
       const disbursement = await storage.getDisbursement(id);
       if (!disbursement) return res.status(404).json({ message: "Disbursement not found" });
       if (disbursement.recipientUserId !== userId) {
@@ -2645,8 +2680,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/users/:userId/admin-kyc", async (req, res) => {
     try {
       const { userId } = req.params;
-      const actorId = req.body?.actorId;
-      if (!actorId || actorId !== userId) {
+      const actorId = requireActorMatchesAuth(req, res, req.body?.actorId);
+      if (!actorId) return;
+      if (actorId !== userId) {
         return res.status(403).json({ message: "You can only submit your own KYC" });
       }
       const { actorId: _, ...rest } = req.body;
@@ -2677,7 +2713,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Kontrib super-admin only: list pending KYC submissions.
   app.get("/api/admin-kyc/pending", async (req, res) => {
     try {
-      const actorId = String(req.query.actorId ?? "");
+      const queryActor = typeof req.query.actorId === "string" ? req.query.actorId : "";
+      const actorId = requireActorMatchesAuth(req, res, queryActor);
+      if (!actorId) return;
       const superId = process.env.KONTRIB_SUPERADMIN_USER_ID || "";
       if (!superId || actorId !== superId) {
         return res.status(403).json({ message: "Kontrib team only" });
@@ -2692,7 +2730,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Kontrib super-admin only: approve / reject a KYC submission.
   app.post("/api/admin-kyc/:userId/review", async (req, res) => {
     try {
-      const actorId = req.body?.actorId;
+      const actorId = requireActorMatchesAuth(req, res, req.body?.actorId);
+      if (!actorId) return;
       const superId = process.env.KONTRIB_SUPERADMIN_USER_ID || "";
       if (!superId || actorId !== superId) {
         return res.status(403).json({ message: "Kontrib team only" });
@@ -2726,10 +2765,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/groups/:groupId/terms", async (req, res) => {
     try {
       const { groupId } = req.params;
-      const actorId = req.body?.actorId;
+      const actorId = requireActorMatchesAuth(req, res, req.body?.actorId);
+      if (!actorId) return;
       const group = await storage.getGroup(groupId);
       if (!group) return res.status(404).json({ message: "Group not found" });
-      if (!actorId || group.adminId !== actorId) {
+      if (group.adminId !== actorId) {
         return res.status(403).json({ message: "Only the group admin can set terms" });
       }
       const { actorId: _, ...rest } = req.body;
@@ -2747,10 +2787,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/groups/:groupId/logo", async (req, res) => {
     try {
       const { groupId } = req.params;
-      const actorId = req.body?.actorId;
+      const actorId = requireActorMatchesAuth(req, res, req.body?.actorId);
+      if (!actorId) return;
       const group = await storage.getGroup(groupId);
       if (!group) return res.status(404).json({ message: "Group not found" });
-      if (!actorId || group.adminId !== actorId) {
+      if (group.adminId !== actorId) {
         return res.status(403).json({ message: "Only the group admin can set the logo" });
       }
       const { actorId: _, ...rest } = req.body;
@@ -2768,8 +2809,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/groups/:groupId/accept-terms", async (req, res) => {
     try {
       const { groupId } = req.params;
-      const actorId = req.body?.actorId;
-      if (!actorId) return res.status(403).json({ message: "Login required" });
+      const actorId = requireActorMatchesAuth(req, res, req.body?.actorId);
+      if (!actorId) return;
       await storage.recordMemberTcAcceptance(groupId, actorId);
       res.json({ ok: true });
     } catch (error: any) {
