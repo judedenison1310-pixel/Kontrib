@@ -199,8 +199,9 @@ export function AddDisbursementModal({
                   type="button"
                   onClick={() => {
                     form.setValue("recipientType", "other");
+                    // Don't clobber whatever the user already typed when they
+                    // tap "Other Person" — only blank the dropdown selection.
                     form.setValue("recipientUserId", "");
-                    form.setValue("recipient", "");
                     form.clearErrors(["recipient", "recipientUserId"]);
                   }}
                   className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
@@ -214,7 +215,8 @@ export function AddDisbursementModal({
               </div>
             </FormItem>
 
-            {recipientType === "member" ? (
+            {/* Member dropdown — only when the user picks "Group Member". */}
+            {recipientType === "member" && (
               <FormField
                 control={form.control}
                 name="recipientUserId"
@@ -238,25 +240,35 @@ export function AddDisbursementModal({
                   </FormItem>
                 )}
               />
-            ) : (
-              <FormField
-                control={form.control}
-                name="recipient"
-                render={({ field: f }) => (
-                  <FormItem>
-                    <FormControl>
-                      <Input
-                        placeholder="Recipient full name"
-                        autoComplete="name"
-                        data-testid="input-disbursement-recipient-name"
-                        {...f}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             )}
+
+            {/* Recipient name input — ALWAYS mounted (just hidden when picking
+                a group member). Keeping it mounted means React never tears
+                down the underlying <input>, so keystrokes can't be eaten by
+                an unmount/remount race. We control value/onChange explicitly
+                instead of spreading the RHF field so the input identity is
+                stable across renders. */}
+            <FormField
+              control={form.control}
+              name="recipient"
+              render={({ field: f }) => (
+                <FormItem className={recipientType === "member" ? "hidden" : ""}>
+                  <FormControl>
+                    <Input
+                      placeholder="Recipient full name"
+                      autoComplete="name"
+                      data-testid="input-disbursement-recipient-name"
+                      name={f.name}
+                      ref={f.ref}
+                      value={f.value ?? ""}
+                      onChange={(e) => f.onChange(e.target.value)}
+                      onBlur={f.onBlur}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}
