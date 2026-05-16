@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /ops
+Disallow: /api/
+
+Sitemap: https://kontrib.app/sitemap.xml
