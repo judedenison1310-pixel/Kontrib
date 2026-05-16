@@ -25,6 +25,7 @@ import {
 import { formatNaira } from "@/lib/currency";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { getCurrentUser } from "@/lib/auth";
 import type { ContributionWithDetails } from "@shared/schema";
 
 interface PaymentApprovalModalProps {
@@ -45,7 +46,11 @@ export function PaymentApprovalModal({
 
   const confirmMutation = useMutation({
     mutationFn: async (contributionId: string) => {
-      const response = await apiRequest("PATCH", `/api/contributions/${contributionId}/confirm`);
+      const actor = getCurrentUser();
+      if (!actor) throw new Error("Please sign in again to continue.");
+      const response = await apiRequest("PATCH", `/api/contributions/${contributionId}/confirm`, {
+        actorId: actor.id,
+      });
       return response.json();
     },
     onSuccess: () => {
@@ -70,8 +75,11 @@ export function PaymentApprovalModal({
 
   const rejectMutation = useMutation({
     mutationFn: async ({ contributionId, reason }: { contributionId: string; reason?: string }) => {
+      const actor = getCurrentUser();
+      if (!actor) throw new Error("Please sign in again to continue.");
       const response = await apiRequest("PATCH", `/api/contributions/${contributionId}/reject`, {
-        reason: reason || undefined
+        reason: reason || undefined,
+        actorId: actor.id,
       });
       return response.json();
     },

@@ -1275,6 +1275,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/contributions/admin/:adminId", async (req, res) => {
     try {
       const { adminId } = req.params;
+      // Reviewer's own pending list — must be the user themselves. Returns
+      // contributions for groups where they are admin OR co-admin.
+      const trustedActor = requireActorMatchesAuth(req, res, adminId);
+      if (!trustedActor) return;
       const contributions = await storage.getAdminContributions(adminId);
       res.json(contributions);
     } catch (error) {
@@ -1342,6 +1346,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/contributions/:id/confirm", async (req, res) => {
     try {
       const { id } = req.params;
+      // Only the group's primary admin or a co-admin may approve a payment.
+      const actorId = requireActorMatchesAuth(req, res, req.body?.actorId);
+      if (!actorId) return;
+      const existing = await storage.getContribution(id);
+      if (!existing) return res.status(404).json({ message: "Contribution not found" });
+      const group = await storage.getGroup(existing.groupId);
+      if (!group) return res.status(404).json({ message: "Group not found" });
+      const isAdmin = group.adminId === actorId;
+      const isCoAdmin = (group.coAdmins ?? []).includes(actorId);
+      if (!isAdmin && !isCoAdmin) {
+        return res.status(403).json({ message: "Only the group admin or a co-admin can approve payments" });
+      }
+
       const contribution = await storage.confirmContribution(id);
       if (!contribution) {
         return res.status(404).json({ message: "Contribution not found" });
@@ -1357,6 +1374,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const { reason } = req.body;
+      // Only the group's primary admin or a co-admin may reject a payment.
+      const actorId = requireActorMatchesAuth(req, res, req.body?.actorId);
+      if (!actorId) return;
+      const existing = await storage.getContribution(id);
+      if (!existing) return res.status(404).json({ message: "Contribution not found" });
+      const group = await storage.getGroup(existing.groupId);
+      if (!group) return res.status(404).json({ message: "Group not found" });
+      const isAdmin = group.adminId === actorId;
+      const isCoAdmin = (group.coAdmins ?? []).includes(actorId);
+      if (!isAdmin && !isCoAdmin) {
+        return res.status(403).json({ message: "Only the group admin or a co-admin can reject payments" });
+      }
+
       const contribution = await storage.updateContribution(id, { 
         status: "rejected" 
       });

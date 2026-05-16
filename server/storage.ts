@@ -717,8 +717,11 @@ export class MemStorage implements IStorage {
   }
 
   async getAdminContributions(adminId: string): Promise<ContributionWithDetails[]> {
-    // Get all groups managed by this admin
-    const adminGroups = Array.from(this.groups.values()).filter(group => group.adminId === adminId);
+    // Get all groups where the user is the primary admin OR a co-admin —
+    // co-admins can review payment proofs too.
+    const adminGroups = Array.from(this.groups.values()).filter(group =>
+      group.adminId === adminId || (group.coAdmins ?? []).includes(adminId)
+    );
     const groupIds = adminGroups.map(group => group.id);
     
     // Get all contributions for these groups
@@ -1220,7 +1223,7 @@ export class MemStorage implements IStorage {
 // Database Storage implementation using Drizzle ORM
 import { db } from "./db";
 import { users as usersTable, groups as groupsTable, groupMembers as groupMembersTable, projects as projectsTable, accountabilityPartners as accountabilityPartnersTable, contributions as contributionsTable, notifications as notificationsTable, otpVerifications as otpVerificationsTable, deviceTokens as deviceTokensTable, disbursements as disbursementsTable, referrals as referralsTable, pushSubscriptions as pushSubscriptionsTable } from "@shared/schema";
-import { eq, and, gt, lt, sql as drizzleSql, desc, inArray } from "drizzle-orm";
+import { eq, and, or, gt, lt, sql as drizzleSql, desc, inArray } from "drizzle-orm";
 
 export class DbStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
@@ -1825,7 +1828,17 @@ export class DbStorage implements IStorage {
   }
 
   async getAdminContributions(adminId: string): Promise<ContributionWithDetails[]> {
-    const adminGroups = await db.select().from(groupsTable).where(eq(groupsTable.adminId, adminId));
+    // Primary admin OR co-admin (coAdmins is a text[] column — use the
+    // PostgreSQL array-contains operator).
+    const adminGroups = await db
+      .select()
+      .from(groupsTable)
+      .where(
+        or(
+          eq(groupsTable.adminId, adminId),
+          drizzleSql`${groupsTable.coAdmins} @> ARRAY[${adminId}]::text[]`,
+        ),
+      );
     const groupIds = adminGroups.map(g => g.id);
 
     if (groupIds.length === 0) return [];
