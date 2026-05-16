@@ -251,3 +251,82 @@ export async function updateProfile(userId: string, updates: { fullName?: string
 export function needsProfileCompletion(): boolean {
   return currentUser !== null && !currentUser.fullName;
 }
+
+// ---------- Continue with Google ----------
+
+export type GoogleIntent = {
+  email: string;
+  fullName: string;
+  picture?: string;
+};
+
+/** Exchange the one-time ?googleAuth=<code> for a device token + user. */
+export async function exchangeGoogleCode(code: string): Promise<{ user: User; deviceToken: string }> {
+  const deviceInfo = navigator.userAgent;
+  const response = await fetch("/api/auth/google/exchange", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code, deviceInfo }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body?.message || "Could not finish Google sign-in.");
+  }
+  const data = await response.json();
+  if (data.deviceToken) setDeviceToken(data.deviceToken);
+  if (data.user) setCurrentUser(data.user);
+  return data;
+}
+
+/** Read the pending Google signup intent (so we can prefill name/email). */
+export async function fetchGoogleIntent(intentId: string): Promise<GoogleIntent> {
+  const response = await fetch(`/api/auth/google/intent/${encodeURIComponent(intentId)}`);
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body?.message || "Signup link expired. Please start again with Google.");
+  }
+  return await response.json();
+}
+
+/** Finish Google signup with the WhatsApp OTP the user just received. */
+export async function completeGoogleSignup(args: {
+  intentId: string;
+  phoneNumber: string;
+  otp: string;
+}): Promise<{ user: User; deviceToken: string }> {
+  const deviceInfo = navigator.userAgent;
+  const response = await fetch("/api/auth/google/complete-signup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...args, deviceInfo }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body?.message || "Could not finish signup.");
+  }
+  const data = await response.json();
+  if (data.deviceToken) setDeviceToken(data.deviceToken);
+  if (data.user) setCurrentUser(data.user);
+  return data;
+}
+
+/** Start the "Link Google to my existing WhatsApp account" flow. Returns the
+ *  Google OAuth URL the caller should navigate to. */
+export async function startGoogleLink(): Promise<string> {
+  const deviceToken = getDeviceToken();
+  if (!deviceToken) throw new Error("Please sign in first.");
+  const response = await fetch("/api/auth/google/link/start", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Device-Token": deviceToken,
+    },
+    body: JSON.stringify({}),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body?.message || "Could not start Google linking.");
+  }
+  const data = await response.json();
+  return data.authUrl as string;
+}

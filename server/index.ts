@@ -4,6 +4,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { handleDynamicOGTags } from "./og-middleware";
 import { setupOpsAuth } from "./ops-auth";
+import { setupAppGoogleAuth } from "./app-google-auth";
 import { attachAuthUser } from "./auth-middleware";
 
 const app = express();
@@ -20,6 +21,11 @@ setupOpsAuth(app);
 // authentication and trust the actor identity instead of relying on a
 // client-supplied actorId in the body.
 app.use("/api", attachAuthUser);
+
+// Mount user-facing "Continue with Google" routes. Must come AFTER
+// attachAuthUser so the /link/start route can read req.authUser. Sits
+// alongside ops-auth — different passport strategy name ("google-app").
+setupAppGoogleAuth(app);
 
 app.use((req, res, next) => {
   const start = Date.now();

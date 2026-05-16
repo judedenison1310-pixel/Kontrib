@@ -7,9 +7,17 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Users, Shield, ArrowRight, Lock, CheckCircle2, Zap, Eye, Gift } from "lucide-react";
-import { SiWhatsapp } from "react-icons/si";
+import { SiWhatsapp, SiGoogle } from "react-icons/si";
 import { type User as UserType } from "@shared/schema";
-import { sendOtp, verifyOtp, updateProfile } from "@/lib/auth";
+import {
+  sendOtp,
+  verifyOtp,
+  updateProfile,
+  exchangeGoogleCode,
+  fetchGoogleIntent,
+  completeGoogleSignup,
+  type GoogleIntent,
+} from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import kontribLogo from "@assets/8_1764455185903.png";
@@ -109,6 +117,12 @@ export default function Landing() {
   const [devOtp, setDevOtp] = useState<string | null>(null);
   const [manualRefCode] = useState(() => localStorage.getItem(REF_KEY) || "");
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  // Set when the user just came back from Google OAuth as a NEW user — we
+  // already have their email + name, but still need WhatsApp to finish signup.
+  const [googleIntent, setGoogleIntent] = useState<
+    (GoogleIntent & { id: string }) | null
+  >(null);
+  const [googleBusy, setGoogleBusy] = useState(false);
 
   const selectedCountry = COUNTRY_CODES.find(c => c.code === countryCode) || COUNTRY_CODES[0];
 
@@ -170,6 +184,23 @@ export default function Landing() {
 
   const verifyOtpMutation = useMutation({
     mutationFn: async (otp: string) => {
+      // Branch: if we're finishing a Google signup, call the dedicated
+      // complete-signup endpoint so we create the user with email + sub in
+      // a single shot. Otherwise fall back to the normal WhatsApp-only flow.
+      if (googleIntent) {
+        const data = await completeGoogleSignup({
+          intentId: googleIntent.id,
+          phoneNumber,
+          otp,
+        });
+        return {
+          verified: true,
+          user: data.user,
+          isNewUser: false, // profile already filled from Google
+          deviceToken: data.deviceToken,
+          message: undefined as string | undefined,
+        };
+      }
       return verifyOtp(phoneNumber, otp);
     },
     onSuccess: (data) => {
@@ -179,6 +210,16 @@ export default function Landing() {
         const code = manualRefCode.trim() || localStorage.getItem(REF_KEY) || "";
         if (code) {
           captureReferral(code, data.user.id);
+        }
+        if (googleIntent) {
+          // Google signup done — name + email already saved, go straight in.
+          setGoogleIntent(null);
+          toast({
+            title: "Welcome to Kontrib!",
+            description: `You're all set, ${data.user.fullName || "friend"}!`,
+          });
+          setLocation(getRedirectPath());
+          return;
         }
         if (data.isNewUser) {
           setStep("profile");
@@ -292,6 +333,73 @@ export default function Landing() {
     }
   }, [step]);
 
+  // Handle return trip from Google OAuth. The server redirects with either
+  // ?googleAuth=<code> (returning user — exchange for a device token & go in)
+  // or ?googleSignup=<intentId> (new user — collect WhatsApp + OTP next).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const authCode = params.get("googleAuth");
+    const signupIntent = params.get("googleSignup");
+
+    const clearParams = () => {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("googleAuth");
+      url.searchParams.delete("googleSignup");
+      window.history.replaceState({}, "", url.toString());
+    };
+
+    if (authCode) {
+      setGoogleBusy(true);
+      clearParams();
+      exchangeGoogleCode(authCode)
+        .then((data) => {
+          toast({
+            title: "Signed in with Google",
+            description: `Good to see you, ${data.user.fullName || "friend"}!`,
+          });
+          setLocation(getRedirectPath());
+        })
+        .catch((e: Error) => {
+          setGoogleBusy(false);
+          toast({
+            title: "Couldn't finish Google sign-in",
+            description: e.message || "Please try again.",
+            variant: "destructive",
+          });
+        });
+      return;
+    }
+
+    if (signupIntent) {
+      setGoogleBusy(true);
+      clearParams();
+      fetchGoogleIntent(signupIntent)
+        .then((intent) => {
+          setGoogleIntent({ ...intent, id: signupIntent });
+          setStep("phone");
+          toast({
+            title: `Hi ${intent.fullName.split(" ")[0]}!`,
+            description: "Add your WhatsApp number to finish setting up your account.",
+          });
+        })
+        .catch((e: Error) => {
+          toast({
+            title: "Sign-up link expired",
+            description: e.message || "Please tap Continue with Google again.",
+            variant: "destructive",
+          });
+        })
+        .finally(() => setGoogleBusy(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const onGoogleClick = () => {
+    setGoogleBusy(true);
+    // Full-page redirect — the OAuth callback brings us back here.
+    window.location.href = "/api/auth/google/start";
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
@@ -316,6 +424,25 @@ export default function Landing() {
 
             {/* Login Card */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+              {googleIntent && (
+                <div
+                  className="mb-4 p-3 rounded-xl bg-blue-50 border border-blue-100 flex items-start gap-3"
+                  data-testid="banner-google-signup"
+                >
+                  <div className="shrink-0 w-9 h-9 rounded-full bg-white border border-blue-100 flex items-center justify-center">
+                    <SiGoogle className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-semibold text-gray-900">
+                      Hi {googleIntent.fullName.split(" ")[0]} 👋
+                    </p>
+                    <p className="text-xs text-gray-600 mt-0.5 break-all">
+                      Signed in with {googleIntent.email}. Add your WhatsApp number
+                      below to finish setting up your account.
+                    </p>
+                  </div>
+                </div>
+              )}
               <Form {...phoneForm}>
                 <form onSubmit={phoneForm.handleSubmit(onPhoneSubmit)} className="space-y-4">
                   <FormField
@@ -389,6 +516,34 @@ export default function Landing() {
               <p className="text-center text-xs text-gray-400 mt-3">
                 Your number is only used to verify your identity. No spam. 100% Secure.
               </p>
+
+              {/* Continue with Google — hidden once we're already finishing a
+                  Google signup, to avoid bouncing the user back to Google. */}
+              {!googleIntent && (
+                <>
+                  <div className="flex items-center gap-3 my-4" aria-hidden="true">
+                    <div className="flex-1 h-px bg-gray-200" />
+                    <span className="text-xs text-gray-400 font-medium">OR</span>
+                    <div className="flex-1 h-px bg-gray-200" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onGoogleClick}
+                    disabled={googleBusy}
+                    className="w-full h-14 bg-white border border-gray-200 hover:bg-gray-50 text-gray-800 font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50"
+                    data-testid="button-google-signin"
+                  >
+                    {googleBusy ? (
+                      <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-700 rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <SiGoogle className="h-5 w-5" />
+                        Continue with Google
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
             </div>
 
             {/* Testimonials heading */}

@@ -60,6 +60,11 @@ export interface IStorage {
   updateUserProfile(userId: string, updates: { fullName?: string; role?: string }): Promise<User | undefined>;
   setUserOnboardingChoice(userId: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  // Google / email identity (added with Continue-with-Google sign-in).
+  getUserByGoogleSub(googleSub: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  linkGoogleIdentity(userId: string, identity: { googleSub: string; email: string; fullName?: string | null }): Promise<User | undefined>;
+  createUserFromGoogleAndPhone(input: { phoneNumber: string; email: string; googleSub: string; fullName: string }): Promise<User>;
   
   // Group methods
   getGroup(id: string): Promise<Group | undefined>;
@@ -230,9 +235,9 @@ export class MemStorage implements IStorage {
     if (existingUser) {
       return existingUser;
     }
-    
+
     const id = randomUUID();
-    const user: User = {
+    const user = {
       id,
       username: null,
       password: null,
@@ -241,7 +246,62 @@ export class MemStorage implements IStorage {
       role: "member",
       profileCompletedAt: null,
       createdAt: new Date(),
-    };
+      email: null,
+      emailVerifiedAt: null,
+      googleSub: null,
+    } as unknown as User;
+    this.users.set(id, user);
+    return user;
+  }
+
+  async getUserByGoogleSub(googleSub: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find((u) => (u as any).googleSub === googleSub);
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const lower = email.toLowerCase().trim();
+    return Array.from(this.users.values()).find(
+      (u) => ((u as any).email ?? "").toLowerCase().trim() === lower,
+    );
+  }
+
+  async linkGoogleIdentity(
+    userId: string,
+    identity: { googleSub: string; email: string; fullName?: string | null },
+  ): Promise<User | undefined> {
+    const user = this.users.get(userId);
+    if (!user) return undefined;
+    const updated = {
+      ...user,
+      googleSub: identity.googleSub,
+      email: identity.email.toLowerCase().trim(),
+      emailVerifiedAt: new Date(),
+      fullName: user.fullName ?? identity.fullName ?? null,
+    } as User;
+    this.users.set(userId, updated);
+    return updated;
+  }
+
+  async createUserFromGoogleAndPhone(input: {
+    phoneNumber: string;
+    email: string;
+    googleSub: string;
+    fullName: string;
+  }): Promise<User> {
+    const id = randomUUID();
+    const user = {
+      id,
+      username: null,
+      password: null,
+      fullName: input.fullName,
+      phoneNumber: input.phoneNumber,
+      role: "member",
+      profileCompletedAt: new Date(),
+      createdAt: new Date(),
+      email: input.email.toLowerCase().trim(),
+      emailVerifiedAt: new Date(),
+      googleSub: input.googleSub,
+    } as unknown as User;
     this.users.set(id, user);
     return user;
   }
@@ -1251,6 +1311,70 @@ export class DbStorage implements IStorage {
       phoneNumber,
       role: "member",
     }).returning();
+    return result[0];
+  }
+
+  async getUserByGoogleSub(googleSub: string): Promise<User | undefined> {
+    const result = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.googleSub, googleSub))
+      .limit(1);
+    return result[0];
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const lower = email.toLowerCase().trim();
+    const result = await db
+      .select()
+      .from(usersTable)
+      .where(drizzleSql`lower(${usersTable.email}) = ${lower}`)
+      .limit(1);
+    return result[0];
+  }
+
+  async linkGoogleIdentity(
+    userId: string,
+    identity: { googleSub: string; email: string; fullName?: string | null },
+  ): Promise<User | undefined> {
+    const existing = await this.getUser(userId);
+    if (!existing) return undefined;
+    const updates: Partial<User> = {
+      googleSub: identity.googleSub,
+      email: identity.email.toLowerCase().trim(),
+      emailVerifiedAt: new Date(),
+    };
+    // Only fill fullName from Google if the user hasn't set one yet.
+    if (!existing.fullName && identity.fullName) {
+      updates.fullName = identity.fullName;
+      updates.profileCompletedAt = existing.profileCompletedAt ?? new Date();
+    }
+    const result = await db
+      .update(usersTable)
+      .set(updates)
+      .where(eq(usersTable.id, userId))
+      .returning();
+    return result[0];
+  }
+
+  async createUserFromGoogleAndPhone(input: {
+    phoneNumber: string;
+    email: string;
+    googleSub: string;
+    fullName: string;
+  }): Promise<User> {
+    const result = await db
+      .insert(usersTable)
+      .values({
+        phoneNumber: input.phoneNumber,
+        email: input.email.toLowerCase().trim(),
+        emailVerifiedAt: new Date(),
+        googleSub: input.googleSub,
+        fullName: input.fullName,
+        profileCompletedAt: new Date(),
+        role: "member",
+      })
+      .returning();
     return result[0];
   }
 

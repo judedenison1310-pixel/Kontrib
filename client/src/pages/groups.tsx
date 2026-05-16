@@ -11,6 +11,7 @@ import { VerificationInbox } from "@/components/verification-inbox";
 import { VerifiedDiscoveryStrip } from "@/components/verified-discovery-strip";
 import { VerifiedBadge } from "@/components/verified-badge";
 import { GroupTypeOnboarding } from "@/components/group-type-onboarding";
+import { LinkGoogleBanner } from "@/components/link-google-banner";
 import { SiWhatsapp } from "react-icons/si";
 import { 
   Users, 
@@ -25,7 +26,9 @@ import {
   ChevronRight,
   Lock,
 } from "lucide-react";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, initializeAuth } from "@/lib/auth";
+import { useToast } from "@/hooks/use-toast";
+import { useEffect } from "react";
 import { formatNaira } from "@/lib/currency";
 import type { GroupWithRole, GroupType } from "@shared/schema";
 import { GROUP_TYPE_ORDER, GROUP_TYPE_META, metaForGroupType } from "@/lib/group-types";
@@ -35,6 +38,26 @@ type FilterType = 'all' | 'admin' | 'member';
 export default function Groups() {
   const user = getCurrentUser();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
+
+  // Handle the post-link redirect from Google OAuth. The server appends
+  // ?googleLinked=1 — toast success, strip the param, and refresh the
+  // cached user so the banner disappears immediately.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("googleLinked") === "1") {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("googleLinked");
+      window.history.replaceState({}, "", url.toString());
+      toast({
+        title: "Google account linked",
+        description: "We'll send your contribution receipts to your email.",
+      });
+      // Re-validate the device token so currentUser picks up the new email.
+      initializeAuth();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [createGroupModalOpen, setCreateGroupModalOpen] = useState(false);
   const [createGroupInitialType, setCreateGroupInitialType] = useState<GroupType | undefined>(undefined);
   const [editGroupModalOpen, setEditGroupModalOpen] = useState(false);
@@ -123,6 +146,7 @@ export default function Groups() {
       <Navigation />
 
       <main className="max-w-lg mx-auto px-4 py-6 space-y-6">
+        <LinkGoogleBanner />
         {user?.id && <VerificationInbox userId={user.id} />}
         <VerifiedDiscoveryStrip userId={user?.id ?? null} state={(user as any)?.state ?? null} lga={(user as any)?.lga ?? null} />
 

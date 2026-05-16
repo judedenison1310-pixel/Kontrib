@@ -38,6 +38,14 @@ export const users = pgTable("users", {
   suspendedAt: timestamp("suspended_at"),
   suspendedReason: text("suspended_reason"),
   suspendedBy: varchar("suspended_by"), // userId of the ops actor
+  // Email + Google identity. Collected either when the user signs in with
+  // Google, or when an existing WhatsApp-first user links their Google
+  // account from the dashboard banner. Both are nullable — WhatsApp is
+  // still the primary identifier. Uniqueness is enforced by partial unique
+  // indexes (see migrations) so multiple rows with NULL are allowed.
+  email: text("email"),
+  emailVerifiedAt: timestamp("email_verified_at"),
+  googleSub: text("google_sub"),
   createdAt: timestamp("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
