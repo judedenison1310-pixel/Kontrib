@@ -96,7 +96,8 @@ export default function ProjectDetails() {
   });
 
   const deleteDisbursementMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("DELETE", `/api/disbursements/${id}`),
+    mutationFn: (id: string) =>
+      apiRequest("DELETE", `/api/disbursements/${id}`, { actorId: user?.id }),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: [`/api/projects/${projectId}/disbursements`],
@@ -123,7 +124,10 @@ export default function ProjectDetails() {
   });
 
   const isLoading = projectLoading || contributionsLoading;
-  const isAdmin = user?.id === group?.adminId;
+  const isPrimaryAdmin = user?.id === group?.adminId;
+  const isCoAdmin = !!user?.id && (group?.coAdmins ?? []).includes(user.id);
+  // Primary admin OR co-admin can manage the group (including disbursements).
+  const isAdmin = isPrimaryAdmin || isCoAdmin;
 
   const confirmedContributions = contributions.filter(
     (c) => c.status === "confirmed",

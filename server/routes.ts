@@ -1380,10 +1380,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { projectId } = req.params;
       const project = await storage.getProject(projectId);
       if (!project) return res.status(404).json({ message: "Project not found" });
+
+      // Only the group admin or a co-admin can record a disbursement.
+      const actorId: string | undefined = req.body.createdBy || req.body.actorId;
+      if (!actorId) {
+        return res.status(401).json({ message: "Sign in to record a disbursement" });
+      }
+      const group = await storage.getGroup(project.groupId);
+      if (!group) return res.status(404).json({ message: "Group not found" });
+      const isAdmin = group.adminId === actorId;
+      const isCoAdmin = (group.coAdmins ?? []).includes(actorId);
+      if (!isAdmin && !isCoAdmin) {
+        return res.status(403).json({ message: "Only the group admin or a co-admin can record disbursements" });
+      }
+
       const data = {
         ...req.body,
         projectId,
         groupId: project.groupId,
+        createdBy: actorId,
         disbursementDate: new Date(req.body.disbursementDate),
         recipientUserId: req.body.recipientUserId || null,
       };
@@ -1479,6 +1494,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/disbursements/:id", async (req, res) => {
     try {
       const { id } = req.params;
+
+      // Only the group admin or a co-admin can delete a disbursement.
+      const actorId: string | undefined =
+        (req.body && (req.body.actorId || req.body.createdBy)) ||
+        (typeof req.query.actorId === "string" ? req.query.actorId : undefined);
+      if (!actorId) {
+        return res.status(401).json({ message: "Sign in to remove a disbursement" });
+      }
+      const existing = await storage.getDisbursement(id);
+      if (!existing) return res.status(404).json({ message: "Disbursement not found" });
+      const group = await storage.getGroup(existing.groupId);
+      if (!group) return res.status(404).json({ message: "Group not found" });
+      const isAdmin = group.adminId === actorId;
+      const isCoAdmin = (group.coAdmins ?? []).includes(actorId);
+      if (!isAdmin && !isCoAdmin) {
+        return res.status(403).json({ message: "Only the group admin or a co-admin can remove disbursements" });
+      }
+
       const success = await storage.deleteDisbursement(id);
       if (!success) return res.status(404).json({ message: "Disbursement not found" });
       res.json({ message: "Disbursement deleted" });
