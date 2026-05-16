@@ -43,7 +43,7 @@ const schema = z.object({
     }),
   recipientType: z.enum(["member", "other"]),
   recipientUserId: z.string().optional(),
-  recipient: z.string().min(2, "Recipient name is required"),
+  recipient: z.string().min(2, "Enter the recipient's full name (at least 2 characters)"),
   purpose: z.string().min(3, "Purpose is required"),
   disbursementDate: z.string().min(1, "Date is required"),
 });
@@ -173,88 +173,90 @@ export function AddDisbursementModal({
               )}
             />
 
-            {/* Recipient type toggle */}
-            <FormField
-              control={form.control}
-              name="recipientType"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Recipient</FormLabel>
-                  <div className="flex gap-2 mb-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        field.onChange("member");
-                        form.setValue("recipientUserId", "");
-                        form.setValue("recipient", "");
-                      }}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                        field.value === "member"
-                          ? "bg-blue-600 text-white border-blue-600"
-                          : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                      }`}
-                    >
-                      <Users className="h-3.5 w-3.5" />
-                      Group Member
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        field.onChange("other");
-                        form.setValue("recipientUserId", "");
-                        form.setValue("recipient", "");
-                      }}
-                      className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                        field.value === "other"
-                          ? "bg-gray-800 text-white border-gray-800"
-                          : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                      }`}
-                    >
-                      Other Person
-                    </button>
-                  </div>
+            {/* Recipient type toggle — rendered flat (not nested inside another
+                FormField) so the inner inputs don't lose focus mid-typing. */}
+            <FormItem>
+              <FormLabel>Recipient</FormLabel>
+              <div className="flex gap-2 mb-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    form.setValue("recipientType", "member");
+                    form.setValue("recipientUserId", "");
+                    form.setValue("recipient", "");
+                    form.clearErrors(["recipient", "recipientUserId"]);
+                  }}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                    recipientType === "member"
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                  }`}
+                >
+                  <Users className="h-3.5 w-3.5" />
+                  Group Member
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    form.setValue("recipientType", "other");
+                    form.setValue("recipientUserId", "");
+                    form.setValue("recipient", "");
+                    form.clearErrors(["recipient", "recipientUserId"]);
+                  }}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                    recipientType === "other"
+                      ? "bg-gray-800 text-white border-gray-800"
+                      : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                  }`}
+                >
+                  Other Person
+                </button>
+              </div>
+            </FormItem>
 
-                  {field.value === "member" ? (
-                    <FormField
-                      control={form.control}
-                      name="recipientUserId"
-                      render={() => (
-                        <FormItem>
-                          <Select onValueChange={handleMemberSelect}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Choose a group member…" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {members.map((m) => (
-                                <SelectItem key={m.userId} value={m.userId}>
-                                  {m.user?.fullName || m.user?.phoneNumber || m.userId}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  ) : (
-                    <FormField
-                      control={form.control}
-                      name="recipient"
-                      render={({ field: f }) => (
-                        <FormItem>
-                          <FormControl>
-                            <Input placeholder="Recipient full name" {...f} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-                </FormItem>
-              )}
-            />
+            {recipientType === "member" ? (
+              <FormField
+                control={form.control}
+                name="recipientUserId"
+                render={() => (
+                  <FormItem>
+                    <Select onValueChange={handleMemberSelect}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choose a group member…" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {members.map((m) => (
+                          <SelectItem key={m.userId} value={m.userId}>
+                            {m.user?.fullName || m.user?.phoneNumber || m.userId}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : (
+              <FormField
+                control={form.control}
+                name="recipient"
+                render={({ field: f }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input
+                        placeholder="Recipient full name"
+                        autoComplete="name"
+                        data-testid="input-disbursement-recipient-name"
+                        {...f}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <FormField
               control={form.control}
